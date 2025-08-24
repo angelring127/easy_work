@@ -19,6 +19,34 @@ bun dev
 
 `app/page.tsx` 파일을 수정하여 페이지를 편집할 수 있습니다. 파일을 수정하면 자동으로 페이지가 업데이트됩니다.
 
+## Supabase 설정
+
+### 1. 환경변수 설정
+
+`.env.example` 파일을 참고하여 `.env.local` 파일을 생성하고 다음 환경변수들을 설정하세요:
+
+```bash
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SUPABASE_JWT_SECRET=your_jwt_secret
+```
+
+### 2. Supabase 프로젝트 설정
+
+1. [Supabase 콘솔](https://supabase.com)에서 새 프로젝트 생성
+2. Settings > API에서 URL과 키 정보 복사
+3. 위의 환경변수에 실제 값 입력
+
+### 3. 연결 테스트
+
+개발 서버 실행 후 다음 URL로 연결 상태를 확인할 수 있습니다:
+
+```
+http://localhost:3000/api/test/supabase
+```
+
 ## 기본 포함 라이브러리
 
 - [Next.js](https://nextjs.org)
@@ -36,6 +64,7 @@ bun dev
 - [React Query](https://tanstack.com/query/latest)
 - [React Hook Form](https://react-hook-form.com)
 - [TS Pattern](https://github.com/gvergnaud/ts-pattern)
+- [Supabase](https://supabase.com) - 인증 및 데이터베이스
 
 ## 사용 가능한 명령어
 

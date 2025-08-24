@@ -1,0 +1,68 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+# Workeasy – Information Architecture (IA)
+
+## 1. 목적
+
+PRD에서 정의된 요구사항을 기반으로, 사용자 관점에서 정보 구조와 화면 흐름을 정의한다.  
+UI/UX 와이어프레임 및 개발(TRD)의 기초 자료로 사용한다.
+
+---
+
+## 2. 사용자 그룹
+
+- **마스터 관리자(Owner)**: 복수 매장 관리, 권한 위임, 전체/매장 채팅
+- **서브 관리자(Sub Manager)**: 권한이 부여된 매장 관리, 매장 채팅
+- **알바생(Part-timer)**: 소속 및 임시 매장 스케줄/채팅, 교대 요청
+
+---
+
+## 3. 글로벌 네비게이션 구조
+
+- 로그인 / 회원가입
+- 매장 선택(Store Switcher)
+- 대시보드
+- 스케줄 관리
+- 교대 요청
+- 채팅(Global / Store)
+- 알림(Notification Center)
+- 프로필 & 설정
+- 언어 설정(Language Switcher)
+
+---
+
+## 4. IA 구조 (Sitemap)
+
+```mermaid
+graph TD
+  A[로그인/회원가입]
+  B[대시보드]
+  C[스케줄 관리]
+  D[교대 요청]
+  E[채팅]
+  F[알림 센터]
+  G[프로필/설정]
+  H[언어 설정]
+
+  B --> C
+  B --> D
+  B --> E
+  B --> F
+  B --> G
+  G --> H
+
+  E --> E1[전체(Global) 채팅]
+  E --> E2[매장(Store) 채팅]
+
+  C --> C1[자동 배정]
+  C --> C2[수정/드래그앤드롭]
+  C --> C3[근무 유형 관리]
+
+  D --> D1[요청 생성]
+  D --> D2[수락/거절]
+  D --> D3[승인 프로세스]
+```
