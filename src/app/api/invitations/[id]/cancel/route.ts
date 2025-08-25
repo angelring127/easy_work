@@ -72,17 +72,18 @@ async function cancelInvitation(
       );
     }
 
-    // 초대 취소
-    const { error: updateError } = await supabase
+    // 초대 완전 삭제 (취소)
+    console.log("초대 삭제 시작:", { invitationId, invitation });
+
+    const { error: deleteError } = await supabase
       .from("invitations")
-      .update({
-        status: "CANCELLED",
-        updated_at: new Date().toISOString(),
-      })
+      .delete()
       .eq("id", invitationId);
 
-    if (updateError) {
-      console.error("초대 취소 오류:", updateError);
+    console.log("초대 삭제 결과:", { deleteError });
+
+    if (deleteError) {
+      console.error("초대 취소 오류:", deleteError);
       return NextResponse.json(
         {
           success: false,
@@ -91,6 +92,8 @@ async function cancelInvitation(
         { status: 500 }
       );
     }
+
+    console.log("초대 삭제 성공");
 
     // 감사 로그 기록
     try {
@@ -101,10 +104,12 @@ async function cancelInvitation(
         p_old_values: {
           id: invitationId,
           status: "PENDING",
+          invited_email: invitation.invited_email,
         },
         p_new_values: {
           id: invitationId,
-          status: "CANCELLED",
+          status: "DELETED",
+          invited_email: invitation.invited_email,
         },
       });
     } catch (auditError) {

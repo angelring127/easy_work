@@ -1,159 +1,289 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/auth/middleware";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
-// 요청 데이터 검증 스키마
+// 초대 생성 스키마
 const createInvitationSchema = z.object({
-  storeId: z.string().uuid(),
-  email: z.string().email(),
-  roleHint: z
-    .enum(["PART_TIMER", "SUB_MANAGER"])
-    .optional()
-    .default("PART_TIMER"),
-  expiresInDays: z.number().min(1).max(30).optional().default(7),
+  email: z.string().email("유효한 이메일을 입력해주세요"),
+  roleHint: z.enum(["PART_TIMER", "SUB_MANAGER"], {
+    errorMap: () => ({ message: "유효한 역할을 선택해주세요" }),
+  }),
+  storeId: z.string().uuid("유효한 매장 ID를 입력해주세요"),
+  expiresInDays: z.number().min(1).max(30).default(7),
 });
 
 /**
  * 초대 생성 API
  * POST /api/invitations
  */
-async function createInvitation(
-  request: NextRequest,
-  context: { user: any }
-): Promise<NextResponse> {
+async function createInvitation(request: NextRequest, context: { user: any }) {
   try {
     const { user } = context;
     const body = await request.json();
 
-    // 요청 데이터 검증
+    console.log("초대 생성 요청:", {
+      user: user.email,
+      body,
+    });
+
+    // 입력 검증
     const validationResult = createInvitationSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
         {
           success: false,
-          error: "잘못된 요청 데이터입니다",
-          details: validationResult.error.errors,
+          error: validationResult.error.errors[0].message,
         },
         { status: 400 }
       );
     }
 
-    const { storeId, email, roleHint, expiresInDays } = validationResult.data;
+    const { email, roleHint, storeId, expiresInDays } = validationResult.data;
+
     const supabase = await createClient();
 
-    // 매장 접근 권한 확인 (RLS가 처리하지만, 명시적 확인)
+    // 매장 정보 조회
     const { data: store, error: storeError } = await supabase
       .from("stores")
       .select("*")
       .eq("id", storeId)
-      .eq("status", "ACTIVE")
       .single();
 
     if (storeError || !store) {
       return NextResponse.json(
         {
           success: false,
-          error: "매장을 찾을 수 없습니다",
+          error: "매장을 찾을 수 없습니다.",
         },
         { status: 404 }
       );
     }
 
-    // 권한 확인: 매장 소유자 또는 서브 매니저만 초대 생성 가능
-    const isOwner = store.owner_id === user.id;
+    // 권한 확인 (마스터 또는 서브 매니저만 초대 가능)
     const { data: userRole } = await supabase
       .from("user_store_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("store_id", storeId)
-      .eq("status", "ACTIVE")
       .single();
 
-    const isSubManager = userRole?.role === "SUB_MANAGER";
-
-    if (!isOwner && !isSubManager) {
+    if (!userRole || !["MASTER", "SUB_MANAGER"].includes(userRole.role)) {
       return NextResponse.json(
         {
           success: false,
-          error: "초대 생성 권한이 없습니다",
+          error: "초대를 생성할 권한이 없습니다.",
         },
         { status: 403 }
       );
     }
 
-    // 기존 사용자 확인
-    const { data: existingUser } = await supabase.auth.admin.listUsers();
-    const isExistingUser = existingUser?.users?.some(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    );
+    // 이미 초대된 이메일인지 확인
+    const { data: existingInvitation } = await supabase
+      .from("invitations")
+      .select("*")
+      .eq("invited_email", email)
+      .eq("store_id", storeId)
+      .eq("status", "PENDING")
+      .single();
 
-    if (isExistingUser) {
+    if (existingInvitation) {
       return NextResponse.json(
         {
           success: false,
-          error: "이미 등록된 사용자입니다. 직접 매장에 추가해주세요.",
+          error: "이미 초대된 이메일입니다.",
         },
         { status: 400 }
       );
     }
 
-    // 초대 생성 함수 호출
-    const { data: invitationId, error: createError } = await supabase.rpc(
-      "create_invitation",
-      {
+    // 초대 생성
+    const { data: invitation, error: invitationError } = await supabase
+      .rpc("create_invitation", {
         p_store_id: storeId,
         p_invited_email: email,
         p_role_hint: roleHint,
         p_expires_in_days: expiresInDays,
         p_invited_by: user.id,
-      }
-    );
+      })
+      .single();
 
-    if (createError) {
-      console.error("초대 생성 오류:", createError);
+    if (invitationError) {
+      console.error("초대 생성 실패:", invitationError);
       return NextResponse.json(
         {
           success: false,
-          error: "초대 생성에 실패했습니다",
+          error: "초대 생성에 실패했습니다.",
         },
         { status: 500 }
       );
     }
 
-    // 초대 정보 조회 (이메일 전송용)
-    const { data: invitation } = await supabase
-      .from("invitations")
-      .select("*")
-      .eq("id", invitationId)
-      .single();
+    const invitationId = (invitation as any).id;
 
     if (invitation) {
       try {
-        // 초대 링크가 포함된 이메일 전송 (커스텀 이메일)
-        const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/ko/invites/accept/${invitation.token_hash}`;
+        // 새 사용자 생성 시도 (기존 사용자면 오류 발생)
+        let signUpData = null;
+        let signUpError = null;
 
-        console.log("초대 링크 생성:", {
+        try {
+          const result = await supabase.auth.admin.createUser({
+            email: email,
+            password: "1q2w3e4r!", // 기본 패스워드
+            email_confirm: true, // 이메일 자동 확인
+            user_metadata: {
+              store_id: storeId,
+              store_name: store.name,
+              role_hint: roleHint,
+              token_hash: (invitation as any).token_hash,
+              type: "store_invitation",
+              invited_by: user.user_metadata?.name || user.email || "관리자",
+              is_invited_user: true,
+              needs_password_change: true, // 패스워드 변경 필요 플래그
+            },
+          });
+          signUpData = result.data;
+          signUpError = result.error;
+        } catch (error) {
+          signUpError = error;
+        }
+
+        // 기존 사용자인 경우
+        if (
+          signUpError &&
+          signUpError.message?.includes("already been registered")
+        ) {
+          console.log("기존 사용자 발견:", email);
+
+          // 기존 사용자에게 이메일 발송 (inviteUserByEmail 사용)
+          console.log("기존 사용자에게 이메일 발송 시도:", {
+            email,
+            redirectTo: `${
+              process.env.NEXT_PUBLIC_APP_URL
+            }/ko/invites/verify-email?token=${
+              (invitation as any).token_hash
+            }&type=invite`,
+          });
+
+          const { error: emailError } =
+            await supabase.auth.admin.inviteUserByEmail(email, {
+              data: {
+                store_id: storeId,
+                store_name: store.name,
+                role_hint: roleHint,
+                token_hash: (invitation as any).token_hash,
+                type: "store_invitation",
+                invited_by: user.user_metadata?.name || user.email || "관리자",
+                is_invited_user: true,
+              },
+              redirectTo: `${
+                process.env.NEXT_PUBLIC_APP_URL
+              }/ko/invites/verify-email?token=${
+                (invitation as any).token_hash
+              }&type=invite`,
+            });
+
+          if (emailError) {
+            console.error("이메일 발송 실패:", emailError);
+            await supabase.from("invitations").delete().eq("id", invitationId);
+            return NextResponse.json(
+              {
+                success: false,
+                error: "이메일 발송에 실패했습니다.",
+              },
+              { status: 500 }
+            );
+          }
+
+          console.log("기존 사용자 초대 이메일 발송 성공:", {
+            email,
+            storeName: store.name,
+            roleHint,
+          });
+
+          return NextResponse.json({
+            success: true,
+            data: {
+              invitation: {
+                id: invitationId,
+                invited_email: email,
+                role_hint: roleHint,
+                expires_at: (invitation as any).expires_at,
+                status: "PENDING",
+              },
+              message: "기존 사용자에게 초대 이메일이 발송되었습니다.",
+            },
+          });
+        }
+
+        // 새 사용자 생성 실패 (다른 오류)
+        if (signUpError) {
+          console.error("사용자 생성 실패:", signUpError);
+
+          // 사용자 생성 실패 시 초대 레코드 삭제
+          await supabase.from("invitations").delete().eq("id", invitationId);
+
+          return NextResponse.json(
+            {
+              success: false,
+              error: "사용자 생성에 실패했습니다. 이메일 주소를 확인해주세요.",
+            },
+            { status: 500 }
+          );
+        }
+
+        // 새 사용자 생성 성공 시 이메일 발송
+        console.log("새 사용자 생성 성공:", signUpData.user.email);
+
+        // 새 사용자에게 이메일 발송 (inviteUserByEmail 사용)
+        console.log("새 사용자에게 이메일 발송 시도:", {
           email,
-          inviteUrl,
+          redirectTo: `${
+            process.env.NEXT_PUBLIC_APP_URL
+          }/ko/invites/verify-email?token=${
+            (invitation as any).token_hash
+          }&type=invite`,
+        });
+
+        const { error: emailError } =
+          await supabase.auth.admin.inviteUserByEmail(email, {
+            data: {
+              store_id: storeId,
+              store_name: store.name,
+              role_hint: roleHint,
+              token_hash: (invitation as any).token_hash,
+              type: "store_invitation",
+              invited_by: user.user_metadata?.name || user.email || "관리자",
+              is_invited_user: true,
+            },
+            redirectTo: `${
+              process.env.NEXT_PUBLIC_APP_URL
+            }/ko/invites/verify-email?token=${
+              (invitation as any).token_hash
+            }&type=invite`,
+          });
+
+        if (emailError) {
+          console.error("이메일 발송 실패:", emailError);
+
+          // 이메일 발송 실패 시 사용자와 초대 레코드 삭제
+          await supabase.auth.admin.deleteUser(signUpData.user.id);
+          await supabase.from("invitations").delete().eq("id", invitationId);
+
+          return NextResponse.json(
+            {
+              success: false,
+              error: "이메일 발송에 실패했습니다.",
+            },
+            { status: 500 }
+          );
+        }
+
+        console.log("새 사용자 초대 이메일 전송 성공:", {
+          email,
           storeName: store.name,
           roleHint,
         });
-
-        // TODO: 실제 이메일 전송 구현
-        // 현재는 로그로만 표시 (실제로는 SendGrid, Resend 등을 사용)
-        console.log(`
-=== 초대 이메일 ===
-받는 사람: ${email}
-매장명: ${store.name}
-역할: ${roleHint}
-초대 링크: ${inviteUrl}
-초대자: ${user.user_metadata?.name || user.email || "관리자"}
-====================
-        `);
-
-        // 개발 환경에서는 성공으로 처리
-        // 실제 환경에서는 실제 이메일 서비스 연동 필요
       } catch (emailError) {
         console.error("이메일 전송 오류:", emailError);
       }
@@ -197,118 +327,81 @@ async function createInvitation(
  * 초대 목록 조회 API
  * GET /api/invitations?storeId=&status=&page=&limit=
  */
-async function getInvitations(
-  request: NextRequest,
-  context: { user: any }
-): Promise<NextResponse> {
+async function getInvitations(request: NextRequest, context: { user: any }) {
   try {
     const { user } = context;
     const { searchParams } = new URL(request.url);
 
-    // 쿼리 파라미터 파싱
     const storeId = searchParams.get("storeId");
     const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const offset = (page - 1) * limit;
+    const limit = parseInt(searchParams.get("limit") || "10");
+
+    if (!storeId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "매장 ID가 필요합니다.",
+        },
+        { status: 400 }
+      );
+    }
 
     const supabase = await createClient();
 
-    // 매장 접근 권한 확인 (RLS가 처리하지만, 명시적 확인)
-    if (storeId) {
-      const { data: store, error: storeError } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("id", storeId)
-        .eq("status", "ACTIVE")
-        .single();
+    // 권한 확인
+    const { data: userRole } = await supabase
+      .from("user_store_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("store_id", storeId)
+      .single();
 
-      if (storeError || !store) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "매장을 찾을 수 없습니다",
-          },
-          { status: 404 }
-        );
-      }
-
-      // 권한 확인: 매장 소유자 또는 서브 매니저만 초대 조회 가능
-      const isOwner = store.owner_id === user.id;
-      const { data: userRole } = await supabase
-        .from("user_store_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("store_id", storeId)
-        .eq("status", "ACTIVE")
-        .single();
-
-      const isSubManager = userRole?.role === "SUB_MANAGER";
-
-      if (!isOwner && !isSubManager) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "초대 조회 권한이 없습니다",
-          },
-          { status: 403 }
-        );
-      }
+    if (!userRole || !["MASTER", "SUB_MANAGER"].includes(userRole.role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "초대 목록을 조회할 권한이 없습니다.",
+        },
+        { status: 403 }
+      );
     }
 
-    // 초대 목록 조회 (invitations 테이블 직접 조회)
-    let query = supabase.from("invitations").select("*");
+    // 초대 목록 조회
+    let query = supabase
+      .from("invitation_details")
+      .select("*")
+      .eq("store_id", storeId)
+      .order("created_at", { ascending: false });
 
-    if (storeId) {
-      query = query.eq("store_id", storeId);
-    }
     if (status) {
       query = query.eq("status", status);
     }
 
-    // 페이지네이션 적용
-    query = query
-      .range(offset, offset + limit - 1)
-      .order("created_at", { ascending: false });
+    const { data: invitations, error } = await query.range(
+      (page - 1) * limit,
+      page * limit - 1
+    );
 
-    const { data: invitations, error: invitationsError, count } = await query;
-
-    if (invitationsError) {
-      console.error("초대 목록 조회 오류:", invitationsError);
+    if (error) {
+      console.error("초대 목록 조회 실패:", error);
       return NextResponse.json(
         {
           success: false,
-          error: "초대 목록 조회에 실패했습니다",
+          error: "초대 목록 조회에 실패했습니다.",
         },
         { status: 500 }
       );
     }
 
-    // 매장 정보 추가
-    const invitationsWithStoreInfo = await Promise.all(
-      (invitations || []).map(async (invitation) => {
-        const { data: store } = await supabase
-          .from("stores")
-          .select("name")
-          .eq("id", invitation.store_id)
-          .single();
-
-        return {
-          ...invitation,
-          store_name: store?.name || "Unknown Store",
-        };
-      })
-    );
-
     return NextResponse.json({
       success: true,
       data: {
-        invitations: invitationsWithStoreInfo,
+        invitations,
         pagination: {
           page,
           limit,
-          total: count || 0,
-          totalPages: Math.ceil((count || 0) / limit),
+          hasMore: invitations.length === limit,
         },
       },
     });
@@ -324,15 +417,39 @@ async function getInvitations(
   }
 }
 
+export { createInvitation, getInvitations };
+
 // Next.js 라우트 핸들러
 export async function POST(request: NextRequest) {
-  return withAuth(async (req, context) => {
-    return createInvitation(req, context);
-  })(request);
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return NextResponse.json(
+      { success: false, error: "인증이 필요합니다." },
+      { status: 401 }
+    );
+  }
+
+  return createInvitation(request, { user });
 }
 
 export async function GET(request: NextRequest) {
-  return withAuth(async (req, context) => {
-    return getInvitations(req, context);
-  })(request);
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return NextResponse.json(
+      { success: false, error: "인증이 필요합니다." },
+      { status: 401 }
+    );
+  }
+
+  return getInvitations(request, { user });
 }

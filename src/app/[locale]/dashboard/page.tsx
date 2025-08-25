@@ -155,6 +155,39 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* 패스워드 변경 안내 (초대된 사용자) */}
+        {(user as any).user_metadata?.is_invited_user &&
+          (user as any).user_metadata?.needs_password_change && (
+            <Card className="mb-6 border-orange-200 bg-orange-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <Settings className="h-4 w-4 text-orange-600" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-medium text-orange-900">
+                      {t("dashboard.passwordChangeRequired", currentLocale)}
+                    </h3>
+                    <p className="text-sm text-orange-700 mt-1">
+                      {t("dashboard.passwordChangeDescription", currentLocale)}
+                    </p>
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        onClick={() => router.push(`/${locale}/profile`)}
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        {t("dashboard.passwordChangeButton", currentLocale)}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
         {/* 매장이 없는 경우 안내 */}
         {accessibleStores.length === 0 && (
           <Card className="mb-6">

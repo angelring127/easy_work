@@ -15,6 +15,7 @@ DROP TRIGGER IF EXISTS update_invitations_updated_at ON invitations;
 DROP POLICY IF EXISTS "Store managers can view invitations" ON invitations;
 DROP POLICY IF EXISTS "Store managers can create invitations" ON invitations;
 DROP POLICY IF EXISTS "Store managers can update invitations" ON invitations;
+DROP POLICY IF EXISTS "Store managers can delete invitations" ON invitations;
 
 -- 기존 뷰 삭제
 DROP VIEW IF EXISTS invitation_details;
@@ -92,6 +93,18 @@ CREATE POLICY "Store managers can create invitations" ON invitations
 -- 매장 관리자만 invitations 수정 가능
 CREATE POLICY "Store managers can update invitations" ON invitations
     FOR UPDATE USING (
+        store_id IN (
+            SELECT id FROM stores WHERE owner_id = auth.uid()
+        ) OR
+        store_id IN (
+            SELECT store_id FROM user_store_roles 
+            WHERE user_id = auth.uid() AND role IN ('MASTER', 'SUB_MANAGER') AND status = 'ACTIVE'
+        )
+    );
+
+-- 매장 관리자만 invitations 삭제 가능
+CREATE POLICY "Store managers can delete invitations" ON invitations
+    FOR DELETE USING (
         store_id IN (
             SELECT id FROM stores WHERE owner_id = auth.uid()
         ) OR

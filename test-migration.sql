@@ -26,3 +26,4 @@ WHERE tablename IN ('stores', 'store_users', 'invites');
 -- 5. 토큰 생성 함수 테스트
 SELECT generate_invite_token() as sample_token;
 
+

@@ -228,3 +228,4 @@ INSERT INTO stores (name, description, owner_id) VALUES
 ('테스트 카페', '개발용 테스트 매장', '00000000-0000-0000-0000-000000000000');
 */
 
+

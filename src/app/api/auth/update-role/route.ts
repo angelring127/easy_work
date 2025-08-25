@@ -70,3 +70,4 @@ async function updateUserRole(request: NextRequest, context: { user: any }) {
 // 인증 필요
 export const POST = withAuth(updateUserRole);
 
+

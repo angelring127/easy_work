@@ -21,6 +21,8 @@ interface AuthContextType {
   refreshSession: () => Promise<void>;
   sessionExpired: boolean;
   isSessionValid: boolean;
+  isProcessingInvite: boolean; // 초대 토큰 처리 중 상태
+  setProcessingInvite: (processing: boolean) => void; // 초대 토큰 처리 상태 설정
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [isSessionValid, setIsSessionValid] = useState(false);
+  const [isProcessingInvite, setIsProcessingInvite] = useState(false);
 
   const supabase = createClient();
 
@@ -256,6 +259,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           currentPath.includes("/login") ||
           currentPath.includes("/signup")
         ) {
+          // 초대 토큰 처리 중이면 리다이렉트 차단
+          if (isProcessingInvite) {
+            if (process.env.NODE_ENV === "development") {
+              console.log("AuthContext: 초대 토큰 처리 중, 리다이렉트 차단");
+            }
+            return;
+          }
+
           if (process.env.NODE_ENV === "development") {
             console.log(
               "AuthContext: 로그인/회원가입에서 대시보드로 리다이렉트"
@@ -289,6 +300,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshSession,
     sessionExpired,
     isSessionValid,
+    isProcessingInvite,
+    setProcessingInvite: setIsProcessingInvite,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

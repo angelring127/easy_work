@@ -33,6 +33,12 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
     const { tokenHash, name, password } = validationResult.data;
     const supabase = await createClient();
 
+    console.log("초대 수락 API 호출:", {
+      tokenHash,
+      name,
+      passwordLength: password.length,
+    });
+
     // 초대 정보 조회
     const { data: invitation, error: inviteError } = await supabase
       .from("invitations")
@@ -41,7 +47,23 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
       .eq("status", "PENDING")
       .single();
 
+    console.log("초대 정보 조회 결과:", {
+      invitation: invitation
+        ? {
+            id: invitation.id,
+            status: invitation.status,
+            expires_at: invitation.expires_at,
+            invited_email: invitation.invited_email,
+          }
+        : null,
+      error: inviteError,
+    });
+
     if (inviteError || !invitation) {
+      console.log("초대 정보 조회 실패:", {
+        inviteError,
+        hasInvitation: !!invitation,
+      });
       return NextResponse.json(
         {
           success: false,
@@ -62,17 +84,66 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // 1. 사용자 회원가입
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email: invitation.invited_email,
-      password,
-      options: {
-        data: {
-          name,
-          role: invitation.role_hint,
-        },
-      },
-    });
+    // 현재 로그인된 사용자 확인 (magiclink로 이미 로그인된 상태)
+    const {
+      data: { user: currentUser },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    let authData;
+    let signUpError;
+
+    if (currentUser && currentUser.email === invitation.invited_email) {
+      // 이미 로그인된 사용자 (magiclink 통해 로그인됨)
+      console.log("이미 로그인된 사용자:", currentUser.email);
+      console.log("사용자 메타데이터:", currentUser.user_metadata);
+      authData = { user: currentUser, session: null };
+    } else {
+      // 사용자 정보 조회
+      const { data: existingUsers } = await supabase.auth.admin.listUsers();
+      const existingUser = existingUsers?.users?.find(
+        (u) => u.email?.toLowerCase() === invitation.invited_email.toLowerCase()
+      );
+
+      if (existingUser) {
+        // 기존 사용자: 비밀번호로 로그인 시도
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email: invitation.invited_email,
+            password,
+          });
+
+        if (signInError) {
+          console.error("로그인 실패:", signInError);
+          // 기본 패스워드로 실패했을 수도 있으므로 더 자세한 오류 제공
+          return NextResponse.json(
+            {
+              success: false,
+              error: `로그인 실패: ${signInError.message}. 기본 패스워드(1q2w3e4r!)로 시도해보세요.`,
+            },
+            { status: 400 }
+          );
+        }
+
+        authData = { user: existingUser, session: signInData.session };
+      } else {
+        // 새 사용자: 회원가입 (거의 발생하지 않음)
+        const { data: signUpData, error: signUpErr } =
+          await supabase.auth.signUp({
+            email: invitation.invited_email,
+            password,
+            options: {
+              data: {
+                name,
+                role: invitation.role_hint,
+              },
+            },
+          });
+
+        authData = signUpData;
+        signUpError = signUpErr;
+      }
+    }
 
     if (signUpError) {
       console.error("회원가입 실패:", signUpError);

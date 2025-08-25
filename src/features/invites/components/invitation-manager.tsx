@@ -50,16 +50,24 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
   const queryClient = useQueryClient();
 
   // 초대 목록 조회
-  const { data: invitationsData, isLoading } = useQuery({
+  const {
+    data: invitationsData,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["invitations", storeId],
     queryFn: async () => {
+      console.log("초대 목록 조회 중...", { storeId });
       const response = await fetch(`/api/invitations?storeId=${storeId}`);
       const result = await response.json();
+      console.log("초대 목록 응답:", result);
       if (!result.success) {
         throw new Error(result.error);
       }
       return result.data;
     },
+    refetchOnWindowFocus: false,
+    staleTime: 0, // 항상 최신 데이터 가져오기
   });
 
   // 초대 생성
@@ -125,17 +133,30 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
   // 초대 취소
   const cancelInvitationMutation = useMutation({
     mutationFn: async (invitationId: string) => {
+      console.log("초대 취소 요청:", { invitationId });
       const response = await fetch(`/api/invitations/${invitationId}/cancel`, {
         method: "POST",
       });
       const result = await response.json();
+      console.log("초대 취소 응답:", result);
       if (!result.success) {
         throw new Error(result.error);
       }
       return result.data;
     },
     onSuccess: () => {
+      console.log("초대 취소 성공, 캐시 무효화 시작");
+
+      // 모든 초대 관련 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
       queryClient.invalidateQueries({ queryKey: ["invitations", storeId] });
+
+      // 즉시 리페치
+      setTimeout(() => {
+        console.log("초대 목록 리페치 시작");
+        refetch();
+      }, 50);
+
       toast({
         title: t("invite.cancelSuccess", locale),
         description: t("invite.cancelSuccess", locale),
@@ -318,7 +339,19 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("invite.list", locale)}</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>{t("invite.list", locale)}</CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                console.log("수동 리페치 버튼 클릭");
+                refetch();
+              }}
+            >
+              새로고침
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (

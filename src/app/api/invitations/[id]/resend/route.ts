@@ -108,6 +108,208 @@ async function resendInvitation(
       );
     }
 
+    // 기존 사용자 확인
+    console.log("재발송 전 기존 사용자 확인:", invitation.invited_email);
+
+    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(
+      (u) => u.email?.toLowerCase() === invitation.invited_email.toLowerCase()
+    );
+
+    // 기존 사용자가 있으면 삭제 후 새로 생성
+    if (existingUser) {
+      console.log("기존 사용자 삭제 중:", existingUser.email);
+
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(
+        existingUser.id
+      );
+
+      if (deleteError) {
+        console.error("기존 사용자 삭제 실패:", deleteError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "기존 사용자 삭제에 실패했습니다",
+          },
+          { status: 500 }
+        );
+      }
+
+      console.log("기존 사용자 삭제 완료:", existingUser.email);
+
+      // 삭제 확인 및 재시도
+      let retryCount = 0;
+      let stillExists = true;
+
+      while (stillExists && retryCount < 3) {
+        console.log(`삭제 확인 시도 ${retryCount + 1}/3`);
+
+        // 잠시 대기
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        const { data: checkUsers } = await supabase.auth.admin.listUsers();
+        const existingUserCheck = checkUsers?.users?.find(
+          (u) =>
+            u.email?.toLowerCase() === invitation.invited_email.toLowerCase()
+        );
+
+        if (existingUserCheck) {
+          console.log(
+            "⚠️ 사용자 여전히 존재함, 재삭제 시도:",
+            existingUserCheck.email
+          );
+
+          // 재삭제 시도
+          const { error: retryDeleteError } =
+            await supabase.auth.admin.deleteUser(existingUserCheck.id);
+
+          if (retryDeleteError) {
+            console.error("재삭제 실패:", retryDeleteError);
+          } else {
+            console.log("재삭제 성공");
+          }
+
+          retryCount++;
+        } else {
+          console.log("✅ 사용자 삭제 성공 - 더 이상 존재하지 않음");
+          stillExists = false;
+        }
+      }
+
+      if (stillExists) {
+        console.error("❌ 사용자 삭제 실패 - 최대 재시도 횟수 초과");
+        return NextResponse.json(
+          {
+            success: false,
+            error: "사용자 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.",
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    // 새 사용자 생성 및 이메일 발송
+    try {
+      console.log("새 사용자 생성 및 이메일 발송 시도:", {
+        email: invitation.invited_email,
+        isExistingUser: !!existingUser,
+      });
+
+      // 새 사용자 생성
+      const { data: signUpData, error: signUpError } =
+        await supabase.auth.admin.createUser({
+          email: invitation.invited_email,
+          password: "1q2w3e4r!", // 기본 패스워드
+          email_confirm: true, // 이메일 자동 확인
+          user_metadata: {
+            store_id: invitation.store_id,
+            store_name: (store as any)?.name || "Unknown Store",
+            role_hint: invitation.role_hint,
+            token_hash: invitation.token_hash,
+            type: "store_invitation",
+            invited_by: user.user_metadata?.name || user.email || "관리자",
+            is_invited_user: true,
+            needs_password_change: true,
+          },
+        });
+
+      if (signUpError) {
+        console.error("사용자 생성 실패:", signUpError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "사용자 생성에 실패했습니다",
+          },
+          { status: 500 }
+        );
+      }
+
+      // 이메일 발송 (inviteUserByEmail 사용 - 더 확실함)
+      console.log("inviteUserByEmail 호출:", {
+        email: invitation.invited_email,
+      });
+
+      // 더 강력한 사용자 삭제 확인
+      console.log("최종 사용자 삭제 확인 중...");
+      const { data: finalCheck } = await supabase.auth.admin.listUsers();
+      const finalUserCheck = finalCheck?.users?.find(
+        (u) => u.email?.toLowerCase() === invitation.invited_email.toLowerCase()
+      );
+
+      if (finalUserCheck) {
+        console.log("⚠️ 최종 확인: 사용자 여전히 존재함, 강제 삭제 시도");
+        await supabase.auth.admin.deleteUser(finalUserCheck.id);
+        // 삭제 후 잠시 대기
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } else {
+        console.log("✅ 최종 확인: 사용자 삭제 완료");
+      }
+
+      const { error: emailError } = await supabase.auth.admin.inviteUserByEmail(
+        invitation.invited_email,
+        {
+          data: {
+            store_id: invitation.store_id,
+            store_name: (store as any)?.name || "Unknown Store",
+            role_hint: invitation.role_hint,
+            token_hash: invitation.token_hash,
+            type: "store_invitation",
+            invited_by: user.user_metadata?.name || user.email || "관리자",
+            is_invited_user: true,
+          },
+          redirectTo: `http://localhost:3000/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`,
+        }
+      );
+
+      console.log("inviteUserByEmail 결과:", {
+        error: emailError,
+        success: !emailError,
+      });
+
+      if (emailError) {
+        console.error("이메일 발송 실패:", emailError);
+
+        // 이메일 발송 실패 시 사용자 삭제
+        if (signUpData.user) {
+          await supabase.auth.admin.deleteUser(signUpData.user.id);
+        }
+
+        // 더 구체적인 에러 메시지
+        let errorMessage = "이메일 발송에 실패했습니다";
+        if (emailError.message?.includes("already been registered")) {
+          errorMessage = "이미 등록된 이메일입니다. 잠시 후 다시 시도해주세요.";
+        }
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: errorMessage,
+          },
+          { status: 500 }
+        );
+      }
+
+      console.log("재발송 이메일 전송 성공:", {
+        email: invitation.invited_email,
+        storeName: (store as any)?.name,
+        roleHint: invitation.role_hint,
+        isExistingUser: !!existingUser,
+        userId: signUpData.user?.id,
+        redirectTo: `http://localhost:3000/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`,
+      });
+
+      console.log("📧 이메일 발송 완료 - 수신함을 확인해주세요!");
+    } catch (emailError) {
+      console.error("이메일 재발송 오류:", emailError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "이메일 재발송 중 오류가 발생했습니다",
+        },
+        { status: 500 }
+      );
+    }
+
     // 감사 로그 기록
     try {
       await supabase.rpc("log_store_audit", {

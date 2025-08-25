@@ -35,22 +35,22 @@ export async function checkAuth(
   try {
     const supabase = await createClient();
 
-    // 세션 확인
+    // 사용자 인증 확인
     const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (sessionError) {
+    if (userError) {
       return {
         success: false,
-        error: "Failed to verify session",
+        error: "Failed to verify user",
         statusCode: 401,
       };
     }
 
     // 인증되지 않은 사용자 처리
-    if (!session || !session.user) {
+    if (!user) {
       if (options.allowUnauthenticated) {
         return { success: true };
       }
@@ -64,16 +64,12 @@ export async function checkAuth(
 
     // 사용자 프로필 생성
     const userProfile: UserProfile = {
-      id: session.user.id,
-      email: session.user.email || "",
-      name:
-        session.user.user_metadata?.name ||
-        session.user.email?.split("@")[0] ||
-        "",
-      role:
-        (session.user.user_metadata?.role as UserRole) || UserRole.PART_TIMER,
-      created_at: session.user.created_at,
-      updated_at: session.user.updated_at || session.user.created_at,
+      id: user.id,
+      email: user.email || "",
+      name: user.user_metadata?.name || user.email?.split("@")[0] || "",
+      role: (user.user_metadata?.role as UserRole) || UserRole.PART_TIMER,
+      created_at: user.created_at,
+      updated_at: user.updated_at || user.created_at,
     };
 
     // 특정 역할 확인
