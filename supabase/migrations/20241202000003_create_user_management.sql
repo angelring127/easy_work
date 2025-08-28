@@ -132,12 +132,15 @@ RETURNS UUID AS $$
 DECLARE
     role_id UUID;
 BEGIN
-    -- 권한 확인: 매장 소유자만 역할 부여 가능
+    -- 권한 확인: 매장 소유자 또는 서브 매니저만 역할 부여 가능
     IF NOT EXISTS (
-        SELECT 1 FROM stores 
-        WHERE id = p_store_id AND owner_id = p_granted_by
+        SELECT 1 FROM user_store_roles 
+        WHERE user_id = p_granted_by 
+        AND store_id = p_store_id 
+        AND role IN ('MASTER', 'SUB_MANAGER')
+        AND status = 'ACTIVE'
     ) THEN
-        RAISE EXCEPTION 'Permission denied: Only store owner can grant roles';
+        RAISE EXCEPTION 'Permission denied: Only store owner or sub manager can grant roles';
     END IF;
 
     -- 기존 역할이 있으면 업데이트, 없으면 새로 생성

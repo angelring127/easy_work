@@ -39,30 +39,98 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
       passwordLength: password.length,
     });
 
-    // 초대 정보 조회
-    const { data: invitation, error: inviteError } = await supabase
-      .from("invitations")
-      .select("*")
-      .eq("token_hash", tokenHash)
-      .eq("status", "PENDING")
-      .single();
+    // 초대 정보 조회 (invitations 테이블 먼저 확인) - RLS 우회 함수 사용
+    console.log("초대 정보 조회 시도:", { tokenHash });
+
+    let { data: invitation, error: inviteError } = await supabase.rpc(
+      "get_invitation_by_token",
+      { p_token: tokenHash }
+    );
+
+    console.log("RPC 함수 호출 결과:", {
+      invitation,
+      inviteError,
+      invitationType: typeof invitation,
+      isArray: Array.isArray(invitation),
+      length: invitation?.length,
+    });
+
+    // invitations 테이블에서 찾지 못한 경우 invites 테이블 확인
+    if (inviteError || !invitation || invitation.length === 0) {
+      console.log("invitations 테이블에서 찾지 못함, invites 테이블 확인:", {
+        tokenHash,
+      });
+
+      // invites 테이블 조회 - RLS 우회 함수 사용
+      const { data: oldInvite, error: oldInviteError } = await supabase.rpc(
+        "get_invite_by_token",
+        { p_token: tokenHash }
+      );
+
+      if (oldInvite && !oldInviteError && oldInvite.length > 0) {
+        // invites 테이블에서 찾은 경우 invitations 형식으로 변환
+        const oldInviteData = oldInvite[0]; // RPC 함수는 배열을 반환하므로 첫 번째 요소 사용
+
+        // 사용된 초대나 취소된 초대는 제외
+        if (oldInviteData.is_used || oldInviteData.is_cancelled) {
+          console.log("사용되었거나 취소된 초대:", {
+            is_used: oldInviteData.is_used,
+            is_cancelled: oldInviteData.is_cancelled,
+          });
+        } else {
+          invitation = {
+            ...oldInviteData,
+            invited_email: oldInviteData.email,
+            role_hint: oldInviteData.role,
+            token_hash: oldInviteData.token,
+            status: "PENDING",
+          };
+          inviteError = null;
+          console.log("invites 테이블에서 초대 찾음:", {
+            id: oldInviteData.id,
+          });
+        }
+      } else {
+        console.log("invites 테이블에서도 찾지 못함:", {
+          error: oldInviteError,
+        });
+      }
+    } else {
+      // invitations 테이블에서 찾은 경우
+      if (Array.isArray(invitation) && invitation.length > 0) {
+        invitation = invitation[0];
+        inviteError = null;
+        console.log("invitations 테이블에서 초대 찾음:", { id: invitation.id });
+      } else {
+        invitation = null;
+        inviteError = new Error("초대 정보를 찾을 수 없습니다");
+      }
+    }
 
     console.log("초대 정보 조회 결과:", {
       invitation: invitation
         ? {
-            id: invitation.id,
-            status: invitation.status,
-            expires_at: invitation.expires_at,
-            invited_email: invitation.invited_email,
+            id: invitation.id || invitation[0]?.id,
+            status: invitation.status || invitation[0]?.status,
+            expires_at: invitation.expires_at || invitation[0]?.expires_at,
+            invited_email:
+              invitation.invited_email || invitation[0]?.invited_email,
           }
         : null,
       error: inviteError,
+      rawInvitation: invitation,
     });
 
-    if (inviteError || !invitation) {
+    if (
+      inviteError ||
+      !invitation ||
+      (Array.isArray(invitation) && invitation.length === 0)
+    ) {
       console.log("초대 정보 조회 실패:", {
         inviteError,
         hasInvitation: !!invitation,
+        isArray: Array.isArray(invitation),
+        length: invitation?.length,
       });
       return NextResponse.json(
         {
@@ -168,15 +236,54 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
     }
 
     // 2. 매장에 사용자 추가
+    console.log("매장에 사용자 추가 시도:", {
+      userId: authData.user.id,
+      storeId: invitation.store_id,
+      role: invitation.role_hint,
+      invitedBy: invitation.invited_by,
+      userEmail: authData.user.email,
+    });
+
     const { data: userRoleId, error: roleError } = await supabase.rpc(
-      "grant_user_role",
+      "grant_user_role_by_invitation",
       {
         p_user_id: authData.user.id,
         p_store_id: invitation.store_id,
         p_role: invitation.role_hint,
-        p_granted_by: invitation.invited_by,
+        p_invited_by: invitation.invited_by,
       }
     );
+
+    console.log("매장에 사용자 추가 결과:", {
+      userRoleId,
+      roleError,
+      success: !roleError,
+    });
+
+    if (roleError) {
+      console.error("매장 등록 상세 오류:", {
+        message: roleError.message,
+        details: roleError.details,
+        hint: roleError.hint,
+      });
+    }
+
+    // 3. 사용자 메타데이터에 패스워드 변경 필요 플래그 추가
+    const currentMetadata = authData.user.user_metadata || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      needs_password_change: true,
+      last_invitation_accepted: new Date().toISOString(),
+    };
+
+    const { error: metadataError } = await supabase.auth.updateUser({
+      data: updatedMetadata,
+    });
+
+    if (metadataError) {
+      console.error("사용자 메타데이터 업데이트 실패:", metadataError);
+      // 메타데이터 업데이트 실패는 치명적이지 않으므로 계속 진행
+    }
 
     if (roleError) {
       console.error("매장 추가 실패:", roleError);
@@ -190,15 +297,47 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // 3. 초대 상태 업데이트
-    const { error: updateError } = await supabase
-      .from("invitations")
-      .update({
-        status: "ACCEPTED",
-        accepted_at: new Date().toISOString(),
-        accepted_by: authData.user.id,
-      })
-      .eq("id", invitation.id);
+    // 매장 등록 확인
+    console.log("매장 등록 성공 확인:", {
+      userRoleId,
+      userId: authData.user.id,
+      storeId: invitation.store_id,
+    });
+
+    // 3. 초대 상태 업데이트 (invitations 또는 invites 테이블)
+    let updateError = null;
+
+    if (invitation.token_hash === invitation.token) {
+      // invites 테이블의 초대인 경우
+      const { error: invitesUpdateError } = await supabase
+        .from("invites")
+        .update({
+          is_used: true,
+          accepted_at: new Date().toISOString(),
+          accepted_by: authData.user.id,
+        })
+        .eq("id", invitation.id);
+
+      updateError = invitesUpdateError;
+      console.log("invites 테이블 초대 상태 업데이트:", {
+        error: invitesUpdateError,
+      });
+    } else {
+      // invitations 테이블의 초대인 경우
+      const { error: invitationsUpdateError } = await supabase
+        .from("invitations")
+        .update({
+          status: "ACCEPTED",
+          accepted_at: new Date().toISOString(),
+          accepted_by: authData.user.id,
+        })
+        .eq("id", invitation.id);
+
+      updateError = invitationsUpdateError;
+      console.log("invitations 테이블 초대 상태 업데이트:", {
+        error: invitationsUpdateError,
+      });
+    }
 
     if (updateError) {
       console.error("초대 상태 업데이트 실패:", updateError);

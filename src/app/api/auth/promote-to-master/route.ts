@@ -70,3 +70,6 @@ async function promoteToMaster(request: NextRequest, context: { user: any }) {
 export const POST = withAuth(promoteToMaster);
 
 
+
+
+

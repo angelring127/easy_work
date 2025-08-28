@@ -119,13 +119,58 @@ async function getStores(
     const supabase = await createClient();
 
     if (mine) {
-      // 사용자가 소유한 매장만 조회 (단순화)
-      const { data: stores, error: storesError } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("status", "ACTIVE")
-        .eq("owner_id", user.id)
-        .order("name", { ascending: true });
+      // RLS 우회 함수를 사용하여 사용자가 접근 가능한 매장 조회
+      let { data: stores, error: storesError } = await supabase.rpc(
+        "get_user_accessible_stores",
+        { p_user_id: user.id }
+      );
+
+      // 함수가 없는 경우 대안 로직 사용
+      if (
+        storesError &&
+        storesError.message.includes("Could not find the function")
+      ) {
+        console.log("RLS 우회 함수가 없어서 대안 로직 사용");
+
+        // 직접 쿼리로 매장 조회 (소유한 매장 + 초대된 매장)
+        const { data: ownedStores } = await supabase
+          .from("stores")
+          .select("*")
+          .eq("status", "ACTIVE")
+          .eq("owner_id", user.id);
+
+        const { data: userRoles } = await supabase
+          .from("user_store_roles")
+          .select("store_id, role, granted_at")
+          .eq("user_id", user.id)
+          .eq("status", "ACTIVE");
+
+        const { data: invitedStores } = await supabase
+          .from("stores")
+          .select("*")
+          .eq("status", "ACTIVE")
+          .in("id", userRoles?.map((r) => r.store_id) || []);
+
+        // 매장 목록 합치기
+        const allStores = [
+          ...(ownedStores || []).map((store) => ({
+            ...store,
+            user_role: "MASTER",
+            granted_at: store.created_at,
+          })),
+          ...(invitedStores || []).map((store) => {
+            const userRole = userRoles?.find((r) => r.store_id === store.id);
+            return {
+              ...store,
+              user_role: userRole?.role || "PART_TIMER",
+              granted_at: userRole?.granted_at || store.created_at,
+            };
+          }),
+        ];
+
+        stores = allStores.sort((a, b) => a.name.localeCompare(b.name));
+        storesError = null;
+      }
 
       if (storesError) {
         console.error("매장 목록 조회 오류:", storesError);
@@ -138,12 +183,24 @@ async function getStores(
         );
       }
 
-      // 사용자 역할 정보 추가
-      const storesWithRole = (stores || []).map((store) => ({
-        ...store,
-        user_role: "MASTER",
-        granted_at: store.created_at,
-      }));
+      console.log("매장 목록 조회 결과:", {
+        userId: user.id,
+        userEmail: user.email,
+        storesCount: stores?.length || 0,
+        stores: stores?.map((s) => ({
+          id: s.id,
+          name: s.name,
+          owner_id: s.owner_id,
+          user_role: s.user_role,
+          isOwner: s.owner_id === user.id,
+        })),
+        usedFallback:
+          storesError?.message?.includes("Could not find the function") ||
+          false,
+      });
+
+      // RLS 우회 함수가 이미 역할 정보를 포함하므로 그대로 사용
+      const storesWithRole = stores || [];
 
       return NextResponse.json({
         success: true,

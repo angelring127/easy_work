@@ -77,6 +77,17 @@ async function createInvitation(request: NextRequest, context: { user: any }) {
       );
     }
 
+    // 기존 사용자인지 먼저 확인
+    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    );
+    console.log("찾는 이메일:", email);
+    console.log(
+      "기존 사용자 찾음:",
+      existingUser ? existingUser.email : "없음"
+    );
+
     // 이미 초대된 이메일인지 확인
     const { data: existingInvitation } = await supabase
       .from("invitations")
@@ -86,14 +97,95 @@ async function createInvitation(request: NextRequest, context: { user: any }) {
       .eq("status", "PENDING")
       .single();
 
-    if (existingInvitation) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "이미 초대된 이메일입니다.",
-        },
-        { status: 400 }
+    // 기존 사용자가 감지된 경우 - 기존 사용자용 로직 실행
+    if (existingUser) {
+      console.log("기존 사용자 감지됨 - 기존 사용자용 로직 실행");
+
+      if (existingInvitation) {
+        console.log("기존 초대 발견:", existingInvitation.id);
+        console.log("기존 사용자에게 재발송:", email);
+
+        // 기존 사용자는 메일 발송 없이 바로 매장에 초대
+        console.log("기존 사용자 초대 성공 (메일 발송 없음):", {
+          email,
+          storeName: store.name,
+          roleHint,
+        });
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            invitation: {
+              id: existingInvitation.id,
+              invited_email: email,
+              role_hint: roleHint,
+              expires_at: existingInvitation.expires_at,
+              status: "PENDING",
+            },
+            message: "기존 사용자에게 매장 초대가 완료되었습니다.",
+          },
+        });
+      } else {
+        // 기존 사용자이지만 기존 초대가 없는 경우 - 새 초대 생성 (메일 발송 없음)
+        console.log(
+          "기존 사용자이지만 기존 초대 없음 - 새 초대 생성 (메일 발송 없음)"
+        );
+
+        // 먼저 초대 생성
+        const { data: newInvitation, error: invitationError } = await supabase
+          .rpc("create_invitation", {
+            p_store_id: storeId,
+            p_invited_email: email,
+            p_role_hint: roleHint,
+            p_expires_in_days: expiresInDays,
+            p_invited_by: user.id,
+          })
+          .single();
+
+        if (invitationError) {
+          console.error("초대 생성 실패:", invitationError);
+          return NextResponse.json(
+            {
+              success: false,
+              error: "초대 생성에 실패했습니다.",
+            },
+            { status: 500 }
+          );
+        }
+
+        const newInvitationId = (newInvitation as any).id;
+
+        console.log("기존 사용자 초대 성공 (메일 발송 없음):", {
+          email,
+          storeName: store.name,
+          roleHint,
+        });
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            invitation: {
+              id: newInvitationId,
+              invited_email: email,
+              role_hint: roleHint,
+              expires_at: (newInvitation as any).expires_at,
+              status: "PENDING",
+            },
+            message: "기존 사용자에게 매장 초대가 완료되었습니다.",
+          },
+        });
+      }
+    }
+
+    // 기존 초대가 있지만 기존 사용자가 아닌 경우
+    if (existingInvitation && !existingUser) {
+      console.log(
+        "기존 초대 발견하지만 기존 사용자 아님 - 기존 초대 삭제 후 새로 생성"
       );
+      await supabase
+        .from("invitations")
+        .delete()
+        .eq("id", existingInvitation.id);
     }
 
     // 초대 생성
@@ -121,41 +213,41 @@ async function createInvitation(request: NextRequest, context: { user: any }) {
     const invitationId = (invitation as any).id;
 
     if (invitation) {
+      // 새 사용자 생성 시도 (기존 사용자면 오류 발생)
+      let signUpData = null;
+      let signUpError = null;
+
       try {
-        // 새 사용자 생성 시도 (기존 사용자면 오류 발생)
-        let signUpData = null;
-        let signUpError = null;
+        const result = await supabase.auth.admin.createUser({
+          email: email,
+          password: "1q2w3e4r!", // 기본 패스워드
+          email_confirm: true, // 이메일 자동 확인
+          user_metadata: {
+            store_id: storeId,
+            store_name: store.name,
+            role_hint: roleHint,
+            token_hash: (invitation as any).token_hash,
+            type: "store_invitation",
+            invited_by: user.user_metadata?.name || user.email || "관리자",
+            is_invited_user: true,
+            needs_password_change: true, // 패스워드 변경 필요 플래그
+          },
+        });
+        signUpData = result.data;
+        signUpError = result.error;
+      } catch (error) {
+        signUpError = error;
+      }
 
+      // 기존 사용자인 경우
+      if (
+        signUpError &&
+        signUpError.message?.includes("already been registered")
+      ) {
+        console.log("기존 사용자 발견:", email);
+
+        // 기존 사용자에게 이메일 발송 시도
         try {
-          const result = await supabase.auth.admin.createUser({
-            email: email,
-            password: "1q2w3e4r!", // 기본 패스워드
-            email_confirm: true, // 이메일 자동 확인
-            user_metadata: {
-              store_id: storeId,
-              store_name: store.name,
-              role_hint: roleHint,
-              token_hash: (invitation as any).token_hash,
-              type: "store_invitation",
-              invited_by: user.user_metadata?.name || user.email || "관리자",
-              is_invited_user: true,
-              needs_password_change: true, // 패스워드 변경 필요 플래그
-            },
-          });
-          signUpData = result.data;
-          signUpError = result.error;
-        } catch (error) {
-          signUpError = error;
-        }
-
-        // 기존 사용자인 경우
-        if (
-          signUpError &&
-          signUpError.message?.includes("already been registered")
-        ) {
-          console.log("기존 사용자 발견:", email);
-
-          // 기존 사용자에게 이메일 발송 (inviteUserByEmail 사용)
           console.log("기존 사용자에게 이메일 발송 시도:", {
             email,
             redirectTo: `${
@@ -184,12 +276,22 @@ async function createInvitation(request: NextRequest, context: { user: any }) {
             });
 
           if (emailError) {
-            console.error("이메일 발송 실패:", emailError);
+            console.error("기존 사용자 이메일 발송 실패:", emailError);
+
+            // 이메일 발송 실패 시 초대 레코드 삭제
             await supabase.from("invitations").delete().eq("id", invitationId);
+
+            // 더 구체적인 오류 메시지 제공
+            let errorMessage = "이메일 발송에 실패했습니다.";
+            if (emailError.message?.includes("already been registered")) {
+              errorMessage =
+                "이미 등록된 이메일입니다. 다른 이메일 주소를 사용하거나 기존 계정으로 로그인해주세요.";
+            }
+
             return NextResponse.json(
               {
                 success: false,
-                error: "이메일 발송에 실패했습니다.",
+                error: errorMessage,
               },
               { status: 500 }
             );
@@ -214,28 +316,44 @@ async function createInvitation(request: NextRequest, context: { user: any }) {
               message: "기존 사용자에게 초대 이메일이 발송되었습니다.",
             },
           });
-        }
+        } catch (emailError) {
+          console.error("기존 사용자 이메일 발송 중 예외 발생:", emailError);
 
-        // 새 사용자 생성 실패 (다른 오류)
-        if (signUpError) {
-          console.error("사용자 생성 실패:", signUpError);
-
-          // 사용자 생성 실패 시 초대 레코드 삭제
+          // 예외 발생 시 초대 레코드 삭제
           await supabase.from("invitations").delete().eq("id", invitationId);
 
           return NextResponse.json(
             {
               success: false,
-              error: "사용자 생성에 실패했습니다. 이메일 주소를 확인해주세요.",
+              error:
+                "이메일 발송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
             },
             { status: 500 }
           );
         }
+      }
 
-        // 새 사용자 생성 성공 시 이메일 발송
-        console.log("새 사용자 생성 성공:", signUpData.user.email);
+      // 새 사용자 생성 실패 (다른 오류)
+      if (signUpError) {
+        console.error("사용자 생성 실패:", signUpError);
 
-        // 새 사용자에게 이메일 발송 (inviteUserByEmail 사용)
+        // 사용자 생성 실패 시 초대 레코드 삭제
+        await supabase.from("invitations").delete().eq("id", invitationId);
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: "사용자 생성에 실패했습니다. 이메일 주소를 확인해주세요.",
+          },
+          { status: 500 }
+        );
+      }
+
+      // 새 사용자 생성 성공 시 이메일 발송
+      console.log("새 사용자 생성 성공:", signUpData.user.email);
+
+      // 새 사용자에게 이메일 발송 시도
+      try {
         console.log("새 사용자에게 이메일 발송 시도:", {
           email,
           redirectTo: `${
@@ -264,16 +382,23 @@ async function createInvitation(request: NextRequest, context: { user: any }) {
           });
 
         if (emailError) {
-          console.error("이메일 발송 실패:", emailError);
+          console.error("새 사용자 이메일 발송 실패:", emailError);
 
           // 이메일 발송 실패 시 사용자와 초대 레코드 삭제
           await supabase.auth.admin.deleteUser(signUpData.user.id);
           await supabase.from("invitations").delete().eq("id", invitationId);
 
+          // 더 구체적인 오류 메시지 제공
+          let errorMessage = "이메일 발송에 실패했습니다.";
+          if (emailError.message?.includes("already been registered")) {
+            errorMessage =
+              "이미 등록된 이메일입니다. 다른 이메일 주소를 사용하거나 기존 계정으로 로그인해주세요.";
+          }
+
           return NextResponse.json(
             {
               success: false,
-              error: "이메일 발송에 실패했습니다.",
+              error: errorMessage,
             },
             { status: 500 }
           );
@@ -285,7 +410,20 @@ async function createInvitation(request: NextRequest, context: { user: any }) {
           roleHint,
         });
       } catch (emailError) {
-        console.error("이메일 전송 오류:", emailError);
+        console.error("새 사용자 이메일 발송 중 예외 발생:", emailError);
+
+        // 예외 발생 시 사용자와 초대 레코드 삭제
+        await supabase.auth.admin.deleteUser(signUpData.user.id);
+        await supabase.from("invitations").delete().eq("id", invitationId);
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "이메일 발송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+          },
+          { status: 500 }
+        );
       }
     }
 

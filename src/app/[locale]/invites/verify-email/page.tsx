@@ -84,26 +84,36 @@ export default function VerifyEmailPage() {
               console.log("VerifyEmailPage: 세션 설정 성공", data.user.email);
               setUser(data.user);
 
-              // 초대 토큰 상태 확인
+              // URL 파라미터 토큰으로 초대 정보 조회 (우선)
               if (token) {
                 try {
+                  console.log("URL 파라미터 토큰으로 초대 정보 조회 시도:", {
+                    token,
+                  });
+
                   const response = await fetch(
-                    `/api/invitations/info/${token}`
+                    `/api/invitations/info?token=${token}`
                   );
                   const result = await response.json();
 
                   if (result.success) {
-                    console.log("초대 토큰 상태 확인:", result.data.invitation);
-                    console.log("초대 토큰이 유효함");
+                    console.log(
+                      "URL 파라미터 토큰으로 초대 정보 조회 성공:",
+                      result.data
+                    );
+                    console.log("초대가 유효함");
                     setIsVerified(true);
                     setIsLoading(false);
                     return;
                   } else {
-                    console.log("초대 토큰 조회 실패:", result.error);
+                    console.log(
+                      "URL 파라미터 토큰으로 초대 정보 조회 실패:",
+                      result.error
+                    );
 
                     // 초대가 이미 처리되었거나 만료된 경우
                     if (
-                      result.error === "초대 정보를 찾을 수 없습니다" ||
+                      result.error === "초대를 찾을 수 없습니다" ||
                       result.error === "초대가 만료되었습니다"
                     ) {
                       toast({
@@ -115,10 +125,24 @@ export default function VerifyEmailPage() {
                       router.push(`/${currentLocale}/dashboard`);
                       return;
                     }
+
+                    // 기타 오류의 경우
+                    toast({
+                      title: "초대 오류",
+                      description: result.error,
+                      variant: "destructive",
+                    });
+                    router.push(`/${currentLocale}/invites/error`);
+                    return;
                   }
                 } catch (error) {
-                  console.error("초대 토큰 상태 확인 중 오류:", error);
+                  console.error(
+                    "URL 파라미터 토큰으로 초대 정보 조회 중 오류:",
+                    error
+                  );
                 }
+              } else {
+                console.log("URL 파라미터에 토큰이 없음");
               }
 
               // 초대된 사용자인지 확인
@@ -368,7 +392,7 @@ export default function VerifyEmailPage() {
         description: "패스워드가 설정되고 초대가 수락되었습니다.",
       });
 
-      // 대시보드로 이동
+      // 대시보드로 이동 (초대 수락 완료 후)
       router.push(`/${currentLocale}/dashboard`);
     } catch (error) {
       console.error("패스워드 설정 및 초대 수락 실패:", error);

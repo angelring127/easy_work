@@ -98,6 +98,10 @@ export default function DashboardPage() {
     return null;
   }
 
+  // 패스워드 변경이 필요한 경우 알림 표시
+  const needsPasswordChange = (user as any).user_metadata
+    ?.needs_password_change;
+
   const handleSignOut = async () => {
     await signOut();
     router.push(`/${locale}/login`);

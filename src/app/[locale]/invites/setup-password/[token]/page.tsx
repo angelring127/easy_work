@@ -171,7 +171,7 @@ export default function SetupPasswordPage() {
 
         // 초대 정보 조회
         try {
-          const response = await fetch(`/api/invitations/info/${token}`);
+          const response = await fetch(`/api/invitations/info?token=${token}`);
           const result = await response.json();
 
           if (result.success) {
@@ -275,7 +275,7 @@ export default function SetupPasswordPage() {
           description: "초대가 성공적으로 수락되었습니다.",
         });
 
-        // 대시보드로 리다이렉트
+        // 대시보드로 이동
         router.push(`/${locale}/dashboard`);
       } else {
         throw new Error(result.error);

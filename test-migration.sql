@@ -27,3 +27,5 @@ WHERE tablename IN ('stores', 'store_users', 'invites');
 SELECT generate_invite_token() as sample_token;
 
 
+
+
