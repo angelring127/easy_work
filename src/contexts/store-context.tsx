@@ -60,6 +60,8 @@ export function StoreProvider({ children }: StoreProviderProps) {
 
     setIsLoading(true);
     try {
+      console.log("StoreContext: 매장 목록 로드 시작", { userId: user.id });
+
       const response = await fetch("/api/stores?mine=1", {
         method: "GET",
         headers: {
@@ -71,6 +73,11 @@ export function StoreProvider({ children }: StoreProviderProps) {
         const result = await response.json();
         if (result.success) {
           const stores = result.data || [];
+          console.log("StoreContext: 매장 목록 로드 완료", {
+            storesCount: stores.length,
+            storeNames: stores.map((s: any) => s.name),
+          });
+
           setAccessibleStores(stores);
 
           // 현재 선택된 매장이 목록에 없으면 첫 번째 매장으로 설정
@@ -79,9 +86,13 @@ export function StoreProvider({ children }: StoreProviderProps) {
               setCurrentStore(stores[0]);
               // localStorage에 저장
               localStorage.setItem("currentStoreId", stores[0].id);
+              console.log("StoreContext: 첫 번째 매장으로 설정", {
+                storeName: stores[0].name,
+              });
             } else {
               setCurrentStore(null);
               localStorage.removeItem("currentStoreId");
+              console.log("StoreContext: 매장 없음");
             }
           }
         }

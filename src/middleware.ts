@@ -57,7 +57,14 @@ export async function middleware(request: NextRequest) {
   const pathWithoutLocale = pathname.replace(`/${currentLocale}`, "") || "/";
 
   // 인증이 필요하지 않은 페이지들
-  const publicPaths = ["/", "/login", "/signup", "/auth", "/invites/error"];
+  const publicPaths = [
+    "/",
+    "/login",
+    "/signup",
+    "/auth",
+    "/invites/error",
+    "/invites/verify-email",
+  ];
 
   const isPublicPath = publicPaths.some(
     (path) =>

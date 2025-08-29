@@ -77,6 +77,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     // 매장 관리 권한 (생성/삭제 제외)
     Permission.MANAGE_STORE,
     Permission.INVITE_USER,
+    Permission.MANAGE_USER_ROLES,
     Permission.REMOVE_USER,
     Permission.CREATE_SCHEDULE,
     Permission.EDIT_SCHEDULE,
@@ -142,4 +143,3 @@ export interface RoleChangeRequest {
   storeId?: string; // 매장별 역할인 경우
   reason?: string;
 }
-

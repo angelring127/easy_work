@@ -53,6 +53,36 @@ export default function DashboardPage() {
     isManager,
   } = useAdminAccess();
 
+  // 사용자가 변경될 때마다 매장 목록 새로고침
+  useEffect(() => {
+    if (!loading && user) {
+      // 매장 목록 새로고침
+      const refreshStores = async () => {
+        try {
+          const response = await fetch("/api/stores?mine=1", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+              console.log("Dashboard: 매장 목록 새로고침 완료", {
+                storesCount: result.data?.length || 0,
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Dashboard: 매장 목록 새로고침 실패", error);
+        }
+      };
+
+      refreshStores();
+    }
+  }, [loading, user]);
+
   // 디버깅을 위한 상태 로그 (최소화)
   useEffect(() => {
     if (process.env.NODE_ENV === "development" && !loading) {

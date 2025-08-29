@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { usePermissions } from "@/hooks/use-permissions";
+import { useStore } from "@/contexts/store-context";
+import { usePermissions, useAdminAccess } from "@/hooks/use-permissions";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { StoreSwitcher } from "@/components/ui/store-switcher";
+import { RoleBadge } from "@/components/auth/role-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,6 +28,9 @@ import {
   Users,
   Calendar,
   Settings,
+  User,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
@@ -44,8 +51,14 @@ interface StoreData {
 
 export default function StoreDetailPage() {
   const { locale, id } = useParams();
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
+  const {
+    currentStore,
+    accessibleStores,
+    isLoading: storesLoading,
+  } = useStore();
   const { userRole } = usePermissions();
+  const { canManageStore, canManageUsers, isManager } = useAdminAccess();
   const router = useRouter();
   const { toast } = useToast();
   const currentLocale = (locale as Locale) || "ko";
@@ -99,6 +112,11 @@ export default function StoreDetailPage() {
     router.push(`/${locale}/stores/${storeId}/edit`);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    router.push(`/${locale}/login`);
+  };
+
   const getRoleDisplayName = (role: string | undefined) => {
     if (!role) return t("store.role.part_timer", currentLocale);
     return t(`store.role.${role.toLowerCase()}`, currentLocale);
@@ -113,11 +131,11 @@ export default function StoreDetailPage() {
   };
 
   // 로딩 중인 경우
-  if (loading || isLoading) {
+  if (loading || storesLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
           <p className="text-lg font-medium text-gray-700">
             {t("common.loading", currentLocale)}
           </p>
@@ -154,27 +172,58 @@ export default function StoreDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <div className="bg-white shadow">
+      <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
+            <div className="flex items-center">
+              <h1 className="text-3xl font-bold text-gray-900">Workeasy</h1>
+            </div>
             <div className="flex items-center space-x-4">
+              <LanguageSwitcher />
+              <StoreSwitcher />
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5" />
+                <span className="text-sm font-medium">{user.email}</span>
+                {userRole && <RoleBadge role={userRole} className="text-xs" />}
+              </div>
               <Button
-                variant="ghost"
-                onClick={() => router.push(`/${locale}/stores`)}
+                variant="outline"
+                onClick={handleSignOut}
                 className="flex items-center space-x-2"
               >
-                <ArrowLeft className="h-4 w-4" />
-                <span>{t("common.back", currentLocale)}</span>
+                <LogOut className="h-4 w-4" />
+                <span>{t("dashboard.logout", currentLocale)}</span>
               </Button>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                  <Store className="h-8 w-8" />
-                  {store.name}
-                </h1>
-                <p className="text-gray-600">
-                  {store.description || t("store.noDescription", currentLocale)}
-                </p>
-              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* 메인 콘텐츠 */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* 뒤로가기 버튼 */}
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => router.push(`/${locale}/stores`)}
+            className="flex items-center space-x-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>{t("common.back", currentLocale)}</span>
+          </Button>
+        </div>
+
+        {/* 매장 정보 헤더 */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-4 mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <Store className="h-8 w-8" />
+                {store.name}
+              </h1>
+              <p className="text-gray-600">
+                {store.description || t("store.noDescription", currentLocale)}
+              </p>
             </div>
             <div className="flex items-center space-x-2">
               <Badge
@@ -206,10 +255,7 @@ export default function StoreDetailPage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* 메인 콘텐츠 */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 매장 정보 */}
           <div className="lg:col-span-2">

@@ -15,12 +15,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { t, type Locale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
+import { useStore } from "@/contexts/store-context";
 
 export default function VerifyEmailPage() {
   const { locale } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { refreshStores } = useStore();
   const currentLocale = (locale as Locale) || "ko";
 
   const [isLoading, setIsLoading] = useState(true);
@@ -34,11 +36,16 @@ export default function VerifyEmailPage() {
   const token = searchParams.get("token");
   const type = searchParams.get("type");
 
+  console.log("=== VerifyEmailPage 시작 ===");
   console.log("verify-email 페이지 로드:", { token, type });
+  console.log("현재 URL:", window.location.href);
+  console.log("URL 해시:", window.location.hash);
 
   useEffect(() => {
+    console.log("=== VerifyEmailPage useEffect 시작 ===");
     const checkVerification = async () => {
       try {
+        console.log("checkVerification 함수 시작");
         const supabase = createClient();
 
         // URL 해시 확인 및 처리 (즉시 실행)
@@ -84,32 +91,36 @@ export default function VerifyEmailPage() {
               console.log("VerifyEmailPage: 세션 설정 성공", data.user.email);
               setUser(data.user);
 
-              // URL 파라미터 토큰으로 초대 정보 조회 (우선)
-              if (token) {
+              // 사용자 메타데이터에서 토큰 가져오기
+              const tokenFromMetadata = data.user.user_metadata?.token_hash;
+              const tokenToUse = token || tokenFromMetadata;
+
+              console.log("토큰 확인:", {
+                urlToken: token,
+                metadataToken: tokenFromMetadata,
+                tokenToUse,
+              });
+
+              // 토큰으로 초대 정보 조회
+              if (tokenToUse) {
                 try {
-                  console.log("URL 파라미터 토큰으로 초대 정보 조회 시도:", {
-                    token,
+                  console.log("토큰으로 초대 정보 조회 시도:", {
+                    token: tokenToUse,
                   });
 
                   const response = await fetch(
-                    `/api/invitations/info?token=${token}`
+                    `/api/invitations/info?token=${tokenToUse}`
                   );
                   const result = await response.json();
 
                   if (result.success) {
-                    console.log(
-                      "URL 파라미터 토큰으로 초대 정보 조회 성공:",
-                      result.data
-                    );
+                    console.log("토큰으로 초대 정보 조회 성공:", result.data);
                     console.log("초대가 유효함");
                     setIsVerified(true);
                     setIsLoading(false);
                     return;
                   } else {
-                    console.log(
-                      "URL 파라미터 토큰으로 초대 정보 조회 실패:",
-                      result.error
-                    );
+                    console.log("토큰으로 초대 정보 조회 실패:", result.error);
 
                     // 초대가 이미 처리되었거나 만료된 경우
                     if (
@@ -122,6 +133,7 @@ export default function VerifyEmailPage() {
                           "이미 처리된 초대이거나 만료된 초대입니다.",
                         variant: "destructive",
                       });
+                      await refreshStores();
                       router.push(`/${currentLocale}/dashboard`);
                       return;
                     }
@@ -136,13 +148,10 @@ export default function VerifyEmailPage() {
                     return;
                   }
                 } catch (error) {
-                  console.error(
-                    "URL 파라미터 토큰으로 초대 정보 조회 중 오류:",
-                    error
-                  );
+                  console.error("토큰으로 초대 정보 조회 중 오류:", error);
                 }
               } else {
-                console.log("URL 파라미터에 토큰이 없음");
+                console.log("사용 가능한 토큰이 없음");
               }
 
               // 초대된 사용자인지 확인
@@ -157,6 +166,7 @@ export default function VerifyEmailPage() {
               } else {
                 console.log("일반 사용자:", data.user.user_metadata);
                 // 일반 사용자면 대시보드로 이동
+                await refreshStores();
                 router.push(`/${currentLocale}/dashboard`);
                 return;
               }
@@ -279,6 +289,7 @@ export default function VerifyEmailPage() {
         } else {
           console.log("일반 사용자:", user.user_metadata);
           // 일반 사용자면 대시보드로 이동
+          await refreshStores();
           router.push(`/${currentLocale}/dashboard`);
         }
       } catch (error) {
@@ -392,7 +403,8 @@ export default function VerifyEmailPage() {
         description: "패스워드가 설정되고 초대가 수락되었습니다.",
       });
 
-      // 대시보드로 이동 (초대 수락 완료 후)
+      // 매장 목록 새로고침 후 대시보드로 이동
+      await refreshStores();
       router.push(`/${currentLocale}/dashboard`);
     } catch (error) {
       console.error("패스워드 설정 및 초대 수락 실패:", error);
