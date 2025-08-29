@@ -43,6 +43,7 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     email: "",
+    name: "",
     roleHint: "PART_TIMER" as const,
     expiresInDays: 7,
   });
@@ -66,8 +67,10 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
       }
       return result.data;
     },
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 새로고침
+    refetchInterval: 2000, // 2초마다 자동 새로고침 (더 빠른 업데이트)
     staleTime: 0, // 항상 최신 데이터 가져오기
+    cacheTime: 0, // 캐시 시간을 0으로 설정하여 항상 새로고침
   });
 
   // 초대 생성
@@ -87,7 +90,12 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invitations", storeId] });
       setIsCreateDialogOpen(false);
-      setCreateForm({ email: "", roleHint: "PART_TIMER", expiresInDays: 7 });
+      setCreateForm({
+        email: "",
+        name: "",
+        roleHint: "PART_TIMER",
+        expiresInDays: 7,
+      });
       toast({
         title: t("invite.createSuccess", locale),
         description: t("invite.createSuccess", locale),
@@ -253,6 +261,18 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
             </DialogHeader>
             <div className="space-y-4">
               <div>
+                <Label htmlFor="name">{t("invite.name", locale)}</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, name: e.target.value })
+                  }
+                  placeholder="홍길동"
+                />
+              </div>
+              <div>
                 <Label htmlFor="email">{t("invite.email", locale)}</Label>
                 <Input
                   id="email"
@@ -374,48 +394,58 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invitationsData?.invitations?.map((invitation: Invitation) => (
-                  <TableRow key={invitation.id}>
-                    <TableCell>{invitation.invited_email}</TableCell>
-                    <TableCell>
-                      {getRoleDisplayName(invitation.role_hint)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(invitation.status)}>
-                        {getStatusDisplayName(invitation.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(invitation.expires_at)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        {invitation.status === "PENDING" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                resendInvitationMutation.mutate(invitation.id)
-                              }
-                              disabled={resendInvitationMutation.isPending}
-                            >
-                              {t("invite.resend", locale)}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() =>
-                                cancelInvitationMutation.mutate(invitation.id)
-                              }
-                              disabled={cancelInvitationMutation.isPending}
-                            >
-                              {t("invite.cancel", locale)}
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {invitationsData?.invitations?.map((invitation: Invitation) => {
+                  console.log("초대 렌더링:", {
+                    id: invitation.id,
+                    email: invitation.invited_email,
+                    status: invitation.status,
+                    displayStatus: getStatusDisplayName(invitation.status),
+                  });
+                  return (
+                    <TableRow key={invitation.id}>
+                      <TableCell>{invitation.invited_email}</TableCell>
+                      <TableCell>
+                        {getRoleDisplayName(invitation.role_hint)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={getStatusBadgeVariant(invitation.status)}
+                        >
+                          {getStatusDisplayName(invitation.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(invitation.expires_at)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          {invitation.status === "PENDING" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  resendInvitationMutation.mutate(invitation.id)
+                                }
+                                disabled={resendInvitationMutation.isPending}
+                              >
+                                {t("invite.resend", locale)}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() =>
+                                  cancelInvitationMutation.mutate(invitation.id)
+                                }
+                                disabled={cancelInvitationMutation.isPending}
+                              >
+                                {t("invite.cancel", locale)}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -78,6 +78,17 @@ async function deleteUser(
       );
     }
 
+    // 마스터 권한을 가진 사용자는 삭제 불가
+    if (currentUser.role === "MASTER") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "마스터 권한을 가진 사용자는 삭제할 수 없습니다",
+        },
+        { status: 400 }
+      );
+    }
+
     // 대상 사용자의 현재 상태 확인
     const { data: currentUser, error: userError } = await supabase
       .from("user_store_roles")

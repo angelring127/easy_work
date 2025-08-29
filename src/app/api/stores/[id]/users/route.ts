@@ -66,7 +66,7 @@ async function getStoreUsers(
       );
     }
 
-    // 매장 구성원 목록 조회
+    // 매장 구성원 목록 조회 (삭제된 사용자 포함)
     const { data: userRoles, error: membersError } = await supabase
       .from("user_store_roles")
       .select("*")
@@ -112,6 +112,7 @@ async function getStoreUsers(
         is_default_store: userRole.is_default_store,
         granted_at: userRole.granted_at,
         updated_at: userRole.updated_at,
+        deleted_at: userRole.deleted_at, // 삭제된 사용자 정보 포함
         email: user?.email || "",
         name: user?.user_metadata?.name || null,
         avatar_url: user?.user_metadata?.avatar_url || null,
@@ -128,7 +129,15 @@ async function getStoreUsers(
       members = members.filter((member) => member.role === role);
     }
     if (status && status !== "all") {
-      members = members.filter((member) => member.status === status);
+      if (status === "DELETED") {
+        // 삭제된 사용자 필터
+        members = members.filter((member) => member.deleted_at !== null);
+      } else {
+        // 일반 상태 필터 (삭제되지 않은 사용자만)
+        members = members.filter(
+          (member) => member.status === status && member.deleted_at === null
+        );
+      }
     }
 
     // 검색 필터 적용 (클라이언트 사이드)

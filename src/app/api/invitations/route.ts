@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, storeId, roleHint, expiresInDays = 7 } = body;
+    const { email, name, storeId, roleHint, expiresInDays = 7 } = body;
 
     if (!email || !storeId || !roleHint) {
       return NextResponse.json(
@@ -227,6 +227,7 @@ export async function POST(request: NextRequest) {
               token_hash: (invitation as any).token_hash,
               type: "store_invitation",
               invited_by: user.user_metadata?.name || user.email || "관리자",
+              invited_name: name || "", // 초대된 사용자 이름 추가
               is_invited_user: true,
             },
             redirectTo: `${
@@ -344,76 +345,159 @@ export async function GET(request: NextRequest) {
     }
 
     // 권한 확인
-    const { data: userRole } = await supabase
+    const { data: userRole, error: userRoleError } = await supabase
       .from("user_store_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("store_id", storeId)
       .single();
 
+    console.log("권한 확인 결과:", {
+      userId: user.id,
+      storeId,
+      userRole,
+      userRoleError,
+      hasPermission:
+        userRole && ["MASTER", "SUB_MANAGER"].includes(userRole.role),
+    });
+
     if (!userRole || !["MASTER", "SUB_MANAGER"].includes(userRole.role)) {
+      console.log("권한 없음 - 초대 목록 조회 거부");
       return NextResponse.json(
         {
           success: false,
           error: "초대 목록을 조회할 권한이 없습니다.",
+          details: {
+            userRole: userRole?.role,
+            requiredRoles: ["MASTER", "SUB_MANAGER"],
+          },
         },
         { status: 403 }
       );
     }
 
-    // 초대 목록 조회
-    let query = supabase
+    // 초대 목록 조회 (invitations 테이블 + invites 테이블)
+    console.log("초대 목록 조회 시작:", { storeId, status });
+
+    // 1. invitations 테이블 조회
+    let invitationsQuery = supabase
       .from("invitations")
       .select("*")
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
 
     if (status) {
-      query = query.eq("status", status);
+      invitationsQuery = invitationsQuery.eq("status", status);
     }
 
-    const offset = (page - 1) * limit;
-    const { data: invitations, error: invitationsError } = await query.range(
-      offset,
-      offset + limit - 1
-    );
+    const { data: invitations, error: invitationsError } =
+      await invitationsQuery;
 
     if (invitationsError) {
-      console.error("초대 목록 조회 실패:", invitationsError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "초대 목록 조회에 실패했습니다.",
-        },
-        { status: 500 }
-      );
+      console.error("invitations 테이블 조회 실패:", invitationsError);
     }
 
-    // 전체 개수 조회
-    let countQuery = supabase
-      .from("invitations")
-      .select("*", { count: "exact", head: true })
-      .eq("store_id", storeId);
+    // 2. invites 테이블 조회 (직접 조회 - RPC 함수 대신)
+    const { data: oldInvites, error: oldInvitesError } = await supabase
+      .from("invites")
+      .select("*")
+      .eq("store_id", storeId)
+      .order("invited_at", { ascending: false });
+
+    if (oldInvitesError) {
+      console.error("invites 테이블 조회 실패:", oldInvitesError);
+    }
+
+    // 3. invites 테이블 데이터를 invitations 형식으로 변환
+    const convertedInvites = (oldInvites || []).map((invite: any) => ({
+      id: invite.id,
+      store_id: invite.store_id,
+      invited_email: invite.email,
+      role_hint: invite.role,
+      token_hash: invite.token,
+      status: invite.is_used
+        ? "ACCEPTED"
+        : invite.is_cancelled
+        ? "CANCELLED"
+        : "PENDING",
+      created_at: invite.invited_at, // invites 테이블은 invited_at 사용
+      expires_at: invite.expires_at,
+      invited_by: invite.invited_by,
+      accepted_at: invite.accepted_at,
+      accepted_by: invite.accepted_by,
+      is_from_invites_table: true, // 구분용 플래그
+    }));
+
+    // 4. 두 테이블 데이터 합치기
+    let allInvitations = [...(invitations || []), ...convertedInvites];
+
+    // 5. 상태 필터링 적용 (두 테이블 모두에 적용)
+    console.log("필터링 전 초대 목록:", {
+      totalCount: allInvitations.length,
+      statusFilter: status,
+      allStatuses: allInvitations.map((i) => ({
+        email: i.invited_email,
+        status: i.status,
+      })),
+    });
 
     if (status) {
-      countQuery = countQuery.eq("status", status);
+      const beforeFilterCount = allInvitations.length;
+      allInvitations = allInvitations.filter(
+        (invitation) => invitation.status === status
+      );
+      console.log("상태 필터링 결과:", {
+        beforeFilter: beforeFilterCount,
+        afterFilter: allInvitations.length,
+        filteredStatus: status,
+        filteredInvitations: allInvitations.map((i) => ({
+          email: i.invited_email,
+          status: i.status,
+        })),
+      });
     }
 
-    const { count, error: countError } = await countQuery;
+    // 6. 날짜순 정렬
+    allInvitations.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
 
-    if (countError) {
-      console.error("초대 개수 조회 실패:", countError);
-    }
+    // 5. 페이지네이션 적용
+    const offset = (page - 1) * limit;
+    const paginatedInvitations = allInvitations.slice(offset, offset + limit);
+
+    console.log("초대 목록 조회 결과:", {
+      invitationsCount: invitations?.length || 0,
+      oldInvitesCount: oldInvites?.length || 0,
+      totalCount: allInvitations.length,
+      paginatedCount: paginatedInvitations.length,
+      statusFilter: status,
+      invitations: invitations?.map((i) => ({
+        id: i.id,
+        email: i.invited_email,
+        status: i.status,
+      })),
+      oldInvites: oldInvites?.map((i) => ({
+        id: i.id,
+        email: i.email,
+        is_used: i.is_used,
+        is_cancelled: i.is_cancelled,
+      })),
+    });
+
+    // 전체 개수는 합쳐진 데이터의 길이
+    const totalCount = allInvitations.length;
 
     return NextResponse.json({
       success: true,
       data: {
-        invitations: invitations || [],
+        invitations: paginatedInvitations || [],
         pagination: {
           page,
           limit,
-          total: count || 0,
-          totalPages: Math.ceil((count || 0) / limit),
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
         },
       },
     });

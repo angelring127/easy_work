@@ -376,10 +376,12 @@ export default function VerifyEmailPage() {
           password: password,
         };
 
+        console.log("=== 초대 수락 API 호출 시작 ===");
         console.log("초대 수락 API 요청:", {
           tokenHash: token,
           name: requestBody.name,
           passwordLength: password.length,
+          timestamp: new Date().toISOString(),
         });
 
         const response = await fetch("/api/invitations/accept", {
@@ -391,10 +393,36 @@ export default function VerifyEmailPage() {
         });
 
         const result = await response.json();
-        console.log("초대 수락 API 응답:", result);
+        console.log("=== 초대 수락 API 응답 ===");
+        console.log("초대 수락 API 응답:", {
+          success: result.success,
+          error: result.error,
+          data: result.data,
+          timestamp: new Date().toISOString(),
+        });
 
         if (!result.success) {
           throw new Error(result.error);
+        }
+
+        // 초대 상태 확인 (수락 후 즉시 확인)
+        try {
+          // 상세한 상태 확인 (테스트 API 사용 - 권한 문제 없음)
+          const detailedStatusResponse = await fetch(
+            `/api/test/invitation-status?storeId=${user?.user_metadata?.store_id}&email=${user?.email}`,
+            { cache: "no-store" }
+          );
+          if (detailedStatusResponse.ok) {
+            const detailedData = await detailedStatusResponse.json();
+            console.log("상세한 초대 상태 확인:", detailedData);
+          } else {
+            console.error(
+              "상세한 초대 상태 확인 실패:",
+              detailedStatusResponse.status
+            );
+          }
+        } catch (statusError) {
+          console.error("초대 상태 확인 실패:", statusError);
         }
       }
 
@@ -405,6 +433,42 @@ export default function VerifyEmailPage() {
 
       // 매장 목록 새로고침 후 대시보드로 이동
       await refreshStores();
+
+      // 강력한 캐시 무효화 (초대 상태 업데이트 및 사용자 목록 새로고침을 위해)
+      try {
+        console.log("캐시 무효화 시작...");
+
+        // 초대 목록 캐시 무효화 (여러 번 시도)
+        for (let i = 0; i < 3; i++) {
+          const invitationsResponse = await fetch(
+            `/api/invitations?storeId=${user?.user_metadata?.store_id}`,
+            { cache: "no-store" }
+          );
+          if (invitationsResponse.ok) {
+            console.log(`초대 목록 캐시 무효화 완료 (시도 ${i + 1}/3)`);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+
+        // 사용자 목록 캐시 무효화 (여러 번 시도)
+        for (let i = 0; i < 3; i++) {
+          const usersResponse = await fetch(
+            `/api/stores/${user?.user_metadata?.store_id}/users`,
+            { cache: "no-store" }
+          );
+          if (usersResponse.ok) {
+            console.log(`사용자 목록 캐시 무효화 완료 (시도 ${i + 1}/3)`);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+
+        // 잠시 대기하여 서버 상태 동기화
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        console.log("캐시 무효화 완료");
+      } catch (error) {
+        console.error("캐시 무효화 실패:", error);
+      }
+
       router.push(`/${currentLocale}/dashboard`);
     } catch (error) {
       console.error("패스워드 설정 및 초대 수락 실패:", error);

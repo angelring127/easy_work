@@ -257,7 +257,7 @@ async function resendInvitation(
             invited_by: user.user_metadata?.name || user.email || "관리자",
             is_invited_user: true,
           },
-          redirectTo: `http://localhost:3000/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`,
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`,
         }
       );
 

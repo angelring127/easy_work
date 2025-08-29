@@ -132,6 +132,9 @@ export default function UserManagementPage({
       console.log("API 응답:", result);
       return result.data;
     },
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 새로고침
+    refetchInterval: 3000, // 3초마다 자동 새로고침
+    staleTime: 0, // 항상 최신 데이터 가져오기
   });
 
   // 역할 부여
@@ -622,6 +625,7 @@ export default function UserManagementPage({
                             <SelectItem value="INACTIVE">
                               {t("user.status.inactive", locale)}
                             </SelectItem>
+                            <SelectItem value="DELETED">삭제됨</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -820,7 +824,13 @@ export default function UserManagementPage({
                                     }
                                     disabled={
                                       deleteUserMutation.isPending ||
-                                      isUserDeleted(member)
+                                      isUserDeleted(member) ||
+                                      member.role === "MASTER"
+                                    }
+                                    title={
+                                      member.role === "MASTER"
+                                        ? "마스터 권한을 가진 사용자는 삭제할 수 없습니다"
+                                        : ""
                                     }
                                   >
                                     {isUserDeleted(member) ? "삭제됨" : "삭제"}

@@ -316,29 +316,19 @@ export default function DashboardPage() {
           </Card>
 
           {/* 사용자 관리 */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="h-5 w-5" />
-                {t("dashboard.userManagement", currentLocale)}
-              </CardTitle>
-              <CardDescription>
-                {t("dashboard.userManagementDescription", currentLocale)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() =>
-                    router.push(`/${locale}/stores/${currentStore?.id}/users`)
-                  }
-                  disabled={!currentStore}
-                >
-                  {t("dashboard.viewUsers", currentLocale)}
-                </Button>
-                {canManageUsers && (
+          {(canManageUsers || isManager) && (
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5" />
+                  {t("dashboard.userManagement", currentLocale)}
+                </CardTitle>
+                <CardDescription>
+                  {t("dashboard.userManagementDescription", currentLocale)}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
                   <Button
                     variant="outline"
                     className="w-full justify-start"
@@ -347,12 +337,26 @@ export default function DashboardPage() {
                     }
                     disabled={!currentStore}
                   >
-                    {t("dashboard.inviteUsers", currentLocale)}
+                    {t("dashboard.viewUsers", currentLocale)}
                   </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  {canManageUsers && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() =>
+                        router.push(
+                          `/${locale}/stores/${currentStore?.id}/users`
+                        )
+                      }
+                      disabled={!currentStore}
+                    >
+                      {t("dashboard.inviteUsers", currentLocale)}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* 매장 관리 */}
           <MasterOnly>
