@@ -66,9 +66,9 @@ async function getStoreUsers(
       );
     }
 
-    // 매장 구성원 목록 조회 (삭제된 사용자 포함)
-    const { data: userRoles, error: membersError } = await supabase
-      .from("user_store_roles")
+    // 보안 강화된 store_members 뷰 사용 (auth.users 데이터 노출 제거됨)
+    const { data: members, error: membersError } = await supabase
+      .from("store_members")
       .select("*")
       .eq("store_id", storeId)
       .order("granted_at", { ascending: false });
@@ -84,8 +84,26 @@ async function getStoreUsers(
       );
     }
 
-    // 사용자 정보 조회
-    const userIds = (userRoles || []).map((ur) => ur.user_id);
+    // 삭제된 사용자 정보도 포함하여 조회 (관리자용)
+    const { data: allUserRoles, error: allRolesError } = await supabase
+      .from("user_store_roles")
+      .select("*")
+      .eq("store_id", storeId)
+      .order("granted_at", { ascending: false });
+
+    if (allRolesError) {
+      console.error("전체 사용자 역할 조회 오류:", allRolesError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "사용자 역할 조회에 실패했습니다",
+        },
+        { status: 500 }
+      );
+    }
+
+    // 사용자 정보 조회 (이메일, 이름 등)
+    const userIds = (members || []).map((m) => m.user_id);
     const { data: users, error: usersError } =
       await supabase.auth.admin.listUsers();
 
@@ -100,41 +118,57 @@ async function getStoreUsers(
       );
     }
 
-    // 데이터 변환
-    let members = (userRoles || []).map((userRole) => {
-      const user = users.users.find((u) => u.id === userRole.user_id);
+    // 활성 사용자 정보에 실제 이메일/이름 추가
+    const enrichedMembers = (members || []).map((member) => {
+      const user = users.users.find((u) => u.id === member.user_id);
       return {
-        id: userRole.id,
-        user_id: userRole.user_id,
-        store_id: userRole.store_id,
-        role: userRole.role,
-        status: userRole.status,
-        is_default_store: userRole.is_default_store,
-        granted_at: userRole.granted_at,
-        updated_at: userRole.updated_at,
-        deleted_at: userRole.deleted_at, // 삭제된 사용자 정보 포함
-        email: user?.email || "",
-        name: user?.user_metadata?.name || null,
-        avatar_url: user?.user_metadata?.avatar_url || null,
-        user_created_at: user?.created_at || "",
-        last_sign_in_at: user?.last_sign_in_at || null,
-        temp_start_date: null, // 임시 근무 정보는 별도 조회 필요
-        temp_end_date: null,
-        temp_reason: null,
+        ...member,
+        email: user?.email || member.email, // 실제 이메일 또는 user_id
+        name: user?.user_metadata?.name || member.name,
+        avatar_url: user?.user_metadata?.avatar_url || member.avatar_url,
+        user_created_at: user?.created_at || member.user_created_at,
+        last_sign_in_at: user?.last_sign_in_at || member.last_sign_in_at,
       };
     });
 
+    // 삭제된 사용자 정보 추가
+    const deletedRoles = (allUserRoles || []).filter(
+      (role) => role.deleted_at !== null
+    );
+    const deletedMembers = deletedRoles.map((role) => ({
+      id: role.id,
+      user_id: role.user_id,
+      store_id: role.store_id,
+      role: role.role,
+      status: role.status,
+      is_default_store: role.is_default_store,
+      granted_at: role.granted_at,
+      updated_at: role.updated_at,
+      deleted_at: role.deleted_at,
+      email: "", // 삭제된 사용자는 이메일 정보 없음
+      name: null,
+      avatar_url: null,
+      user_created_at: "",
+      last_sign_in_at: null,
+      temp_start_date: null,
+      temp_end_date: null,
+      temp_reason: null,
+    }));
+
+    // 활성 사용자와 삭제된 사용자 결합
+    let allMembers = [...enrichedMembers, ...deletedMembers];
+
     // 필터 적용 (클라이언트 사이드)
     if (role && role !== "all") {
-      members = members.filter((member) => member.role === role);
+      allMembers = allMembers.filter((member) => member.role === role);
     }
     if (status && status !== "all") {
       if (status === "DELETED") {
         // 삭제된 사용자 필터
-        members = members.filter((member) => member.deleted_at !== null);
+        allMembers = allMembers.filter((member) => member.deleted_at !== null);
       } else {
         // 일반 상태 필터 (삭제되지 않은 사용자만)
-        members = members.filter(
+        allMembers = allMembers.filter(
           (member) => member.status === status && member.deleted_at === null
         );
       }
@@ -143,7 +177,7 @@ async function getStoreUsers(
     // 검색 필터 적용 (클라이언트 사이드)
     if (search) {
       const searchLower = search.toLowerCase();
-      members = members.filter(
+      allMembers = allMembers.filter(
         (member) =>
           member.email?.toLowerCase().includes(searchLower) ||
           member.name?.toLowerCase().includes(searchLower)
@@ -151,10 +185,10 @@ async function getStoreUsers(
     }
 
     // 페이지네이션 적용 (클라이언트 사이드)
-    const total = members.length;
+    const total = allMembers.length;
     const startIndex = offset;
     const endIndex = startIndex + limit;
-    const paginatedMembers = members.slice(startIndex, endIndex);
+    const paginatedMembers = allMembers.slice(startIndex, endIndex);
 
     return NextResponse.json({
       success: true,

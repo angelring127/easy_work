@@ -474,6 +474,29 @@ export interface Database {
         Args: {};
         Returns: number;
       };
+      get_store_members: {
+        Args: {
+          p_store_id?: string;
+        };
+        Returns: {
+          id: string;
+          user_id: string;
+          store_id: string;
+          role: string;
+          status: string;
+          is_default_store: boolean;
+          granted_at: string;
+          updated_at: string;
+          email: string;
+          name: string | null;
+          avatar_url: string | null;
+          user_created_at: string;
+          last_sign_in_at: string | null;
+          temp_start_date: string | null;
+          temp_end_date: string | null;
+          temp_reason: string | null;
+        }[];
+      };
     };
     Enums: {
       [key: string]: never;
@@ -486,6 +509,9 @@ export type Tables<T extends keyof Database["public"]["Tables"]> =
 
 export type Views<T extends keyof Database["public"]["Views"]> =
   Database["public"]["Views"][T]["Row"];
+
+export type Functions<T extends keyof Database["public"]["Functions"]> =
+  Database["public"]["Functions"][T];
 
 export type Enums<T extends keyof Database["public"]["Enums"]> =
   Database["public"]["Enums"][T];
