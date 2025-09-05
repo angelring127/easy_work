@@ -235,6 +235,113 @@ export interface Database {
           updated_at?: string;
         };
       };
+      store_job_roles: {
+        Row: {
+          id: string;
+          store_id: string;
+          name: string;
+          code: string | null;
+          description: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id: string;
+          name: string;
+          code?: string | null;
+          description?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string;
+          name?: string;
+          code?: string | null;
+          description?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      user_store_job_roles: {
+        Row: {
+          store_id: string;
+          user_id: string;
+          job_role_id: string;
+          created_at: string;
+        };
+        Insert: {
+          store_id: string;
+          user_id: string;
+          job_role_id: string;
+          created_at?: string;
+        };
+        Update: {
+          store_id?: string;
+          user_id?: string;
+          job_role_id?: string;
+          created_at?: string;
+        };
+      };
+      work_item_required_roles: {
+        Row: {
+          work_item_id: string;
+          job_role_id: string;
+          min_count: number;
+        };
+        Insert: {
+          work_item_id: string;
+          job_role_id: string;
+          min_count?: number;
+        };
+        Update: {
+          work_item_id?: string;
+          job_role_id?: string;
+          min_count?: number;
+        };
+      };
+      work_items: {
+        Row: {
+          id: string;
+          store_id: string;
+          name: string;
+          start_min: number;
+          end_min: number;
+          unpaid_break_min: number;
+          max_headcount: number;
+          role_hint: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id: string;
+          name: string;
+          start_min: number;
+          end_min: number;
+          unpaid_break_min?: number;
+          max_headcount?: number;
+          role_hint?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string;
+          name?: string;
+          start_min?: number;
+          end_min?: number;
+          unpaid_break_min?: number;
+          max_headcount?: number;
+          role_hint?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       user_accessible_stores: {

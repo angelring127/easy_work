@@ -110,7 +110,12 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
         });
       } else {
         invitation = null;
-        inviteError = new Error("초대 정보를 찾을 수 없습니다");
+        inviteError = {
+          message: "초대 정보를 찾을 수 없습니다",
+          details: null,
+          hint: null,
+          code: "not_found",
+        } as any;
       }
     }
 
@@ -436,25 +441,8 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    // 감사 로그 기록
-    try {
-      await supabase.rpc("log_store_audit", {
-        p_store_id: invitation.store_id,
-        p_action: "ACCEPT_INVITATION",
-        p_table_name: "invitations",
-        p_old_values: {
-          token_hash: tokenHash,
-          status: "PENDING",
-        },
-        p_new_values: {
-          token_hash: tokenHash,
-          status: "ACCEPTED",
-          accepted_by: authData.user.id,
-        },
-      });
-    } catch (auditError) {
-      console.error("감사 로그 기록 실패:", auditError);
-    }
+    // 감사 로그는 RPC 함수 내부에서 자동으로 기록됨
+    console.log("감사 로그는 accept_invitation RPC 함수에서 자동 기록됨");
 
     // 초대 상태 재확인 (업데이트 후)
     console.log("초대 상태 재확인 시작");

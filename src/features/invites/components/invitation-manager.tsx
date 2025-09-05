@@ -41,10 +41,15 @@ interface InvitationManagerProps {
 
 export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
+  const [createForm, setCreateForm] = useState<{
+    email: string;
+    name: string;
+    roleHint: "PART_TIMER" | "SUB_MANAGER";
+    expiresInDays: number;
+  }>({
     email: "",
     name: "",
-    roleHint: "PART_TIMER" as const,
+    roleHint: "PART_TIMER",
     expiresInDays: 7,
   });
   const { toast } = useToast();
@@ -70,7 +75,7 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
     refetchOnWindowFocus: true, // 윈도우 포커스 시 새로고침
     refetchInterval: 2000, // 2초마다 자동 새로고침 (더 빠른 업데이트)
     staleTime: 0, // 항상 최신 데이터 가져오기
-    cacheTime: 0, // 캐시 시간을 0으로 설정하여 항상 새로고침
+    gcTime: 0, // v5: 캐시 정리 시간 (기존 cacheTime 대체)
   });
 
   // 초대 생성
@@ -409,7 +414,13 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={getStatusBadgeVariant(invitation.status)}
+                          variant={
+                            getStatusBadgeVariant(invitation.status) as
+                              | "default"
+                              | "secondary"
+                              | "destructive"
+                              | "outline"
+                          }
                         >
                           {getStatusDisplayName(invitation.status)}
                         </Badge>

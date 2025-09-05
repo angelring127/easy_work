@@ -14,11 +14,10 @@ const demoteUserSchema = z.object({
  */
 async function demoteSubManager(
   request: NextRequest,
-  context: { user: any; params: Promise<{ id: string }> }
+  context: { user: any; params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const { user } = context;
-    const params = await context.params;
+    const { user, params } = context;
     const storeId = params.id;
     const body = await request.json();
 

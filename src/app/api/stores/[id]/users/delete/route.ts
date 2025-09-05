@@ -14,11 +14,10 @@ const deleteUserSchema = z.object({
  */
 async function deleteUser(
   request: NextRequest,
-  context: { user: any; params: Promise<{ id: string }> }
+  context: { user: any; params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const { user } = context;
-    const params = await context.params;
+    const { user, params } = context;
     const storeId = params.id;
     const body = await request.json();
 
@@ -78,6 +77,13 @@ async function deleteUser(
       );
     }
 
+    // 대상 사용자의 현재 상태 확인
+    const { data: currentUser, error: userError } = await supabase
+      .from("user_store_roles")
+      .select("role, status, deleted_at")
+      .eq("user_id", userId)
+      .eq("store_id", storeId)
+      .single();
     // 마스터 권한을 가진 사용자는 삭제 불가
     if (currentUser.role === "MASTER") {
       return NextResponse.json(
@@ -88,14 +94,6 @@ async function deleteUser(
         { status: 400 }
       );
     }
-
-    // 대상 사용자의 현재 상태 확인
-    const { data: currentUser, error: userError } = await supabase
-      .from("user_store_roles")
-      .select("role, status, deleted_at")
-      .eq("user_id", userId)
-      .eq("store_id", storeId)
-      .single();
 
     if (userError || !currentUser) {
       return NextResponse.json(

@@ -21,3 +21,5 @@ CREATE POLICY "Users can view stores they own or are invited to" ON stores
 -- CREATE POLICY "Authenticated users can create stores" ON stores
 -- CREATE POLICY "Store owners can update stores" ON stores
 
+
+

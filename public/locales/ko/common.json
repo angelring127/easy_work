@@ -98,5 +98,85 @@
     "loading": "로딩 중...",
     "error": "오류",
     "success": "성공"
+  },
+  "settings": {
+    "store": {
+      "title": "매장 설정",
+      "basic": "기본 정보",
+      "hours": "영업시간·휴무",
+      "workItems": "근무 항목",
+      "targets": "커버리지",
+      "breakRules": "브레이크",
+      "policies": "운영 규정",
+      "notifications": "알림",
+      "timezone": "타임존",
+      "weekStart": "주 시작 요일",
+      "phone": "전화",
+      "address": "주소",
+      "brandColor": "브랜드 색상",
+      "publishCutoff": "게시 마감 시간",
+      "freezeBefore": "프리즈(편집 금지) 시작",
+      "saveSuccess": "저장 완료",
+      "saveError": "저장 실패"
+    }
+  },
+  "workItems": {
+    "title": "근무 항목",
+    "name": "이름",
+    "start": "시작",
+    "end": "종료",
+    "break": "무급 휴식(분)",
+    "maxHeadcount": "최대 인원",
+    "roleHint": "역할",
+    "create": "항목 추가",
+    "update": "항목 수정",
+    "delete": "항목 삭제",
+    "uniqueName": "이름이 중복되었습니다"
+  },
+  "targets": {
+    "title": "커버리지 타겟",
+    "weekday": "요일",
+    "start": "시작",
+    "end": "종료",
+    "min": "최소 인원",
+    "max": "최대 인원",
+    "roleHint": "역할",
+    "create": "타겟 추가",
+    "update": "타겟 수정",
+    "delete": "타겟 삭제"
+  },
+  "rules": {
+    "title": "운영 규정",
+    "swap": {
+      "leadTime": "교대 요청 리드타임(시간)",
+      "sameRole": "동일 역할만 교대 허용",
+      "autoApprove": "자동 승인 임계(시간)"
+    },
+    "break": {
+      "auto": "자동 브레이크",
+      "threshold": "임계(시간)",
+      "breakMin": "휴식(분)",
+      "paid": "유급"
+    },
+    "compliance": {
+      "minRest": "근무 간 최소 휴식(시간)",
+      "maxPerDay": "일 최대 근무(시간)",
+      "maxPerWeek": "주 최대 근무(시간)",
+      "maxConsecutive": "연속 근무 최대(일)"
+    },
+    "night": {
+      "boundary": "심야 경계(분)"
+    }
+  },
+  "schedule": {
+    "errors": {
+      "endAfterStart": "종료는 시작보다 커야 합니다",
+      "breakTooLong": "휴식 시간이 근무 시간을 초과합니다",
+      "overMaxHeadcount": "최대 인원을 초과했습니다",
+      "underMinTarget": "최소 타겟 인원 미달",
+      "overMaxTarget": "최대 타겟 인원 초과",
+      "frozen": "프리즈 시간 이후 편집할 수 없습니다",
+      "swapNotAllowed": "교대가 허용되지 않습니다"
+    }
   }
 }

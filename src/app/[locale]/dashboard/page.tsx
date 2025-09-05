@@ -417,7 +417,7 @@ export default function DashboardPage() {
                     className="w-full justify-start"
                     onClick={() =>
                       router.push(
-                        `/${locale}/stores/${currentStore.id}/settings`
+                        `/${locale}/stores/${currentStore.id}/edit?from=dashboard`
                       )
                     }
                   >

@@ -28,5 +28,85 @@
   "submit": "Submit",
   "confirm": "Confirm",
   "close": "Close",
-  "open": "Open"
+  "open": "Open",
+  "settings": {
+    "store": {
+      "title": "Store Settings",
+      "basic": "Basic",
+      "hours": "Hours & Holidays",
+      "workItems": "Work Items",
+      "targets": "Coverage",
+      "breakRules": "Break Rules",
+      "policies": "Policies",
+      "notifications": "Notifications",
+      "timezone": "Timezone",
+      "weekStart": "Week Start",
+      "phone": "Phone",
+      "address": "Address",
+      "brandColor": "Brand Color",
+      "publishCutoff": "Publish Cutoff (hrs)",
+      "freezeBefore": "Freeze Before Shift (hrs)",
+      "saveSuccess": "Saved",
+      "saveError": "Save failed"
+    }
+  },
+  "workItems": {
+    "title": "Work Items",
+    "name": "Name",
+    "start": "Start",
+    "end": "End",
+    "break": "Unpaid Break (min)",
+    "maxHeadcount": "Max Headcount",
+    "roleHint": "Role",
+    "create": "Add Item",
+    "update": "Update Item",
+    "delete": "Delete Item",
+    "uniqueName": "Name already exists"
+  },
+  "targets": {
+    "title": "Staffing Targets",
+    "weekday": "Weekday",
+    "start": "Start",
+    "end": "End",
+    "min": "Min",
+    "max": "Max",
+    "roleHint": "Role",
+    "create": "Add Target",
+    "update": "Update Target",
+    "delete": "Delete Target"
+  },
+  "rules": {
+    "title": "Policies",
+    "swap": {
+      "leadTime": "Swap Lead Time (hrs)",
+      "sameRole": "Swap Only Same Role",
+      "autoApprove": "Auto-Approve Threshold (hrs)"
+    },
+    "break": {
+      "auto": "Auto Break",
+      "threshold": "Threshold (hrs)",
+      "breakMin": "Break (min)",
+      "paid": "Paid"
+    },
+    "compliance": {
+      "minRest": "Min Rest Between Shifts",
+      "maxPerDay": "Max Hours / Day",
+      "maxPerWeek": "Max Hours / Week",
+      "maxConsecutive": "Max Consecutive Days"
+    },
+    "night": {
+      "boundary": "Night Boundary (min)"
+    }
+  },
+  "schedule": {
+    "errors": {
+      "endAfterStart": "End must be after Start",
+      "breakTooLong": "Break exceeds duration",
+      "overMaxHeadcount": "Exceeds max headcount",
+      "underMinTarget": "Below min target",
+      "overMaxTarget": "Above max target",
+      "frozen": "Cannot edit after freeze time",
+      "swapNotAllowed": "Swap is not allowed"
+    }
+  }
 }

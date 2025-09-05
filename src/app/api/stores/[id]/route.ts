@@ -5,16 +5,25 @@ import { createClient } from "@/lib/supabase/server";
 
 // 매장 수정 스키마
 const updateStoreSchema = z.object({
-  name: z
-    .string()
-    .min(1, "매장명은 필수입니다")
-    .max(255, "매장명은 255자 이하여야 합니다")
-    .optional(),
+  name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
   timezone: z.string().optional(),
   status: z.enum(["ACTIVE", "ARCHIVED"]).optional(),
+  week_start: z.number().int().min(0).max(6).optional(),
+  brand_color: z.string().optional(),
+  publish_cutoff_hours: z.number().int().min(0).max(168).optional(),
+  freeze_hours_before_shift: z.number().int().min(0).max(168).optional(),
+  swap_lead_time_hours: z.number().int().min(0).max(168).optional(),
+  swap_require_same_role: z.boolean().optional(),
+  swap_auto_approve_threshold: z.number().int().min(0).max(168).optional(),
+  min_rest_hours_between_shifts: z.number().int().min(0).max(48).optional(),
+  max_hours_per_day: z.number().int().min(0).max(24).optional(),
+  max_hours_per_week: z.number().int().min(0).max(168).optional(),
+  max_consecutive_days: z.number().int().min(0).max(14).optional(),
+  weekly_labor_budget_cents: z.number().int().min(0).optional(),
+  night_shift_boundary_min: z.number().int().min(0).max(1440).optional(),
 });
 
 type UpdateStoreRequest = z.infer<typeof updateStoreSchema>;
@@ -137,7 +146,7 @@ async function updateStore(
     // 기존 데이터 백업 (감사 로그용)
     const oldValues = { ...store };
 
-    // 매장 정보 수정
+    // 매장 정보 수정 (확장 필드 포함)
     const { data: updatedStore, error: updateError } = await supabase
       .from("stores")
       .update(validatedData)

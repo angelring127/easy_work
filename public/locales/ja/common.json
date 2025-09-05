@@ -28,5 +28,85 @@
   "submit": "送信",
   "confirm": "確認",
   "close": "閉じる",
-  "open": "開く"
+  "open": "開く",
+  "settings": {
+    "store": {
+      "title": "店舗設定",
+      "basic": "基本情報",
+      "hours": "営業時間・休業日",
+      "workItems": "勤務項目",
+      "targets": "カバレッジ",
+      "breakRules": "休憩ルール",
+      "policies": "運用ルール",
+      "notifications": "通知",
+      "timezone": "タイムゾーン",
+      "weekStart": "週の開始曜日",
+      "phone": "電話",
+      "address": "住所",
+      "brandColor": "ブランドカラー",
+      "publishCutoff": "公開締切(時間)",
+      "freezeBefore": "開始前編集禁止(時間)",
+      "saveSuccess": "保存しました",
+      "saveError": "保存に失敗しました"
+    }
+  },
+  "workItems": {
+    "title": "勤務項目",
+    "name": "名称",
+    "start": "開始",
+    "end": "終了",
+    "break": "無給休憩(分)",
+    "maxHeadcount": "最大人数",
+    "roleHint": "役割",
+    "create": "項目追加",
+    "update": "項目更新",
+    "delete": "項目削除",
+    "uniqueName": "名称が重複しています"
+  },
+  "targets": {
+    "title": "カバレッジ目標",
+    "weekday": "曜日",
+    "start": "開始",
+    "end": "終了",
+    "min": "最小",
+    "max": "最大",
+    "roleHint": "役割",
+    "create": "目標追加",
+    "update": "目標更新",
+    "delete": "目標削除"
+  },
+  "rules": {
+    "title": "運用ルール",
+    "swap": {
+      "leadTime": "交代リードタイム(時間)",
+      "sameRole": "同役割のみ交代",
+      "autoApprove": "自動承認しきい値(時間)"
+    },
+    "break": {
+      "auto": "自動休憩",
+      "threshold": "しきい値(時間)",
+      "breakMin": "休憩(分)",
+      "paid": "有給"
+    },
+    "compliance": {
+      "minRest": "勤務間最小休息(時間)",
+      "maxPerDay": "1日最大勤務(時間)",
+      "maxPerWeek": "週最大勤務(時間)",
+      "maxConsecutive": "連続勤務最大(日)"
+    },
+    "night": {
+      "boundary": "深夜の境界(分)"
+    }
+  },
+  "schedule": {
+    "errors": {
+      "endAfterStart": "終了は開始より後である必要があります",
+      "breakTooLong": "休憩が勤務時間を超えています",
+      "overMaxHeadcount": "最大人数を超えています",
+      "underMinTarget": "最小目標人数未満",
+      "overMaxTarget": "最大目標人数超過",
+      "frozen": "編集禁止時間を過ぎています",
+      "swapNotAllowed": "交代は許可されていません"
+    }
+  }
 }
