@@ -49,6 +49,8 @@
    - store_members 뷰 보안 취약점 해결
    - auth.users 데이터 직접 노출 제거
    - 뷰에서 auth.users JOIN 제거하여 Supabase 보안 경고 해결
+   - SECURITY DEFINER 속성 제거로 추가 보안 경고 해결
+   - invitation_details 뷰 보안 강화
    - API에서 supabase.auth.admin.listUsers()로 사용자 정보 별도 조회
    - 기존 API 엔드포인트 보안 강화 및 호환성 유지
    - TypeScript 타입 정의 업데이트

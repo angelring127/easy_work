@@ -66,11 +66,12 @@ async function getStoreUsers(
       );
     }
 
-    // 보안 강화된 store_members 뷰 사용 (auth.users 데이터 노출 제거됨)
-    const { data: members, error: membersError } = await supabase
-      .from("store_members")
+    // 직접 테이블 조회 (뷰 제거로 인한 변경)
+    const { data: userRoles, error: membersError } = await supabase
+      .from("user_store_roles")
       .select("*")
       .eq("store_id", storeId)
+      .eq("deleted_at", null)
       .order("granted_at", { ascending: false });
 
     if (membersError) {
@@ -103,7 +104,7 @@ async function getStoreUsers(
     }
 
     // 사용자 정보 조회 (이메일, 이름 등)
-    const userIds = (members || []).map((m) => m.user_id);
+    const userIds = (userRoles || []).map((ur) => ur.user_id);
     const { data: users, error: usersError } =
       await supabase.auth.admin.listUsers();
 
@@ -119,15 +120,26 @@ async function getStoreUsers(
     }
 
     // 활성 사용자 정보에 실제 이메일/이름 추가
-    const enrichedMembers = (members || []).map((member) => {
-      const user = users.users.find((u) => u.id === member.user_id);
+    const enrichedMembers = (userRoles || []).map((userRole) => {
+      const user = users.users.find((u) => u.id === userRole.user_id);
       return {
-        ...member,
-        email: user?.email || member.email, // 실제 이메일 또는 user_id
-        name: user?.user_metadata?.name || member.name,
-        avatar_url: user?.user_metadata?.avatar_url || member.avatar_url,
-        user_created_at: user?.created_at || member.user_created_at,
-        last_sign_in_at: user?.last_sign_in_at || member.last_sign_in_at,
+        id: userRole.id,
+        user_id: userRole.user_id,
+        store_id: userRole.store_id,
+        role: userRole.role,
+        status: userRole.status,
+        is_default_store: userRole.is_default_store,
+        granted_at: userRole.granted_at,
+        updated_at: userRole.updated_at,
+        deleted_at: userRole.deleted_at,
+        email: user?.email || "",
+        name: user?.user_metadata?.name || null,
+        avatar_url: user?.user_metadata?.avatar_url || null,
+        user_created_at: user?.created_at || "",
+        last_sign_in_at: user?.last_sign_in_at || null,
+        temp_start_date: null,
+        temp_end_date: null,
+        temp_reason: null,
       };
     });
 
