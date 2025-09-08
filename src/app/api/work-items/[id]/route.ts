@@ -37,6 +37,54 @@ export async function PATCH(
     );
   }
 
+  // 근무항목이 존재하는지 확인하고 매장 권한 검증
+  const { data: workItem, error: workItemError } = await supabase
+    .from("work_items")
+    .select("id, store_id")
+    .eq("id", id)
+    .single();
+
+  if (workItemError || !workItem) {
+    return NextResponse.json(
+      { success: false, error: "Work item not found" },
+      { status: 404 }
+    );
+  }
+
+  // 매장 관리 권한 확인
+  const { data: store, error: storeError } = await supabase
+    .from("stores")
+    .select("id, owner_id")
+    .eq("id", workItem.store_id)
+    .single();
+
+  if (storeError || !store) {
+    return NextResponse.json(
+      { success: false, error: "Store not found" },
+      { status: 404 }
+    );
+  }
+
+  // 소유자 또는 관리자 권한 확인
+  const isOwner = store.owner_id === user.user.id;
+  const { data: userRole } = await supabase
+    .from("user_store_roles")
+    .select("role")
+    .eq("store_id", workItem.store_id)
+    .eq("user_id", user.user.id)
+    .eq("status", "ACTIVE")
+    .single();
+
+  const isManager =
+    userRole && ["MASTER", "SUB_MANAGER"].includes(userRole.role);
+
+  if (!isOwner && !isManager) {
+    return NextResponse.json(
+      { success: false, error: "Insufficient permissions" },
+      { status: 403 }
+    );
+  }
+
   const p = parsed.data as z.infer<typeof PatchSchema>;
 
   // optional: validate relational invariants if both provided
@@ -98,6 +146,54 @@ export async function DELETE(
     return NextResponse.json(
       { success: false, error: "unauthorized" },
       { status: 401 }
+    );
+  }
+
+  // 근무항목이 존재하는지 확인하고 매장 권한 검증
+  const { data: workItem, error: workItemError } = await supabase
+    .from("work_items")
+    .select("id, store_id")
+    .eq("id", id)
+    .single();
+
+  if (workItemError || !workItem) {
+    return NextResponse.json(
+      { success: false, error: "Work item not found" },
+      { status: 404 }
+    );
+  }
+
+  // 매장 관리 권한 확인
+  const { data: store, error: storeError } = await supabase
+    .from("stores")
+    .select("id, owner_id")
+    .eq("id", workItem.store_id)
+    .single();
+
+  if (storeError || !store) {
+    return NextResponse.json(
+      { success: false, error: "Store not found" },
+      { status: 404 }
+    );
+  }
+
+  // 소유자 또는 관리자 권한 확인
+  const isOwner = store.owner_id === user.user.id;
+  const { data: userRole } = await supabase
+    .from("user_store_roles")
+    .select("role")
+    .eq("store_id", workItem.store_id)
+    .eq("user_id", user.user.id)
+    .eq("status", "ACTIVE")
+    .single();
+
+  const isManager =
+    userRole && ["MASTER", "SUB_MANAGER"].includes(userRole.role);
+
+  if (!isOwner && !isManager) {
+    return NextResponse.json(
+      { success: false, error: "Insufficient permissions" },
+      { status: 403 }
     );
   }
 

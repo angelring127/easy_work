@@ -157,3 +157,4 @@ CREATE POLICY "Authenticated users can view accessible store members" ON store_m
 -- 2. 접근 가능한 모든 매장 구성원 조회: SELECT * FROM get_store_members();
 -- 3. 기존 뷰 사용 (호환성): SELECT * FROM store_members WHERE store_id = 'store-uuid';
 
+

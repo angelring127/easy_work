@@ -34,3 +34,4 @@ LEFT JOIN temporary_assignments ta ON usr.user_id = ta.user_id
     AND CURRENT_DATE BETWEEN ta.start_date AND ta.end_date
 WHERE usr.deleted_at IS NULL;
 
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,6 +12,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Minus, Edit, Trash2, Save, X, Clock, Users } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -35,8 +43,8 @@ interface JobRole {
 }
 
 interface WorkItemRoleRequirement {
-  job_role_id: string;
-  min_count: number;
+  jobRoleId: string;
+  minCount: number;
 }
 
 interface WorkItemsEditorProps {
@@ -50,6 +58,8 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [deletingItem, setDeletingItem] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
     startHour: 10,
@@ -65,7 +75,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
   const { toast } = useToast();
 
   // 근무 항목과 직무 목록 로드
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [workItemsRes, jobRolesRes] = await Promise.all([
         fetch(`/api/work-items?store_id=${storeId}`),
@@ -90,11 +100,11 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId, locale, toast]);
 
   useEffect(() => {
     loadData();
-  }, [storeId]);
+  }, [storeId, loadData]);
 
   const resetForm = () => {
     setForm({
@@ -115,6 +125,54 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     setCreating(true);
     setEditingItem(null);
     resetForm();
+  };
+
+  const startEditing = async (item: WorkItem) => {
+    setEditingItem(item.id);
+    setCreating(false);
+
+    // 기존 데이터로 폼 초기화
+    const { hour: startHour, amPm: startAmPm } = convertFrom24Hour(
+      Math.floor(item.start_min / 60)
+    );
+    const { hour: endHour, amPm: endAmPm } = convertFrom24Hour(
+      Math.floor(item.end_min / 60)
+    );
+
+    // 기존 직무 요구사항 로드
+    let existingRoleRequirements: WorkItemRoleRequirement[] = [];
+    try {
+      const response = await fetch(
+        `/api/work-item-required-roles?work_item_id=${item.id}`
+      );
+      if (response.ok) {
+        const result = await response.json();
+        console.log("기존 직무 요구사항 로드:", result.data);
+
+        // API 응답 데이터를 프론트엔드 형식으로 변환
+        existingRoleRequirements = (result.data || []).map((req: any) => ({
+          jobRoleId: req.job_role_id,
+          minCount: req.min_count,
+        }));
+
+        console.log("변환된 직무 요구사항:", existingRoleRequirements);
+      }
+    } catch (error) {
+      console.error("직무 요구사항 로드 실패:", error);
+    }
+
+    setForm({
+      name: item.name,
+      startHour,
+      startMinute: item.start_min % 60,
+      startAmPm,
+      endHour,
+      endMinute: item.end_min % 60,
+      endAmPm,
+      unpaidBreakMin: item.unpaid_break_min,
+      maxHeadcount: item.max_headcount,
+      roleRequirements: existingRoleRequirements,
+    });
   };
 
   const handleCancel = () => {
@@ -142,14 +200,14 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
 
   const addRoleRequirement = (jobRoleId: string) => {
     const existing = form.roleRequirements.find(
-      (r) => r.job_role_id === jobRoleId
+      (r) => r.jobRoleId === jobRoleId
     );
     if (existing) {
       setForm((prev) => ({
         ...prev,
         roleRequirements: prev.roleRequirements.map((r) =>
-          r.job_role_id === jobRoleId
-            ? { ...r, min_count: Math.min(r.min_count + 1, 99) }
+          r.jobRoleId === jobRoleId
+            ? { ...r, minCount: Math.min(r.minCount + 1, 99) }
             : r
         ),
       }));
@@ -158,7 +216,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
         ...prev,
         roleRequirements: [
           ...prev.roleRequirements,
-          { job_role_id: jobRoleId, min_count: 1 },
+          { jobRoleId: jobRoleId, minCount: 1 },
         ],
       }));
     }
@@ -168,7 +226,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     setForm((prev) => ({
       ...prev,
       roleRequirements: prev.roleRequirements.filter(
-        (r) => r.job_role_id !== jobRoleId
+        (r) => r.jobRoleId !== jobRoleId
       ),
     }));
   };
@@ -177,14 +235,14 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     setForm((prev) => ({
       ...prev,
       roleRequirements: prev.roleRequirements.map((r) =>
-        r.job_role_id === jobRoleId ? { ...r, min_count: minCount } : r
+        r.jobRoleId === jobRoleId ? { ...r, minCount: minCount } : r
       ),
     }));
   };
 
   // 직무별 최소 인원 합계 계산
   const totalRequiredHeadcount = form.roleRequirements.reduce(
-    (sum, req) => sum + req.min_count,
+    (sum, req) => sum + req.minCount,
     0
   );
 
@@ -224,40 +282,105 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     const calculatedMaxHeadcount = Math.max(totalRequiredHeadcount, 1);
 
     try {
-      const response = await fetch("/api/work-items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          storeId,
+      if (editingItem) {
+        // 수정 모드
+        const updateData = {
           name: form.name.trim(),
           startMin,
           endMin,
           unpaidBreakMin: form.unpaidBreakMin,
           maxHeadcount: calculatedMaxHeadcount,
-        }),
-      });
+        };
 
-      if (response.ok) {
-        // 직무 요구 사항 설정
-        if (form.roleRequirements.length > 0) {
-          const workItem = await response.json();
-          await fetch("/api/work-item-required-roles", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              workItemId: workItem.data.id,
-              roles: form.roleRequirements,
-            }),
-          });
-        }
-
-        toast({
-          title: t("workItems.createSuccess", locale),
+        console.log("근무항목 수정 요청 데이터:", {
+          editingItem,
+          updateData,
+          formData: form,
         });
-        await loadData();
-        handleCancel();
+
+        const response = await fetch(`/api/work-items/${editingItem}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updateData),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("근무항목 수정 성공:", result);
+
+          // 직무 요구사항 업데이트
+          if (form.roleRequirements.length > 0) {
+            const roleUpdateData = {
+              workItemId: editingItem,
+              roles: form.roleRequirements.map((req) => ({
+                jobRoleId: req.jobRoleId,
+                minCount: req.minCount,
+              })),
+            };
+
+            console.log("직무 요구사항 업데이트 데이터:", roleUpdateData);
+
+            await fetch("/api/work-item-required-roles", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(roleUpdateData),
+            });
+          }
+
+          toast({
+            title: t("workItems.updateSuccess", locale),
+          });
+          await loadData();
+          handleCancel();
+        } else {
+          const errorData = await response.json();
+          console.error("근무항목 수정 실패:", errorData);
+          throw new Error(errorData.error || "Failed to update work item");
+        }
       } else {
-        throw new Error("Failed to create work item");
+        // 생성 모드
+        const response = await fetch("/api/work-items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storeId,
+            name: form.name.trim(),
+            startMin,
+            endMin,
+            unpaidBreakMin: form.unpaidBreakMin,
+            maxHeadcount: calculatedMaxHeadcount,
+          }),
+        });
+
+        if (response.ok) {
+          // 직무 요구 사항 설정
+          if (form.roleRequirements.length > 0) {
+            const workItem = await response.json();
+            const roleCreateData = {
+              workItemId: workItem.data.id,
+              roles: form.roleRequirements.map((req) => ({
+                jobRoleId: req.jobRoleId,
+                minCount: req.minCount,
+              })),
+            };
+
+            console.log("직무 요구사항 생성 데이터:", roleCreateData);
+
+            await fetch("/api/work-item-required-roles", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(roleCreateData),
+            });
+          }
+
+          toast({
+            title: t("workItems.createSuccess", locale),
+          });
+          await loadData();
+          handleCancel();
+        } else {
+          throw new Error("Failed to create work item");
+        }
       }
     } catch (error) {
       toast({
@@ -279,6 +402,44 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     return `${isNextDay ? "다음날 " : ""}${ampmText} ${hour}시 ${mins
       .toString()
       .padStart(2, "0")}분`;
+  };
+
+  const handleDeleteClick = (itemId: string) => {
+    setDeletingItem(itemId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingItem) return;
+
+    try {
+      const response = await fetch(`/api/work-items/${deletingItem}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast({
+          title: t("workItems.deleteSuccess", locale),
+        });
+        await loadData();
+      } else {
+        throw new Error("Failed to delete work item");
+      }
+    } catch (error) {
+      toast({
+        title: t("common.error", locale),
+        description: String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingItem(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setDeletingItem(null);
   };
 
   if (loading) {
@@ -319,10 +480,14 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
       </div>
 
       {/* 근무 항목 생성/수정 폼 */}
-      {creating && (
+      {(creating || editingItem) && (
         <Card>
           <CardHeader>
-            <CardTitle>{t("workItems.create", locale)}</CardTitle>
+            <CardTitle>
+              {editingItem
+                ? t("workItems.editTitle", locale)
+                : t("workItems.create", locale)}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* 기본 정보 */}
@@ -495,19 +660,17 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                   <Label>{t("workItems.selectedJobs", locale)}</Label>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {form.roleRequirements.map((req) => {
-                      const role = jobRoles.find(
-                        (r) => r.id === req.job_role_id
-                      );
+                      const role = jobRoles.find((r) => r.id === req.jobRoleId);
                       if (!role) return null;
 
                       return (
                         <div
-                          key={req.job_role_id}
+                          key={req.jobRoleId}
                           className="flex items-center justify-between p-2 border rounded bg-gray-50"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{role.name}</span>
-                            <Badge variant="secondary">{req.min_count}</Badge>
+                            <Badge variant="secondary">{req.minCount}</Badge>
                           </div>
                           <div className="flex items-center gap-1">
                             <Button
@@ -515,11 +678,11 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                               variant="outline"
                               onClick={() =>
                                 updateRoleRequirement(
-                                  req.job_role_id,
-                                  Math.max(0, req.min_count - 1)
+                                  req.jobRoleId,
+                                  Math.max(0, req.minCount - 1)
                                 )
                               }
-                              disabled={req.min_count <= 0}
+                              disabled={req.minCount <= 0}
                             >
                               <Minus className="w-3 h-3" />
                             </Button>
@@ -528,8 +691,8 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                               variant="outline"
                               onClick={() =>
                                 updateRoleRequirement(
-                                  req.job_role_id,
-                                  req.min_count + 1
+                                  req.jobRoleId,
+                                  req.minCount + 1
                                 )
                               }
                             >
@@ -539,7 +702,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                               size="sm"
                               variant="outline"
                               onClick={() =>
-                                removeRoleRequirement(req.job_role_id)
+                                removeRoleRequirement(req.jobRoleId)
                               }
                             >
                               <X className="w-3 h-3" />
@@ -562,7 +725,9 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
             <div className="flex gap-2">
               <Button onClick={handleSubmit}>
                 <Save className="w-4 h-4 mr-2" />
-                {t("common.create", locale)}
+                {editingItem
+                  ? t("common.save", locale)
+                  : t("common.create", locale)}
               </Button>
               <Button variant="outline" onClick={handleCancel}>
                 <X className="w-4 h-4 mr-2" />
@@ -625,32 +790,16 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        // 편집 기능은 향후 구현
-                        toast({
-                          title: t("common.info", locale),
-                          description: t(
-                            "workItems.editNotImplemented",
-                            locale
-                          ),
-                        });
-                      }}
+                      onClick={() => startEditing(item)}
+                      disabled={creating || editingItem !== null}
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        // 삭제 기능은 향후 구현
-                        toast({
-                          title: t("common.info", locale),
-                          description: t(
-                            "workItems.deleteNotImplemented",
-                            locale
-                          ),
-                        });
-                      }}
+                      onClick={() => handleDeleteClick(item.id)}
+                      disabled={creating || editingItem !== null}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -661,6 +810,26 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("workItems.deleteConfirm", locale)}</DialogTitle>
+            <DialogDescription>
+              {t("workItems.deleteConfirmDescription", locale)}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDeleteCancel}>
+              {t("common.cancel", locale)}
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm}>
+              {t("workItems.delete", locale)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
