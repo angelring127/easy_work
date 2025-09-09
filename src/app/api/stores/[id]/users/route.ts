@@ -71,7 +71,7 @@ async function getStoreUsers(
       .from("user_store_roles")
       .select("*")
       .eq("store_id", storeId)
-      .eq("deleted_at", null)
+      .is("deleted_at", null)
       .order("granted_at", { ascending: false });
 
     if (membersError) {
@@ -145,7 +145,7 @@ async function getStoreUsers(
 
     // 삭제된 사용자 정보 추가
     const deletedRoles = (allUserRoles || []).filter(
-      (role) => role.deleted_at !== null
+      (role) => role.deleted_at !== null && role.deleted_at !== undefined
     );
     const deletedMembers = deletedRoles.map((role) => ({
       id: role.id,
@@ -177,11 +177,16 @@ async function getStoreUsers(
     if (status && status !== "all") {
       if (status === "DELETED") {
         // 삭제된 사용자 필터
-        allMembers = allMembers.filter((member) => member.deleted_at !== null);
+        allMembers = allMembers.filter(
+          (member) =>
+            member.deleted_at !== null && member.deleted_at !== undefined
+        );
       } else {
         // 일반 상태 필터 (삭제되지 않은 사용자만)
         allMembers = allMembers.filter(
-          (member) => member.status === status && member.deleted_at === null
+          (member) =>
+            member.status === status &&
+            (member.deleted_at === null || member.deleted_at === undefined)
         );
       }
     }

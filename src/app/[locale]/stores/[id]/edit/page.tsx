@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -13,9 +13,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { WorkItemRoleManager } from "@/components/schedule/work-item-role-manager";
 import { RolesEditor } from "@/components/schedule/roles-editor";
 import { WorkItemsEditor } from "@/components/schedule/work-items-editor";
+import {
+  getCurrencySymbol,
+  getCurrencyName,
+  type CurrencyUnit,
+} from "@/lib/currency";
 
 interface StoreData {
   id: string;
@@ -47,21 +59,7 @@ export default function EditStorePage() {
   const [store, setStore] = useState<StoreData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push(`/${locale}/login`);
-    }
-  }, [loading, user, router, locale]);
-
-  // 매장 데이터 로드
-  useEffect(() => {
-    if (user && storeId) {
-      loadStoreData();
-    }
-  }, [user, storeId]);
-
-  const loadStoreData = async () => {
+  const loadStoreData = useCallback(async () => {
     try {
       const response = await fetch(`/api/stores/${storeId}`);
       if (response.ok) {
@@ -96,7 +94,21 @@ export default function EditStorePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [storeId, userRole, user?.id, currentLocale, toast, router, locale]);
+
+  // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/${locale}/login`);
+    }
+  }, [loading, user, router, locale]);
+
+  // 매장 데이터 로드
+  useEffect(() => {
+    if (user && storeId) {
+      loadStoreData();
+    }
+  }, [user, storeId, loadStoreData]);
 
   // 로딩 중인 경우
   if (loading || isLoading) {
@@ -346,7 +358,12 @@ function HoursEditor({ storeId, locale }: { storeId: string; locale: Locale }) {
       if (errorData.details) {
         // 검증 오류 상세 정보 표시
         const fieldErrors = Object.entries(errorData.details.fieldErrors || {})
-          .map(([field, errors]) => `${field}: ${errors?.join(", ")}`)
+          .map(
+            ([field, errors]) =>
+              `${field}: ${
+                Array.isArray(errors) ? errors.join(", ") : String(errors)
+              }`
+          )
           .join(", ");
         if (fieldErrors) {
           errorMessage = `검증 오류: ${fieldErrors}`;
@@ -474,7 +491,7 @@ function HolidaysEditor({
   );
   const [date, setDate] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const res = await fetch(`/api/store-holidays?store_id=${storeId}`, {
       cache: "no-store",
     });
@@ -482,10 +499,11 @@ function HolidaysEditor({
       const json = await res.json();
       setHolidays(json.data || []);
     }
-  };
+  }, [storeId]);
+
   useEffect(() => {
     load();
-  }, [storeId]);
+  }, [load]);
 
   const add = async () => {
     if (!date) return;
@@ -554,16 +572,14 @@ function PoliciesEditor({
   const { toast } = useToast();
   const [form, setForm] = useState({
     publish_cutoff_hours: 0,
-    freeze_hours_before_shift: 0,
     swap_lead_time_hours: 0,
-    swap_require_same_role: false,
-    swap_auto_approve_threshold: 0,
     min_rest_hours_between_shifts: 0,
     max_hours_per_day: 0,
     max_hours_per_week: 0,
     max_consecutive_days: 0,
     weekly_labor_budget_cents: 0,
-    night_shift_boundary_min: 1320,
+    schedule_unit: "week" as "week" | "month",
+    currency_unit: "KRW" as CurrencyUnit,
   });
 
   useEffect(() => {
@@ -575,16 +591,14 @@ function PoliciesEditor({
         setForm((f) => ({
           ...f,
           publish_cutoff_hours: s.publish_cutoff_hours ?? 0,
-          freeze_hours_before_shift: s.freeze_hours_before_shift ?? 0,
           swap_lead_time_hours: s.swap_lead_time_hours ?? 0,
-          swap_require_same_role: s.swap_require_same_role ?? false,
-          swap_auto_approve_threshold: s.swap_auto_approve_threshold ?? 0,
           min_rest_hours_between_shifts: s.min_rest_hours_between_shifts ?? 0,
           max_hours_per_day: s.max_hours_per_day ?? 0,
           max_hours_per_week: s.max_hours_per_week ?? 0,
           max_consecutive_days: s.max_consecutive_days ?? 0,
           weekly_labor_budget_cents: s.weekly_labor_budget_cents ?? 0,
-          night_shift_boundary_min: s.night_shift_boundary_min ?? 1320,
+          schedule_unit: s.schedule_unit ?? "week",
+          currency_unit: s.currency_unit ?? "KRW",
         }));
       }
     })();
@@ -605,31 +619,246 @@ function PoliciesEditor({
   };
 
   return (
-    <section className="space-y-4">
-      <h3 className="text-lg font-semibold">
-        {t("settings.store.policies", locale)}
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Object.entries(form).map(([key, value]) => (
-          <div key={key} className="space-y-1">
-            <Label>{key}</Label>
+    <section className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-4">
+          {t("settings.store.policies", locale)}
+        </h3>
+        <p className="text-sm text-gray-600 mb-6">
+          운영에 필요한 핵심 규정만 설정합니다. 복잡한 규칙은 제거하여 사용하기
+          쉽게 만들었습니다.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 스케줄 단위 설정 */}
+        <div className="space-y-2">
+          <Label htmlFor="schedule_unit">
+            {t("policies.schedule_unit", locale)}
+          </Label>
+          <Select
+            value={form.schedule_unit}
+            onValueChange={(value: "week" | "month") =>
+              setForm((prev) => ({ ...prev, schedule_unit: value }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">
+                {t("policies.schedule_unit_week", locale)}
+              </SelectItem>
+              <SelectItem value="month">
+                {t("policies.schedule_unit_month", locale)}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* 통화 단위 설정 */}
+        <div className="space-y-2">
+          <Label htmlFor="currency_unit">
+            {t("policies.currency_unit", locale)}
+          </Label>
+          <Select
+            value={form.currency_unit}
+            onValueChange={(value: CurrencyUnit) =>
+              setForm((prev) => ({ ...prev, currency_unit: value }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="KRW">
+                {t("policies.currency_krw", locale)} (원)
+              </SelectItem>
+              <SelectItem value="USD">
+                {t("policies.currency_usd", locale)} ($)
+              </SelectItem>
+              <SelectItem value="JPY">
+                {t("policies.currency_jpy", locale)} (¥)
+              </SelectItem>
+              <SelectItem value="EUR">
+                {t("policies.currency_eur", locale)} (€)
+              </SelectItem>
+              <SelectItem value="CAD">
+                {t("policies.currency_cad", locale)} (C$)
+              </SelectItem>
+              <SelectItem value="AUD">
+                {t("policies.currency_aud", locale)} (A$)
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            인건비 예산 및 급여 계산에 사용되는 통화 단위
+          </p>
+        </div>
+
+        {/* 게시 마감 시간 */}
+        <div className="space-y-2">
+          <Label htmlFor="publish_cutoff_hours">
+            {t("policies.publish_cutoff_hours", locale)}
+          </Label>
+          <Input
+            id="publish_cutoff_hours"
+            type="number"
+            min="0"
+            value={form.publish_cutoff_hours}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                publish_cutoff_hours: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            스케줄 게시 전 최소 시간 (시간 단위)
+          </p>
+        </div>
+
+        {/* 교대 요청 리드타임 */}
+        <div className="space-y-2">
+          <Label htmlFor="swap_lead_time_hours">
+            {t("policies.swap_lead_time_hours", locale)}
+          </Label>
+          <Input
+            id="swap_lead_time_hours"
+            type="number"
+            min="0"
+            value={form.swap_lead_time_hours}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                swap_lead_time_hours: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            교대 요청 최소 리드타임 (시간 단위)
+          </p>
+        </div>
+
+        {/* 근무 간 최소 휴식 */}
+        <div className="space-y-2">
+          <Label htmlFor="min_rest_hours_between_shifts">
+            {t("policies.min_rest_hours_between_shifts", locale)}
+          </Label>
+          <Input
+            id="min_rest_hours_between_shifts"
+            type="number"
+            min="0"
+            value={form.min_rest_hours_between_shifts}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                min_rest_hours_between_shifts: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">연속 근무 간 최소 휴식 시간</p>
+        </div>
+
+        {/* 일 최대 근무 시간 */}
+        <div className="space-y-2">
+          <Label htmlFor="max_hours_per_day">
+            {t("policies.max_hours_per_day", locale)}
+          </Label>
+          <Input
+            id="max_hours_per_day"
+            type="number"
+            min="0"
+            value={form.max_hours_per_day}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                max_hours_per_day: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            하루 최대 근무 시간 (0 = 제한 없음)
+          </p>
+        </div>
+
+        {/* 주 최대 근무 시간 */}
+        <div className="space-y-2">
+          <Label htmlFor="max_hours_per_week">
+            {t("policies.max_hours_per_week", locale)}
+          </Label>
+          <Input
+            id="max_hours_per_week"
+            type="number"
+            min="0"
+            value={form.max_hours_per_week}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                max_hours_per_week: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            주 최대 근무 시간 (0 = 제한 없음)
+          </p>
+        </div>
+
+        {/* 연속 근무 최대 일수 */}
+        <div className="space-y-2">
+          <Label htmlFor="max_consecutive_days">
+            {t("policies.max_consecutive_days", locale)}
+          </Label>
+          <Input
+            id="max_consecutive_days"
+            type="number"
+            min="0"
+            value={form.max_consecutive_days}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                max_consecutive_days: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            연속 근무 최대 일수 (0 = 제한 없음)
+          </p>
+        </div>
+
+        {/* 주간 인건비 예산 */}
+        <div className="space-y-2">
+          <Label htmlFor="weekly_labor_budget_cents">
+            {t("policies.weekly_labor_budget_cents", locale)}
+          </Label>
+          <div className="relative">
             <Input
-              type={typeof value === "number" ? "number" : "text"}
-              value={String(value)}
+              id="weekly_labor_budget_cents"
+              type="number"
+              min="0"
+              value={form.weekly_labor_budget_cents}
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  [key]:
-                    typeof value === "number"
-                      ? Number(e.target.value || 0)
-                      : e.target.value,
+                  weekly_labor_budget_cents: Number(e.target.value || 0),
                 }))
               }
+              className="pr-16"
             />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
+              {getCurrencySymbol(form.currency_unit)}
+            </div>
           </div>
-        ))}
+          <p className="text-xs text-gray-500">
+            주간 인건비 예산 ({getCurrencyName(form.currency_unit)} 단위, 0 =
+            제한 없음)
+          </p>
+        </div>
       </div>
-      <Button onClick={save}>{t("common.save", locale)}</Button>
+
+      <div className="flex justify-end">
+        <Button onClick={save}>{t("common.save", locale)}</Button>
+      </div>
     </section>
   );
 }
@@ -651,7 +880,7 @@ function BreakRulesEditor({
     paid: false,
   });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const res = await fetch(`/api/break-rules?store_id=${storeId}`, {
       cache: "no-store",
     });
@@ -659,10 +888,11 @@ function BreakRulesEditor({
       const json = await res.json();
       setItems(json.data || []);
     }
-  };
+  }, [storeId]);
+
   useEffect(() => {
     load();
-  }, [storeId]);
+  }, [load]);
 
   const createItem = async () => {
     const res = await fetch(`/api/break-rules`, {

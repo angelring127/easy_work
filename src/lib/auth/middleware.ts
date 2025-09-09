@@ -170,11 +170,14 @@ export function createAuthErrorResponse(result: AuthCheckResult): NextResponse {
 export function withAuth(
   handler: (
     request: NextRequest,
-    context: { user: UserProfile }
+    context: { user: UserProfile; params?: any }
   ) => Promise<NextResponse>,
   options: AuthMiddlewareOptions = {}
 ) {
-  return async (request: NextRequest): Promise<NextResponse> => {
+  return async (
+    request: NextRequest,
+    context?: { params?: any }
+  ): Promise<NextResponse> => {
     const authResult = await checkAuth(request, options);
 
     if (!authResult.success) {
@@ -190,7 +193,10 @@ export function withAuth(
     }
 
     // 인증된 사용자와 함께 핸들러 실행
-    return handler(request, { user: authResult.user! });
+    return handler(request, {
+      user: authResult.user!,
+      params: context?.params,
+    });
   };
 }
 

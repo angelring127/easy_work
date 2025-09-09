@@ -124,77 +124,86 @@ export default function UserManagementPage({
   };
 
   // 사용자 목록 조회
-  const { data: usersData, isLoading: usersLoading } = useQuery({
+  const {
+    data: usersData,
+    isLoading: usersLoading,
+    error: usersError,
+  } = useQuery({
     queryKey: ["store-users", storeId, filters],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/${storeId}/users`);
-      const result = await response.json();
-      console.log("API 응답:", result);
-      return result.data;
+      try {
+        const response = await fetch(`/api/stores/${storeId}/users`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log("API 응답:", result);
+
+        // API 응답 구조 검증
+        if (!result || typeof result !== "object") {
+          console.error("잘못된 API 응답 구조:", result);
+          return {
+            members: [],
+            pagination: {
+              page: 1,
+              limit: 20,
+              total: 0,
+              totalPages: 0,
+            },
+          };
+        }
+
+        // success가 false인 경우 처리
+        if (result.success === false) {
+          console.error("API 에러:", result.error);
+          return {
+            members: [],
+            pagination: {
+              page: 1,
+              limit: 20,
+              total: 0,
+              totalPages: 0,
+            },
+          };
+        }
+
+        // data가 존재하는지 확인하고 fallback 제공
+        if (!result.data) {
+          console.warn("API 응답에 data가 없습니다:", result);
+          return {
+            members: [],
+            pagination: {
+              page: 1,
+              limit: 20,
+              total: 0,
+              totalPages: 0,
+            },
+          };
+        }
+
+        return result.data;
+      } catch (error) {
+        console.error("사용자 목록 조회 중 오류 발생:", error);
+
+        // 네트워크 오류나 기타 예외 발생 시 fallback 데이터 반환
+        return {
+          members: [],
+          pagination: {
+            page: 1,
+            limit: 20,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
     },
     refetchOnWindowFocus: true, // 윈도우 포커스 시 새로고침
     refetchInterval: 3000, // 3초마다 자동 새로고침
     staleTime: 0, // 항상 최신 데이터 가져오기
-  });
-
-  // 역할 부여
-  const grantRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const response = await fetch(`/api/stores/${storeId}/roles/grant`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role }),
-      });
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      return result.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["store-users", storeId] });
-      toast({
-        title: t("user.roleGranted", locale),
-        description: t("user.roleGrantedDescription", locale),
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: t("user.roleGrantError", locale),
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // 서브 매니저 전환 (파트타이머로)
-  const demoteSubManagerMutation = useMutation({
-    mutationFn: async ({ userId }: { userId: string }) => {
-      const response = await fetch(`/api/stores/${storeId}/users/demote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      return result.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["store-users", storeId] });
-      toast({
-        title: t("user.demoteSubManager", locale),
-        description: t("user.demoteSubManagerDescription", locale),
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: t("user.demoteSubManagerError", locale),
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    retry: 3, // 실패 시 3번 재시도
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // 지수 백오프
   });
 
   // 사용자 비활성화
@@ -257,36 +266,6 @@ export default function UserManagementPage({
     },
   });
 
-  // 사용자 삭제
-  const deleteUserMutation = useMutation({
-    mutationFn: async ({ userId }: { userId: string }) => {
-      const response = await fetch(`/api/stores/${storeId}/users/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      return result.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["store-users", storeId] });
-      toast({
-        title: t("user.deleteUser", locale),
-        description: t("user.deleteUserDescription", locale),
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: t("user.deleteUserError", locale),
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   // 임시 근무 배치
   const temporaryAssignMutation = useMutation({
     mutationFn: async (data: {
@@ -336,27 +315,6 @@ export default function UserManagementPage({
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleGrantRole = (userId: string, role: string) => {
-    grantRoleMutation.mutate({ userId, role });
-  };
-
-  const handleDemoteSubManager = (userId: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: t("user.confirmDemote", locale),
-      message: t("user.confirmDemoteMessage", locale),
-      onConfirm: () => {
-        demoteSubManagerMutation.mutate({ userId });
-        setConfirmDialog({
-          isOpen: false,
-          title: "",
-          message: "",
-          onConfirm: () => {},
-        });
-      },
-    });
-  };
-
   const handleDeactivateUser = (userId: string) => {
     setConfirmDialog({
       isOpen: true,
@@ -376,34 +334,6 @@ export default function UserManagementPage({
 
   const handleReactivateUser = (userId: string) => {
     reactivateUserMutation.mutate({ userId });
-  };
-
-  const handleDeleteUser = (userId: string) => {
-    // 삭제된 사용자인지 확인
-    const member = usersData?.members?.find((m: any) => m.user_id === userId);
-    if (member && isUserDeleted(member)) {
-      toast({
-        title: t("user.alreadyDeleted", locale),
-        description: t("user.alreadyDeletedDescription", locale),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: t("user.confirmDelete", locale),
-      message: t("user.confirmDeleteMessage", locale),
-      onConfirm: () => {
-        deleteUserMutation.mutate({ userId });
-        setConfirmDialog({
-          isOpen: false,
-          title: "",
-          message: "",
-          onConfirm: () => {},
-        });
-      },
-    });
   };
 
   const handleTemporaryAssign = () => {
@@ -532,6 +462,41 @@ export default function UserManagementPage({
         ) : !user ? (
           <div className="text-center py-12">
             <p className="text-gray-500">인증되지 않은 사용자입니다.</p>
+          </div>
+        ) : usersError ? (
+          <div className="text-center py-12">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+              <div className="flex items-center justify-center mb-4">
+                <div className="bg-red-100 rounded-full p-3">
+                  <svg
+                    className="h-6 w-6 text-red-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-lg font-medium text-red-800 mb-2">
+                사용자 목록을 불러올 수 없습니다
+              </h3>
+              <p className="text-red-600 mb-4">
+                네트워크 연결을 확인하고 다시 시도해주세요.
+              </p>
+              <Button
+                onClick={() => window.location.reload()}
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-50"
+              >
+                새로고침
+              </Button>
+            </div>
           </div>
         ) : (
           <>
@@ -716,9 +681,17 @@ export default function UserManagementPage({
                                     </AvatarFallback>
                                   </Avatar>
                                   <div>
-                                    <div className="font-medium">
+                                    <Button
+                                      variant="link"
+                                      className="p-0 h-auto font-medium text-left"
+                                      onClick={() =>
+                                        router.push(
+                                          `/${locale}/stores/${storeId}/users/${member.user_id}`
+                                        )
+                                      }
+                                    >
                                       {member.name || t("user.noName", locale)}
-                                    </div>
+                                    </Button>
                                     {member.is_default_store && (
                                       <Badge
                                         variant="outline"
@@ -751,90 +724,53 @@ export default function UserManagementPage({
                               </TableCell>
                               <TableCell>
                                 <div className="flex gap-2">
-                                  {member.role === "PART_TIMER" && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        handleGrantRole(
-                                          member.user_id,
-                                          "SUB_MANAGER"
-                                        )
-                                      }
-                                      disabled={
-                                        grantRoleMutation.isPending ||
-                                        isUserDeleted(member)
-                                      }
-                                    >
-                                      {t("store.role.sub_manager", locale)} 승격
-                                    </Button>
-                                  )}
-                                  {member.role === "SUB_MANAGER" && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        handleDemoteSubManager(member.user_id)
-                                      }
-                                      disabled={
-                                        demoteSubManagerMutation.isPending ||
-                                        isUserDeleted(member)
-                                      }
-                                    >
-                                      {t("store.role.sub_manager", locale)} 전환
-                                    </Button>
-                                  )}
-                                  {/* 비활성화/재활성화 버튼 */}
-                                  {member.status === "ACTIVE" ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        handleDeactivateUser(member.user_id)
-                                      }
-                                      disabled={
-                                        deactivateUserMutation.isPending ||
-                                        isUserDeleted(member)
-                                      }
-                                    >
-                                      비활성화
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        handleReactivateUser(member.user_id)
-                                      }
-                                      disabled={
-                                        reactivateUserMutation.isPending ||
-                                        isUserDeleted(member)
-                                      }
-                                    >
-                                      재활성화
-                                    </Button>
-                                  )}
-
-                                  {/* 삭제 버튼 */}
                                   <Button
                                     size="sm"
-                                    variant="destructive"
+                                    variant="outline"
                                     onClick={() =>
-                                      handleDeleteUser(member.user_id)
+                                      router.push(
+                                        `/${locale}/stores/${storeId}/users/${member.user_id}`
+                                      )
                                     }
-                                    disabled={
-                                      deleteUserMutation.isPending ||
-                                      isUserDeleted(member) ||
-                                      member.role === "MASTER"
-                                    }
-                                    title={
-                                      member.role === "MASTER"
-                                        ? "마스터 권한을 가진 사용자는 삭제할 수 없습니다"
-                                        : ""
-                                    }
+                                    disabled={isUserDeleted(member)}
                                   >
-                                    {isUserDeleted(member) ? "삭제됨" : "삭제"}
+                                    {t("user.viewDetail", locale)}
                                   </Button>
+
+                                  {/* 비활성화/재활성화 버튼 - 마스터는 제외 */}
+                                  {member.role !== "MASTER" && (
+                                    <>
+                                      {member.status === "ACTIVE" ? (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            handleDeactivateUser(member.user_id)
+                                          }
+                                          disabled={
+                                            deactivateUserMutation.isPending ||
+                                            isUserDeleted(member)
+                                          }
+                                        >
+                                          비활성화
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            handleReactivateUser(member.user_id)
+                                          }
+                                          disabled={
+                                            reactivateUserMutation.isPending ||
+                                            isUserDeleted(member)
+                                          }
+                                        >
+                                          재활성화
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
 
                                   <Dialog
                                     open={isTemporaryAssignDialogOpen}
