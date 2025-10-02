@@ -217,9 +217,6 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  // user_id가 "current"인 경우 현재 사용자 ID로 대체
-  const actualUserId = user_id === "current" ? user.user.id : user_id;
-
   const { data: user, error: authError } = await supabase.auth.getUser();
   if (authError || !user.user) {
     return NextResponse.json(
@@ -227,6 +224,9 @@ export async function DELETE(request: NextRequest) {
       { status: 401 }
     );
   }
+
+  // user_id가 "current"인 경우 현재 사용자 ID로 대체
+  const actualUserId = user_id === "current" ? user.user.id : user_id;
 
   try {
     // 권한 확인: 본인 또는 매장 관리자만 삭제 가능

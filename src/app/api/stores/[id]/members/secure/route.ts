@@ -11,12 +11,11 @@ import { createClient } from "@/lib/supabase/server";
  */
 async function getSecureStoreMembers(
   request: NextRequest,
-  context: { user: any; params: Promise<{ id: string }> }
+  context: { user: any; params?: any }
 ): Promise<NextResponse> {
   try {
-    const { user } = context;
-    const params = await context.params;
-    const storeId = params.id;
+    const { user, params } = context;
+    const storeId = params?.id;
     const { searchParams } = new URL(request.url);
 
     // 쿼리 파라미터 파싱
@@ -148,5 +147,3 @@ export async function GET(
 ) {
   return withAuth(getSecureStoreMembers)(request, { params });
 }
-
-

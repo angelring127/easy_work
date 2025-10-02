@@ -4,10 +4,11 @@ import { UpdateStoreJobRoleSchema } from "@/lib/validations/schedule/job-roles";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
   const body = await request.json();
+  const { id } = await params;
 
   const parsed = UpdateStoreJobRoleSchema.safeParse(body);
   if (!parsed.success) {
@@ -31,7 +32,7 @@ export async function PATCH(
   const { data: existingRole, error: fetchError } = await supabase
     .from("store_job_roles")
     .select("store_id")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (fetchError || !existingRole) {
@@ -72,7 +73,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("store_job_roles")
     .update(updateData)
-    .eq("id", params.id)
+    .eq("id", id)
     .select();
 
   if (error) {
@@ -88,9 +89,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
+  const { id } = await params;
 
   const { data: user, error: authError } = await supabase.auth.getUser();
   if (authError || !user.user) {
@@ -104,7 +106,7 @@ export async function DELETE(
   const { data: existingRole, error: fetchError } = await supabase
     .from("store_job_roles")
     .select("store_id")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (fetchError || !existingRole) {
@@ -138,7 +140,7 @@ export async function DELETE(
   const { data: usageCheck, error: usageError } = await supabase
     .from("user_store_job_roles")
     .select("user_id")
-    .eq("job_role_id", params.id)
+    .eq("job_role_id", id)
     .limit(1);
 
   if (usageError) {
@@ -158,7 +160,7 @@ export async function DELETE(
   const { error } = await supabase
     .from("store_job_roles")
     .delete()
-    .eq("id", params.id);
+    .eq("id", id);
 
   if (error) {
     return NextResponse.json(

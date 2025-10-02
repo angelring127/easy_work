@@ -59,9 +59,9 @@ export async function getWorkItemRoleRequirements(
 
   return (data || []).map((item) => ({
     workItemId: item.work_item_id,
-    jobRoleId: item.store_job_roles.id,
-    jobRoleName: item.store_job_roles.name,
-    jobRoleCode: item.store_job_roles.code,
+    jobRoleId: item.store_job_roles?.[0]?.id,
+    jobRoleName: item.store_job_roles?.[0]?.name,
+    jobRoleCode: item.store_job_roles?.[0]?.code,
     minCount: item.min_count,
   }));
 }
@@ -99,9 +99,9 @@ export async function getUserJobRoles(
 
   return (data || []).map((item) => ({
     userId: item.user_id,
-    jobRoleId: item.store_job_roles.id,
-    jobRoleName: item.store_job_roles.name,
-    jobRoleCode: item.store_job_roles.code,
+    jobRoleId: item.store_job_roles?.[0]?.id,
+    jobRoleName: item.store_job_roles?.[0]?.name,
+    jobRoleCode: item.store_job_roles?.[0]?.code,
   }));
 }
 

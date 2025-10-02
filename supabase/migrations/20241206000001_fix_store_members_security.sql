@@ -158,3 +158,12 @@ CREATE POLICY "Authenticated users can view accessible store members" ON store_m
 -- 3. 기존 뷰 사용 (호환성): SELECT * FROM store_members WHERE store_id = 'store-uuid';
 
 
+
+
+
+
+
+
+
+
+

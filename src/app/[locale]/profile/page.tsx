@@ -33,6 +33,7 @@ import {
   Key,
   Eye,
   EyeOff,
+  Calendar,
 } from "lucide-react";
 
 interface ProfilePageProps {
@@ -438,18 +439,6 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                             : "-"}
                         </p>
                       </div>
-                      {userProfile?.isDefaultStore && (
-                        <div>
-                          <Label className="text-sm font-medium">
-                            {t("user.defaultStore", locale)}
-                          </Label>
-                          <div className="mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {t("user.defaultStore", locale)}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </CardContent>
                 </Card>

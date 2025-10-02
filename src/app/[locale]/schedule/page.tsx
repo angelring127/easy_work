@@ -29,6 +29,7 @@ const dateLocales = { ko, en: enUS, ja };
 
 interface ScheduleAssignment {
   id: string;
+  storeId: string;
   userId: string;
   userName: string;
   workItemId: string;
@@ -36,15 +37,19 @@ interface ScheduleAssignment {
   date: string;
   startTime: string;
   endTime: string;
+  status: "ASSIGNED" | "CONFIRMED" | "CANCELLED";
+  notes?: string;
   requiredRoles: string[];
   userRoles: string[];
 }
 
 interface UserAvailability {
+  id: string;
+  storeId: string;
   userId: string;
   userName: string;
-  unavailableDates: string[];
-  roles: string[];
+  date: string;
+  reason?: string;
 }
 
 export default function SchedulePage() {
@@ -78,14 +83,10 @@ export default function SchedulePage() {
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // 月曜日開始
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
 
-  // 스토어 정책에 따른 초기 뷰 설정
+  // 기본 뷰 설정 (주간 뷰)
   useEffect(() => {
-    if (currentStore?.schedule_unit === "month") {
-      setViewMode("month");
-    } else {
-      setViewMode("week");
-    }
-  }, [currentStore?.schedule_unit]);
+    setViewMode("week");
+  }, []);
 
   // データロード
   useEffect(() => {
@@ -332,21 +333,17 @@ export default function SchedulePage() {
         onValueChange={(value) => setViewMode(value as "week" | "month")}
       >
         <TabsList className="grid w-full grid-cols-2">
-          {currentStore?.schedule_unit !== "month" && (
-            <TabsTrigger value="week" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              {t("schedule.weekView", currentLocale)}
-            </TabsTrigger>
-          )}
-          {currentStore?.schedule_unit !== "week" && (
-            <TabsTrigger value="month" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              {t("schedule.monthView", currentLocale)}
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="week" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            {t("schedule.weekView", currentLocale)}
+          </TabsTrigger>
+          <TabsTrigger value="month" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            {t("schedule.monthView", currentLocale)}
+          </TabsTrigger>
         </TabsList>
 
-        {currentStore?.schedule_unit !== "month" && (
+        {
           <TabsContent value="week" className="space-y-4">
             <WeekGrid
               storeId={currentStore.id}
@@ -361,9 +358,9 @@ export default function SchedulePage() {
               canManage={canManage}
             />
           </TabsContent>
-        )}
+        }
 
-        {currentStore?.schedule_unit !== "week" && (
+        {
           <TabsContent value="month" className="space-y-4">
             <UserAvailabilityCalendar
               storeId={currentStore.id}
@@ -381,7 +378,7 @@ export default function SchedulePage() {
               }}
             />
           </TabsContent>
-        )}
+        }
       </Tabs>
     </div>
   );

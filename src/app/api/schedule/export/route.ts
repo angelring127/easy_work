@@ -83,11 +83,6 @@ export async function GET(request: NextRequest) {
           start_min,
           end_min,
           role_hint
-        ),
-        users:auth.users!inner(
-          id,
-          email,
-          raw_user_meta_data
         )
       `
       )
@@ -104,6 +99,19 @@ export async function GET(request: NextRequest) {
         { success: false, error: assignmentsError.message },
         { status: 500 }
       );
+    }
+
+    // 사용자 정보 조회 (간단한 방법)
+    const userIds = [...new Set(assignments?.map((a) => a.user_id) || [])];
+    const userMap = new Map();
+
+    // 각 사용자에 대해 개별적으로 정보 조회
+    for (const userId of userIds) {
+      const { data: userData, error: userError } =
+        await supabase.auth.admin.getUserById(userId);
+      if (!userError && userData.user) {
+        userMap.set(userId, userData.user);
+      }
     }
 
     // 사용자 필터 적용
@@ -175,6 +183,7 @@ export async function GET(request: NextRequest) {
     // 1. Week Grid 시트
     const weekGridData = generateWeekGridData(
       filteredAssignments,
+      userMap,
       include_private_info
     );
     const weekGridSheet = XLSX.utils.aoa_to_sheet(weekGridData);
@@ -183,6 +192,7 @@ export async function GET(request: NextRequest) {
     // 2. Assignments 시트
     const assignmentsData = generateAssignmentsData(
       filteredAssignments,
+      userMap,
       include_private_info
     );
     const assignmentsSheet = XLSX.utils.aoa_to_sheet(assignmentsData);
@@ -230,6 +240,7 @@ export async function GET(request: NextRequest) {
 // Week Grid 데이터 생성
 function generateWeekGridData(
   assignments: any[],
+  userMap: Map<string, any>,
   includePrivateInfo: boolean
 ): any[][] {
   const data: any[][] = [];
@@ -246,10 +257,9 @@ function generateWeekGridData(
   const users = [...new Set(assignments.map((a) => a.user_id))];
   users.forEach((userId) => {
     const userAssignments = assignments.filter((a) => a.user_id === userId);
+    const userInfo = userMap.get(userId);
     const userName =
-      userAssignments[0]?.users?.raw_user_meta_data?.name ||
-      userAssignments[0]?.users?.email ||
-      "Unknown User";
+      userInfo?.raw_user_meta_data?.name || userInfo?.email || "Unknown User";
 
     const userRow = [userName];
     dates.forEach((date) => {
@@ -272,6 +282,7 @@ function generateWeekGridData(
 // Assignments 데이터 생성
 function generateAssignmentsData(
   assignments: any[],
+  userMap: Map<string, any>,
   includePrivateInfo: boolean
 ): any[][] {
   const data: any[][] = [];
@@ -296,14 +307,13 @@ function generateAssignmentsData(
 
   // 데이터 행
   assignments.forEach((assignment) => {
+    const userInfo = userMap.get(assignment.user_id);
     const row = [
       assignment.date,
       new Date(assignment.date).toLocaleDateString("en-US", {
         weekday: "long",
       }),
-      assignment.users?.raw_user_meta_data?.name ||
-        assignment.users?.email ||
-        "Unknown",
+      userInfo?.raw_user_meta_data?.name || userInfo?.email || "Unknown",
       assignment.work_items?.name || "",
       assignment.start_time,
       assignment.end_time,
@@ -312,7 +322,7 @@ function generateAssignmentsData(
     ];
 
     if (includePrivateInfo) {
-      row.splice(3, 0, assignment.users?.email || "");
+      row.splice(3, 0, userInfo?.email || "");
     }
 
     data.push(row);

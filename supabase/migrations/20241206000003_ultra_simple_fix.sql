@@ -35,3 +35,12 @@ LEFT JOIN temporary_assignments ta ON usr.user_id = ta.user_id
 WHERE usr.deleted_at IS NULL;
 
 
+
+
+
+
+
+
+
+
+
