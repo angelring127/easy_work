@@ -7,10 +7,5 @@ export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
 
-  // 런타임에서만 환경변수 검증
-  if (typeof window !== "undefined" && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
-    throw new Error("Supabase URL과 ANON KEY가 환경변수에 설정되어야 합니다.");
-  }
-
   return createBrowserClient<Database>(url, anonKey);
 }

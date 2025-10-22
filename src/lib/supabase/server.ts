@@ -12,13 +12,6 @@ export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key";
 
-  // 런타임에서만 환경변수 검증
-  if (process.env.NODE_ENV === "production" && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
-    throw new Error(
-      "Supabase URL과 SERVICE_ROLE_KEY가 환경변수에 설정되어야 합니다."
-    );
-  }
-
   return createServerClient<Database>(url, serviceKey, {
     cookies: {
       getAll() {
@@ -42,13 +35,6 @@ export async function createClient() {
 export async function createPureClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key";
-
-  // 런타임에서만 환경변수 검증
-  if (process.env.NODE_ENV === "production" && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
-    throw new Error(
-      "Supabase URL과 SERVICE_ROLE_KEY가 환경변수에 설정되어야 합니다."
-    );
-  }
 
   return createServerClient<Database>(url, serviceKey, {
     cookies: {
