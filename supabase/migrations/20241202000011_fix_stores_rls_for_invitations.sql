@@ -35,3 +35,7 @@ CREATE POLICY "Users can view stores they own or are invited to" ON stores
 
 
 
+
+
+
+

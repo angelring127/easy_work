@@ -23,6 +23,7 @@ import {
   type SignUpFormData,
   type AuthApiResponse,
 } from "@/lib/validations/auth";
+import { t, getCurrentLocale } from "@/lib/i18n";
 
 interface SignUpFormProps {
   onSuccess?: (data: AuthApiResponse) => void;
@@ -30,7 +31,10 @@ interface SignUpFormProps {
 }
 
 // 회원가입 API 호출 함수
-async function signUpUser(data: SignUpFormData): Promise<AuthApiResponse> {
+async function signUpUser(
+  data: SignUpFormData,
+  locale: string
+): Promise<AuthApiResponse> {
   const response = await fetch("/api/auth/signup", {
     method: "POST",
     headers: {
@@ -42,7 +46,9 @@ async function signUpUser(data: SignUpFormData): Promise<AuthApiResponse> {
   const result = await response.json();
 
   if (!response.ok) {
-    throw new Error(result.error || "회원가입에 실패했습니다");
+    throw new Error(
+      result.error || t("auth.signup.errorDescription", locale as any)
+    );
   }
 
   return result;
@@ -52,6 +58,7 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
+  const locale = getCurrentLocale();
 
   const form = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
@@ -63,18 +70,20 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
   });
 
   const signUpMutation = useMutation({
-    mutationFn: signUpUser,
+    mutationFn: (data: SignUpFormData) => signUpUser(data, locale),
     onSuccess: (data) => {
       toast({
-        title: "회원가입 성공",
-        description: data.message || "회원가입이 완료되었습니다",
+        title: t("auth.signup.success", locale),
+        description:
+          data.message || t("auth.signup.successDescription", locale),
       });
       onSuccess?.(data);
     },
     onError: (error: Error) => {
-      const errorMessage = error.message || "회원가입에 실패했습니다";
+      const errorMessage =
+        error.message || t("auth.signup.errorDescription", locale);
       toast({
-        title: "회원가입 실패",
+        title: t("auth.signup.error", locale),
         description: errorMessage,
         variant: "destructive",
       });
@@ -95,10 +104,10 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>이메일</FormLabel>
+              <FormLabel>{t("auth.signup.email", locale)}</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="이메일을 입력하세요"
+                  placeholder={t("auth.signup.emailPlaceholder", locale)}
                   type="email"
                   autoComplete="email"
                   {...field}
@@ -115,11 +124,11 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>비밀번호</FormLabel>
+              <FormLabel>{t("auth.signup.password", locale)}</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Input
-                    placeholder="비밀번호를 입력하세요"
+                    placeholder={t("auth.signup.passwordPlaceholder", locale)}
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
                     {...field}
@@ -131,7 +140,9 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={
-                      showPassword ? "비밀번호 숨기기" : "비밀번호 보기"
+                      showPassword
+                        ? t("auth.signup.passwordHide", locale)
+                        : t("auth.signup.passwordShow", locale)
                     }
                   >
                     {showPassword ? (
@@ -153,11 +164,14 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
           name="confirmPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>비밀번호 확인</FormLabel>
+              <FormLabel>{t("auth.signup.confirmPassword", locale)}</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Input
-                    placeholder="비밀번호를 다시 입력하세요"
+                    placeholder={t(
+                      "auth.signup.confirmPasswordPlaceholder",
+                      locale
+                    )}
                     type={showConfirmPassword ? "text" : "password"}
                     autoComplete="new-password"
                     {...field}
@@ -169,7 +183,9 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     aria-label={
-                      showConfirmPassword ? "비밀번호 숨기기" : "비밀번호 보기"
+                      showConfirmPassword
+                        ? t("auth.signup.passwordHide", locale)
+                        : t("auth.signup.passwordShow", locale)
                     }
                   >
                     {showConfirmPassword ? (
@@ -194,10 +210,10 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
           {signUpMutation.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              회원가입 중...
+              {t("auth.signup.submitting", locale)}
             </>
           ) : (
-            "회원가입"
+            t("auth.signup.submit", locale)
           )}
         </Button>
       </form>
