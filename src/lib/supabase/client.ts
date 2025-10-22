@@ -3,11 +3,12 @@ import { Database } from "./types";
 
 // 클라이언트 사이드에서 사용하는 Supabase 클라이언트 생성
 export function createClient() {
-  // 환경변수 검증
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // 환경변수 검증 (빌드 시점에서는 기본값 사용)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
 
-  if (!url || !anonKey) {
+  // 런타임에서만 환경변수 검증
+  if (typeof window !== "undefined" && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
     throw new Error("Supabase URL과 ANON KEY가 환경변수에 설정되어야 합니다.");
   }
 

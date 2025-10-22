@@ -8,11 +8,12 @@ import { Database } from "./types";
 export async function createClient() {
   const cookieStore = await cookies();
 
-  // 환경변수 검증
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // 환경변수 검증 (빌드 시점에서는 기본값 사용)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key";
 
-  if (!url || !serviceKey) {
+  // 런타임에서만 환경변수 검증
+  if (process.env.NODE_ENV === "production" && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
     throw new Error(
       "Supabase URL과 SERVICE_ROLE_KEY가 환경변수에 설정되어야 합니다."
     );
@@ -39,10 +40,11 @@ export async function createClient() {
 
 // 쿠키 없이 사용하는 순수 서버 클라이언트 (관리자 작업용)
 export async function createPureClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key";
 
-  if (!url || !serviceKey) {
+  // 런타임에서만 환경변수 검증
+  if (process.env.NODE_ENV === "production" && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
     throw new Error(
       "Supabase URL과 SERVICE_ROLE_KEY가 환경변수에 설정되어야 합니다."
     );
