@@ -576,10 +576,12 @@ function PoliciesEditor({
     min_rest_hours_between_shifts: 0,
     max_hours_per_day: 0,
     max_hours_per_week: 0,
+    max_hours_per_month: 160,
     max_consecutive_days: 0,
     weekly_labor_budget_cents: 0,
     schedule_unit: "week" as "week" | "month",
     currency_unit: "KRW" as CurrencyUnit,
+    shift_boundary_time_min: 720, // 12:00 기본값
   });
 
   useEffect(() => {
@@ -595,10 +597,12 @@ function PoliciesEditor({
           min_rest_hours_between_shifts: s.min_rest_hours_between_shifts ?? 0,
           max_hours_per_day: s.max_hours_per_day ?? 0,
           max_hours_per_week: s.max_hours_per_week ?? 0,
+          max_hours_per_month: s.max_hours_per_month ?? 160,
           max_consecutive_days: s.max_consecutive_days ?? 0,
           weekly_labor_budget_cents: s.weekly_labor_budget_cents ?? 0,
           schedule_unit: s.schedule_unit ?? "week",
           currency_unit: s.currency_unit ?? "KRW",
+          shift_boundary_time_min: s.shift_boundary_time_min ?? 720,
         }));
       }
     })();
@@ -693,6 +697,59 @@ function PoliciesEditor({
           </Select>
           <p className="text-xs text-gray-500">
             인건비 예산 및 급여 계산에 사용되는 통화 단위
+          </p>
+        </div>
+
+        {/* 오전/오후 구분 시간 설정 */}
+        <div className="space-y-2">
+          <Label htmlFor="shift_boundary_time">
+            {t("policies.shift_boundary_time", locale)}
+          </Label>
+          <div className="flex gap-2 items-center">
+            <Input
+              id="shift_boundary_time_hour"
+              type="number"
+              min="0"
+              max="23"
+              value={Math.floor(form.shift_boundary_time_min / 60)}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  shift_boundary_time_min:
+                    parseInt(e.target.value || "0") * 60 +
+                    (prev.shift_boundary_time_min % 60),
+                }))
+              }
+              className="w-20"
+            />
+            <span>:</span>
+            <Input
+              id="shift_boundary_time_minute"
+              type="number"
+              min="0"
+              max="59"
+              value={form.shift_boundary_time_min % 60}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  shift_boundary_time_min:
+                    Math.floor(prev.shift_boundary_time_min / 60) * 60 +
+                    parseInt(e.target.value || "0"),
+                }))
+              }
+              className="w-20"
+            />
+            <span className="text-sm text-gray-500">
+              (
+              {Math.floor(form.shift_boundary_time_min / 60)
+                .toString()
+                .padStart(2, "0")}
+              :{(form.shift_boundary_time_min % 60).toString().padStart(2, "0")}
+              )
+            </span>
+          </div>
+          <p className="text-xs text-gray-500">
+            {t("policies.shift_boundary_time_desc", locale)}
           </p>
         </div>
 
@@ -801,6 +858,30 @@ function PoliciesEditor({
           />
           <p className="text-xs text-gray-500">
             주 최대 근무 시간 (0 = 제한 없음)
+          </p>
+        </div>
+
+        {/* 월 최대 근무 시간 */}
+        <div className="space-y-2">
+          <Label htmlFor="max_hours_per_month">
+            {t("rules.compliance.maxPerMonth", locale)}
+          </Label>
+          <Input
+            id="max_hours_per_month"
+            type="number"
+            min="1"
+            max="999.99"
+            step="0.01"
+            value={form.max_hours_per_month}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                max_hours_per_month: Number(e.target.value || 160),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            월 최대 근무 시간 (기본값: 160시간)
           </p>
         </div>
 

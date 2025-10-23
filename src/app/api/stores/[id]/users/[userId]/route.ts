@@ -8,6 +8,14 @@ const updateUserProfileSchema = z.object({
   jobRoleIds: z.array(z.string().uuid()).optional(),
   resignationDate: z.string().optional().nullable(),
   desiredWeeklyHours: z.number().int().min(0).max(168).optional().nullable(),
+  preferredWeekdays: z
+    .array(
+      z.object({
+        weekday: z.number().int().min(0).max(6),
+        isPreferred: z.boolean(),
+      })
+    )
+    .optional(),
 });
 
 type UpdateUserProfileRequest = z.infer<typeof updateUserProfileSchema>;
@@ -106,6 +114,18 @@ async function getUserDetail(
     const resignationDate = userMetadata.resignation_date || null;
     const desiredWeeklyHours = userMetadata.desired_weekly_hours || null;
 
+    // 희망 근무 요일 조회
+    const { data: preferredWeekdays, error: weekdaysError } = await supabase
+      .from("user_preferred_weekdays")
+      .select("weekday, is_preferred")
+      .eq("store_id", storeId)
+      .eq("user_id", userId)
+      .order("weekday");
+
+    if (weekdaysError) {
+      console.error("희망 근무 요일 조회 오류:", weekdaysError);
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -121,6 +141,7 @@ async function getUserDetail(
         jobRoles: jobRoles || [],
         resignationDate,
         desiredWeeklyHours,
+        preferredWeekdays: preferredWeekdays || [],
         avatarUrl: userInfo.user.user_metadata?.avatar_url || null,
       },
     });
@@ -231,6 +252,53 @@ async function updateUserProfile(
             {
               success: false,
               error: "직무 역할 업데이트에 실패했습니다",
+            },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
+    // 희망 근무 요일 업데이트
+    if (validatedData.preferredWeekdays !== undefined) {
+      // 기존 희망 근무 요일 삭제
+      const { error: deleteWeekdaysError } = await supabase
+        .from("user_preferred_weekdays")
+        .delete()
+        .eq("store_id", storeId)
+        .eq("user_id", userId);
+
+      if (deleteWeekdaysError) {
+        console.error("기존 희망 근무 요일 삭제 오류:", deleteWeekdaysError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "희망 근무 요일 업데이트에 실패했습니다",
+          },
+          { status: 500 }
+        );
+      }
+
+      // 새 희망 근무 요일 추가
+      if (validatedData.preferredWeekdays.length > 0) {
+        const weekdaysData = validatedData.preferredWeekdays.map((weekday) => ({
+          store_id: storeId,
+          user_id: userId,
+          weekday: weekday.weekday,
+          is_preferred: weekday.isPreferred,
+          created_by: user.id,
+        }));
+
+        const { error: insertWeekdaysError } = await supabase
+          .from("user_preferred_weekdays")
+          .insert(weekdaysData);
+
+        if (insertWeekdaysError) {
+          console.error("새 희망 근무 요일 추가 오류:", insertWeekdaysError);
+          return NextResponse.json(
+            {
+              success: false,
+              error: "희망 근무 요일 업데이트에 실패했습니다",
             },
             { status: 500 }
           );

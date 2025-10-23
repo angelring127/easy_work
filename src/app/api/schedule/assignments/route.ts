@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 기존 배정과의 충돌 확인
+    // 기존 배정이 있으면 삭제 후 새로 생성 (upsert 방식)
     const { data: existingAssignment, error: conflictError } = await supabase
       .from("schedule_assignments")
       .select("id")
@@ -204,13 +204,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingAssignment && !conflictError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "User already has an assignment for this date",
-        },
-        { status: 400 }
-      );
+      // 기존 스케줄 삭제
+      const { error: deleteError } = await supabase
+        .from("schedule_assignments")
+        .delete()
+        .eq("id", existingAssignment.id);
+
+      if (deleteError) {
+        console.error("기존 스케줄 삭제 오류:", deleteError);
+        return NextResponse.json(
+          { success: false, error: "Failed to delete existing assignment" },
+          { status: 500 }
+        );
+      }
     }
 
     // 스케줄 배정 생성

@@ -47,6 +47,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // 매장 영업 시간 가져오기
+    const { data: businessHours, error: businessHoursError } = await supabase
+      .from("store_business_hours")
+      .select("*")
+      .eq("store_id", store_id);
+
+    if (businessHoursError) {
+      return NextResponse.json(
+        { success: false, error: businessHoursError.message },
+        { status: 500 }
+      );
+    }
+
+    // 영업 시간이 없으면 기본값 사용
+    const defaultStartTime = "09:00";
+    const defaultEndTime = "18:00";
+
     // 기간 내 배정되지 않은 work_items 가져오기 (간단화: 해당 기간 날짜별 하나씩 있다고 가정)
     const { data: items, error: itemsError } = await supabase
       .from("work_items")
@@ -173,16 +190,56 @@ export async function POST(request: NextRequest) {
 
     // 삽입
     if (chosen.length > 0) {
-      const rows = chosen.map((c) => ({
-        store_id,
-        user_id: c.user_id,
-        work_item_id: c.work_item_id,
-        date: c.date,
-        start_time: "09:00",
-        end_time: "18:00",
-        status: "ASSIGNED",
-        created_by: authUser.user!.id,
-      }));
+      const rows = chosen.map((c) => {
+        // 해당 날짜의 영업 시간 찾기
+        const date = new Date(c.date);
+        const dayOfWeek = date.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
+
+        let startTime = defaultStartTime;
+        let endTime = defaultEndTime;
+
+        if (businessHours && businessHours.length > 0) {
+          // 요일별 영업 시간 찾기 (day_of_week: 0=일요일, 1=월요일, ..., 6=토요일)
+          const dayBusinessHour = businessHours.find(
+            (bh) => bh.day_of_week === dayOfWeek
+          );
+          if (
+            dayBusinessHour &&
+            dayBusinessHour.open_min !== null &&
+            dayBusinessHour.close_min !== null
+          ) {
+            // 분을 시간:분 형식으로 변환
+            const openHour = Math.floor(dayBusinessHour.open_min / 60);
+            const openMinute = dayBusinessHour.open_min % 60;
+
+            // close_min이 0인 경우 자정(24:00)으로 처리
+            const closeMin =
+              dayBusinessHour.close_min === 0
+                ? 1440
+                : dayBusinessHour.close_min;
+            const closeHour = Math.floor(closeMin / 60);
+            const closeMinute = closeMin % 60;
+
+            startTime = `${openHour.toString().padStart(2, "0")}:${openMinute
+              .toString()
+              .padStart(2, "0")}`;
+            endTime = `${closeHour.toString().padStart(2, "0")}:${closeMinute
+              .toString()
+              .padStart(2, "0")}`;
+          }
+        }
+
+        return {
+          store_id,
+          user_id: c.user_id,
+          work_item_id: c.work_item_id,
+          date: c.date,
+          start_time: startTime,
+          end_time: endTime,
+          status: "ASSIGNED",
+          created_by: authUser.user!.id,
+        };
+      });
       const { error: insertError } = await supabase
         .from("schedule_assignments")
         .insert(rows);

@@ -92,6 +92,7 @@
       "minRest": "勤務間最小休息(時間)",
       "maxPerDay": "1日最大勤務(時間)",
       "maxPerWeek": "週最大勤務(時間)",
+      "maxPerMonth": "月最大勤務(時間)",
       "maxConsecutive": "連続勤務最大(日)"
     },
     "night": {
@@ -99,6 +100,16 @@
     }
   },
   "schedule": {
+    "title": "スケジュール管理",
+    "weekView": "週表示",
+    "monthView": "月表示",
+    "weekGrid": "週グリッド",
+    "user": "ユーザー",
+    "clickToAssign": "クリックして割り当て",
+    "noUsers": "ユーザーがありません",
+    "noBusinessHours": "営業時間が設定されていません",
+    "closed": "休業",
+    "staff": "スタッフ",
     "errors": {
       "endAfterStart": "終了は開始より後である必要があります",
       "breakTooLong": "休憩が勤務時間を超えています",

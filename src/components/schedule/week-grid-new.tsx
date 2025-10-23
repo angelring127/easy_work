@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Calendar,
-  Clock,
-  Users,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-} from "lucide-react";
+import { Calendar, Clock, Users, AlertCircle, CheckCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,20 +13,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { t, type Locale } from "@/lib/i18n";
 import {
   format,
@@ -94,8 +73,6 @@ interface WeekGridProps {
     name: string;
     email: string;
     roles: string[];
-    status?: string;
-    deleted_at?: string | null;
   }>;
   onAssignmentClick?: (assignment: ScheduleAssignment) => void;
   onUserClick?: (userId: string, date: string) => void;
@@ -104,7 +81,6 @@ interface WeekGridProps {
     date: string,
     isUnavailable: boolean
   ) => void;
-  onScheduleChange?: () => void; // 스케줄 변경 시 콜백
   canManage?: boolean;
 }
 
@@ -118,54 +94,25 @@ export function WeekGrid({
   onAssignmentClick,
   onUserClick,
   onAvailabilityToggle,
-  onScheduleChange,
   canManage = false,
 }: WeekGridProps) {
   const [loading, setLoading] = useState(false);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
-  const [shiftBoundaryTimeMin, setShiftBoundaryTimeMin] = useState<number>(720); // 기본값: 12:00
   const [selectedCell, setSelectedCell] = useState<{
     userId: string;
     date: string;
   } | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalCell, setModalCell] = useState<{
-    userId: string;
-    date: string;
-    userName: string;
-  } | null>(null);
-  const [workItems, setWorkItems] = useState<
-    Array<{
-      id: string;
-      name: string;
-      start_min: number;
-      end_min: number;
-    }>
-  >([]);
-  const [selectedWorkItem, setSelectedWorkItem] = useState<string>("");
-  const [isModalLoading, setIsModalLoading] = useState(false);
 
   // 週の日付 범위 계산
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // 월요일 시작
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  // 매장 정보 및 영업 시간 조회
+  // 매장 영업 시간 조회
   useEffect(() => {
-    const fetchStoreData = async () => {
+    const fetchBusinessHours = async () => {
       try {
         setLoading(true);
-
-        // 매장 정보 조회 (shift_boundary_time_min 포함)
-        const storeResponse = await fetch(`/api/stores/${storeId}`);
-        const storeData = await storeResponse.json();
-        if (storeData.success && storeData.data) {
-          setShiftBoundaryTimeMin(
-            storeData.data.shift_boundary_time_min ?? 720
-          );
-        }
-
-        // 영업 시간 조회
         const response = await fetch(
           `/api/store-business-hours?store_id=${storeId}`
         );
@@ -235,25 +182,8 @@ export function WeekGrid({
       }
     };
 
-    const fetchWorkItems = async () => {
-      if (!storeId) return;
-
-      try {
-        const response = await fetch(`/api/work-items?store_id=${storeId}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            setWorkItems(data.data || []);
-          }
-        }
-      } catch (error) {
-        console.error("근무 항목 조회 오류:", error);
-      }
-    };
-
     if (storeId) {
-      fetchStoreData();
-      fetchWorkItems();
+      fetchBusinessHours();
     }
   }, [storeId]);
 
@@ -264,44 +194,26 @@ export function WeekGrid({
     ...userAvailabilities.map((a) => a.userId),
   ]);
 
-  const users = Array.from(allUserIds)
-    .map((userId) => {
-      // 매장 사용자 정보 우선 사용
-      const storeUser = storeUsers.find((u) => u.id === userId);
-      if (storeUser) {
-        // 비활성화되거나 삭제된 유저 필터링
-        if (storeUser.status === "INACTIVE" || storeUser.deleted_at) {
-          return null;
-        }
-
-        return {
-          id: userId,
-          name: storeUser.name,
-          roles: storeUser.roles,
-        };
-      }
-
-      // 배정/출근불가에서 사용자 정보 추출
-      const assignment = assignments.find((a) => a.userId === userId);
-      const availability = userAvailabilities.find((a) => a.userId === userId);
-      const userName = assignment?.userName || availability?.userName || "";
-
-      // Unknown User는 필터링
-      if (!userName || userName === "Unknown User") {
-        return null;
-      }
-
+  const users = Array.from(allUserIds).map((userId) => {
+    // 매장 사용자 정보 우선 사용
+    const storeUser = storeUsers.find((u) => u.id === userId);
+    if (storeUser) {
       return {
         id: userId,
-        name: userName,
-        roles: assignment?.userRoles || [],
+        name: storeUser.name,
+        roles: storeUser.roles,
       };
-    })
-    .filter((user) => user !== null) as Array<{
-    id: string;
-    name: string;
-    roles: string[];
-  }>;
+    }
+
+    // 배정/출근불가에서 사용자 정보 추출
+    const assignment = assignments.find((a) => a.userId === userId);
+    const availability = userAvailabilities.find((a) => a.userId === userId);
+    return {
+      id: userId,
+      name: assignment?.userName || availability?.userName || "Unknown User",
+      roles: assignment?.userRoles || [],
+    };
+  });
 
   // 특정 사용자의 특정 날짜 출근 불가 상태 조회
   const getAvailabilityForUserDate = (
@@ -321,74 +233,10 @@ export function WeekGrid({
     return time.substring(0, 5); // HH:mm 형식으로 변환
   };
 
-  // 분을 시간:분 형식으로 변환
-  const formatTimeFromMinutes = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours.toString().padStart(2, "0")}:${mins
-      .toString()
-      .padStart(2, "0")}`;
-  };
-
   // 날짜 포맷팅
   const formatDate = (date: Date): string => {
     const dateLocale = dateLocales[locale];
     return format(date, "MM/dd", { locale: dateLocale });
-  };
-
-  // 오전/오후 인원수 계산
-  const getShiftCounts = (
-    date: Date
-  ): { morning: number; afternoon: number } => {
-    const dayStr = date.toISOString().split("T")[0];
-    const dayAssignments = assignments.filter(
-      (a) => a.date === dayStr && a.status === "ASSIGNED"
-    );
-
-    let morningCount = 0;
-    let afternoonCount = 0;
-
-    // 각 배정에 대해 오전/오후 카운트
-    dayAssignments.forEach((assignment) => {
-      const startMin =
-        parseInt(assignment.startTime.split(":")[0]) * 60 +
-        parseInt(assignment.startTime.split(":")[1]);
-      const endMin =
-        parseInt(assignment.endTime.split(":")[0]) * 60 +
-        parseInt(assignment.endTime.split(":")[1]);
-
-      // 오전 시간대에 근무하는 경우 (시작 시간이 구분 시간 이전)
-      if (startMin < shiftBoundaryTimeMin) {
-        morningCount++;
-      }
-
-      // 오후 시간대에 근무하는 경우 (종료 시간이 구분 시간 이후)
-      if (endMin > shiftBoundaryTimeMin) {
-        afternoonCount++;
-      }
-    });
-
-    return { morning: morningCount, afternoon: afternoonCount };
-  };
-
-  // 사용자의 총 스케줄 시간 계산
-  const getUserTotalHours = (userId: string): number => {
-    const userAssignments = assignments.filter(
-      (a) => a.userId === userId && a.status === "ASSIGNED"
-    );
-
-    let totalMinutes = 0;
-    userAssignments.forEach((assignment) => {
-      const startMin =
-        parseInt(assignment.startTime.split(":")[0]) * 60 +
-        parseInt(assignment.startTime.split(":")[1]);
-      const endMin =
-        parseInt(assignment.endTime.split(":")[0]) * 60 +
-        parseInt(assignment.endTime.split(":")[1]);
-      totalMinutes += endMin - startMin;
-    });
-
-    return Math.round((totalMinutes / 60) * 10) / 10; // 소수점 첫째자리까지
   };
 
   // 요일 포맷팅
@@ -399,27 +247,10 @@ export function WeekGrid({
 
   // 셀 클릭 핸들러
   const handleCellClick = (userId: string, date: string) => {
-    const user = users.find((u) => u.id === userId);
-    if (user) {
-      setModalCell({ userId, date, userName: user.name });
-
-      // 기존 스케줄이 있는지 확인
-      const existingAssignment = assignments.find(
-        (a) => a.userId === userId && a.date === date && a.status === "ASSIGNED"
-      );
-
-      if (existingAssignment) {
-        // 기존 스케줄이 있으면 해당 work_item_id를 선택
-        setSelectedWorkItem(existingAssignment.workItemId);
-      } else {
-        // 기존 스케줄이 없으면 선택 초기화
-        setSelectedWorkItem("");
-      }
-
-      setIsModalOpen(true);
+    if (canManage) {
+      setSelectedCell({ userId, date });
+      onUserClick?.(userId, date);
     }
-    setSelectedCell({ userId, date });
-    onUserClick?.(userId, date);
   };
 
   // 출근 불가 토글 핸들러
@@ -486,38 +317,6 @@ export function WeekGrid({
                 ))}
               </div>
 
-              {/* 오전/오후 라벨 행 */}
-              <div className="grid grid-cols-8 gap-1 mb-2">
-                <div className="p-2 text-center border rounded-md bg-muted/30">
-                  <div className="flex flex-col gap-1">
-                    <div className="text-xs text-blue-600 font-medium">
-                      {t("schedule.morningStaff", locale)}
-                    </div>
-                    <div className="text-xs text-orange-600 font-medium">
-                      {t("schedule.afternoonStaff", locale)}
-                    </div>
-                  </div>
-                </div>
-                {weekDays.map((day, index) => {
-                  const { morning, afternoon } = getShiftCounts(day);
-                  return (
-                    <div
-                      key={index}
-                      className="p-2 text-center border rounded-md bg-muted/30"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs text-blue-600 font-medium">
-                          {morning}
-                        </div>
-                        <div className="text-xs text-orange-600 font-medium">
-                          {afternoon}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
               {/* 사용자별 행 */}
               {users.map((user) => (
                 <div key={user.id} className="grid grid-cols-8 gap-1 mb-1">
@@ -532,9 +331,6 @@ export function WeekGrid({
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
                           {user.name}
-                        </div>
-                        <div className="text-xs text-blue-600 font-medium">
-                          {getUserTotalHours(user.id)}h
                         </div>
                         {user.roles.length > 0 && (
                           <div className="flex gap-1 mt-1 flex-wrap">
@@ -603,7 +399,9 @@ export function WeekGrid({
                           ${isUnavailable ? "bg-red-50 border-red-200" : ""}
                         `}
                         onClick={() => {
-                          handleCellClick(user.id, dayStr);
+                          if (isBusinessDay) {
+                            handleCellClick(user.id, dayStr);
+                          }
                         }}
                       >
                         {isUnavailable ? (
@@ -652,8 +450,6 @@ export function WeekGrid({
                                     `}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // 스케줄 클릭 시에도 모달 열기
-                                      handleCellClick(user.id, dayStr);
                                       onAssignmentClick?.(assignment);
                                     }}
                                   >
@@ -707,19 +503,33 @@ export function WeekGrid({
                                         </div>
                                       </div>
                                     )}
+                                    {assignment.notes && (
+                                      <div className="mt-1">
+                                        <div className="text-xs font-medium">
+                                          Notes:
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {assignment.notes}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </TooltipContent>
                               </Tooltip>
                             ))}
                           </div>
                         ) : isBusinessDay ? (
-                          // 빈 근무 셀
-                          <div className="flex items-center justify-center h-full text-muted-foreground opacity-50">
-                            <span className="text-xs">-</span>
+                          // 빈 셀 (배정 가능)
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <span className="text-xs">
+                              {canManage
+                                ? t("schedule.clickToAssign", locale)
+                                : ""}
+                            </span>
                           </div>
                         ) : (
                           // 휴무일
-                          <div className="flex items-center justify-center h-full text-muted-foreground opacity-30">
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
                             <span className="text-xs">
                               {t("schedule.closed", locale)}
                             </span>
@@ -742,259 +552,6 @@ export function WeekGrid({
           </div>
         </CardContent>
       </Card>
-
-      {/* 선택 모달 */}
-      <Dialog
-        open={isModalOpen}
-        onOpenChange={(open) => {
-          setIsModalOpen(open);
-          if (!open) {
-            // 모달이 닫힐 때 선택된 근무 항목 초기화
-            setSelectedWorkItem("");
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {modalCell && (
-                <>
-                  {modalCell.userName} -{" "}
-                  {format(new Date(modalCell.date), "MM/dd (EEE)", {
-                    locale: dateLocales[locale],
-                  })}
-                </>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              {t("schedule.selectAction", locale)}
-            </div>
-
-            {/* 기존 스케줄 정보 표시 */}
-            {modalCell &&
-              (() => {
-                const existingAssignment = assignments.find(
-                  (a) =>
-                    a.userId === modalCell.userId &&
-                    a.date === modalCell.date &&
-                    a.status === "ASSIGNED"
-                );
-
-                if (existingAssignment) {
-                  return (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                      <div className="text-sm font-medium text-blue-800 mb-1">
-                        {t("schedule.currentSchedule", locale)}
-                      </div>
-                      <div className="text-sm text-blue-700">
-                        {existingAssignment.workItemName} -{" "}
-                        {formatTime(existingAssignment.startTime)} ~{" "}
-                        {formatTime(existingAssignment.endTime)}
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
-            {/* 근무 항목 선택 */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {t("schedule.selectWorkItem", locale)}
-              </label>
-              <Select
-                value={selectedWorkItem}
-                disabled={isModalLoading}
-                onValueChange={async (value) => {
-                  setSelectedWorkItem(value);
-
-                  if (value === "DELETE_SCHEDULE") {
-                    // 스케줄 삭제 로직
-                    if (!modalCell) return;
-
-                    setIsModalLoading(true);
-                    try {
-                      const existingAssignment = assignments.find(
-                        (a) =>
-                          a.userId === modalCell.userId &&
-                          a.date === modalCell.date
-                      );
-
-                      if (!existingAssignment) {
-                        alert(t("schedule.noScheduleToDelete", locale));
-                        return;
-                      }
-
-                      const response = await fetch(
-                        `/api/schedule/assignments/${existingAssignment.id}`,
-                        {
-                          method: "DELETE",
-                        }
-                      );
-
-                      if (response.ok) {
-                        const result = await response.json();
-                        if (result.success) {
-                          if (onScheduleChange) {
-                            onScheduleChange();
-                          }
-                          setIsModalOpen(false);
-                        } else {
-                          alert(t("schedule.scheduleDeleteError", locale));
-                        }
-                      } else {
-                        alert(t("schedule.scheduleDeleteError", locale));
-                      }
-                    } catch (error) {
-                      console.error("스케줄 삭제 오류:", error);
-                      alert(t("schedule.scheduleDeleteError", locale));
-                    } finally {
-                      setIsModalLoading(false);
-                    }
-                  } else if (value && value !== "DELETE_SCHEDULE") {
-                    // 스케줄 추가/수정 로직
-                    if (!modalCell) return;
-
-                    setIsModalLoading(true);
-
-                    // 기존 스케줄이 있는지 확인
-                    const existingAssignment = assignments.find(
-                      (a) =>
-                        a.userId === modalCell.userId &&
-                        a.date === modalCell.date &&
-                        a.status === "ASSIGNED"
-                    );
-
-                    try {
-                      const selectedItem = workItems.find(
-                        (item) => item.id === value
-                      );
-
-                      const requestData = {
-                        store_id: storeId,
-                        user_id: modalCell.userId,
-                        work_item_id: value,
-                        date: modalCell.date,
-                        start_time: selectedItem?.start_min
-                          ? formatTimeFromMinutes(selectedItem.start_min)
-                          : "09:00",
-                        end_time: selectedItem?.end_min
-                          ? formatTimeFromMinutes(selectedItem.end_min)
-                          : "18:00",
-                      };
-
-                      console.log("스케줄 요청 데이터:", requestData);
-
-                      let response;
-
-                      if (existingAssignment) {
-                        // 기존 스케줄이 있으면 수정 (PATCH)
-                        console.log("기존 스케줄 수정:", existingAssignment.id);
-                        response = await fetch(
-                          `/api/schedule/assignments/${existingAssignment.id}`,
-                          {
-                            method: "PATCH",
-                            headers: {
-                              "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({
-                              work_item_id: value,
-                              start_time: selectedItem?.start_min
-                                ? formatTimeFromMinutes(selectedItem.start_min)
-                                : "09:00",
-                              end_time: selectedItem?.end_min
-                                ? formatTimeFromMinutes(selectedItem.end_min)
-                                : "18:00",
-                            }),
-                          }
-                        );
-                      } else {
-                        // 기존 스케줄이 없으면 추가 (POST)
-                        console.log("새 스케줄 추가");
-                        response = await fetch("/api/schedule/assignments", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify(requestData),
-                        });
-                      }
-
-                      console.log("API 응답 상태:", response.status);
-
-                      if (response.ok) {
-                        const result = await response.json();
-                        console.log("API 응답 데이터:", result);
-                        if (result.success) {
-                          if (onScheduleChange) {
-                            onScheduleChange();
-                          }
-                          setIsModalOpen(false);
-                        } else {
-                          console.error("API 오류:", result.error);
-                          alert(
-                            `${t("schedule.scheduleAddError", locale)}: ${
-                              result.error
-                            }`
-                          );
-                        }
-                      } else {
-                        const errorText = await response.text();
-                        console.error("HTTP 오류:", response.status, errorText);
-                        alert(
-                          `${t("schedule.scheduleAddError", locale)}: ${
-                            response.status
-                          }`
-                        );
-                      }
-                    } catch (error) {
-                      console.error("스케줄 처리 오류:", error);
-                      alert(t("schedule.scheduleAddError", locale));
-                    } finally {
-                      setIsModalLoading(false);
-                    }
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      isModalLoading
-                        ? t("schedule.processing", locale)
-                        : t("schedule.selectWorkItemPlaceholder", locale)
-                    }
-                  />
-                  {isModalLoading && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  {workItems.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} ({formatTimeFromMinutes(item.start_min)} -{" "}
-                      {formatTimeFromMinutes(item.end_min)})
-                    </SelectItem>
-                  ))}
-                  {/* 기존 스케줄이 있는 경우에만 삭제 옵션 표시 */}
-                  {modalCell &&
-                    assignments.some(
-                      (a) =>
-                        a.userId === modalCell.userId &&
-                        a.date === modalCell.date &&
-                        a.status === "ASSIGNED"
-                    ) && (
-                      <SelectItem value="DELETE_SCHEDULE">
-                        {t("schedule.deleteSchedule", locale)}
-                      </SelectItem>
-                    )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </TooltipProvider>
   );
 }

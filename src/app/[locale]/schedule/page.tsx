@@ -355,6 +355,7 @@ export default function SchedulePage() {
               onAssignmentClick={handleAssignmentClick}
               onUserClick={handleUserClick}
               onAvailabilityToggle={handleAvailabilityToggle}
+              onScheduleChange={loadScheduleData}
               canManage={canManage}
             />
           </TabsContent>

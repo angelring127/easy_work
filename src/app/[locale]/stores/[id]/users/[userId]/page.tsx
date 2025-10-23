@@ -63,6 +63,10 @@ interface UserDetail {
   }>;
   resignationDate: string | null;
   desiredWeeklyHours: number | null;
+  preferredWeekdays: Array<{
+    weekday: number;
+    is_preferred: boolean;
+  }>;
   avatarUrl: string | null;
 }
 
@@ -96,6 +100,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
     jobRoleIds: [] as string[],
     resignationDate: "",
     desiredWeeklyHours: "",
+    preferredWeekdays: [] as Array<{ weekday: number; isPreferred: boolean }>,
   });
 
   // 확인 다이얼로그 상태
@@ -177,6 +182,10 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
         jobRoleIds: userDetail.jobRoles.map((jr) => jr.store_job_roles.id),
         resignationDate: userDetail.resignationDate || "",
         desiredWeeklyHours: userDetail.desiredWeeklyHours?.toString() || "",
+        preferredWeekdays: userDetail.preferredWeekdays.map((pw) => ({
+          weekday: pw.weekday,
+          isPreferred: pw.is_preferred,
+        })),
       });
     }
   }, [userDetail]);
@@ -187,6 +196,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
       jobRoleIds?: string[];
       resignationDate?: string | null;
       desiredWeeklyHours?: number | null;
+      preferredWeekdays?: Array<{ weekday: number; isPreferred: boolean }>;
     }) => {
       const response = await fetch(`/api/stores/${storeId}/users/${userId}`, {
         method: "PATCH",
@@ -328,6 +338,33 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
     }));
   };
 
+  const handlePreferredWeekdayChange = (
+    weekday: number,
+    isPreferred: boolean
+  ) => {
+    setFormData((prev) => {
+      const existingIndex = prev.preferredWeekdays.findIndex(
+        (pw) => pw.weekday === weekday
+      );
+
+      if (existingIndex >= 0) {
+        // 기존 항목 업데이트
+        const updated = [...prev.preferredWeekdays];
+        updated[existingIndex] = { weekday, isPreferred };
+        return { ...prev, preferredWeekdays: updated };
+      } else {
+        // 새 항목 추가
+        return {
+          ...prev,
+          preferredWeekdays: [
+            ...prev.preferredWeekdays,
+            { weekday, isPreferred },
+          ],
+        };
+      }
+    });
+  };
+
   const handleSave = () => {
     const updateData: any = {};
 
@@ -349,6 +386,19 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
       updateData.desiredWeeklyHours = formData.desiredWeeklyHours
         ? parseInt(formData.desiredWeeklyHours)
         : null;
+    }
+
+    // 희망 근무 요일 변경 확인
+    const currentWeekdays = userDetail?.preferredWeekdays || [];
+    const hasWeekdayChanges =
+      formData.preferredWeekdays.length !== currentWeekdays.length ||
+      formData.preferredWeekdays.some((pw) => {
+        const current = currentWeekdays.find((cw) => cw.weekday === pw.weekday);
+        return !current || current.is_preferred !== pw.isPreferred;
+      });
+
+    if (hasWeekdayChanges) {
+      updateData.preferredWeekdays = formData.preferredWeekdays;
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -745,6 +795,78 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                         }
                         className="mt-1"
                       />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 희망 근무 요일 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t("user.preferredWeekdays", locale)}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {t("user.preferredWeekdays.description", locale)}
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {[
+                        {
+                          weekday: 0,
+                          label: t("user.weekdays.sunday", locale),
+                        },
+                        {
+                          weekday: 1,
+                          label: t("user.weekdays.monday", locale),
+                        },
+                        {
+                          weekday: 2,
+                          label: t("user.weekdays.tuesday", locale),
+                        },
+                        {
+                          weekday: 3,
+                          label: t("user.weekdays.wednesday", locale),
+                        },
+                        {
+                          weekday: 4,
+                          label: t("user.weekdays.thursday", locale),
+                        },
+                        {
+                          weekday: 5,
+                          label: t("user.weekdays.friday", locale),
+                        },
+                        {
+                          weekday: 6,
+                          label: t("user.weekdays.saturday", locale),
+                        },
+                      ].map(({ weekday, label }) => {
+                        const isChecked = formData.preferredWeekdays.some(
+                          (pw) => pw.weekday === weekday && pw.isPreferred
+                        );
+
+                        return (
+                          <div
+                            key={weekday}
+                            className="flex items-center space-x-2"
+                          >
+                            <Checkbox
+                              id={`weekday-${weekday}`}
+                              checked={isChecked}
+                              onCheckedChange={(checked) =>
+                                handlePreferredWeekdayChange(
+                                  weekday,
+                                  checked as boolean
+                                )
+                              }
+                            />
+                            <Label
+                              htmlFor={`weekday-${weekday}`}
+                              className="text-sm"
+                            >
+                              {label}
+                            </Label>
+                          </div>
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>

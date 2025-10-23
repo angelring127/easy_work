@@ -92,6 +92,7 @@
       "minRest": "Min Rest Between Shifts",
       "maxPerDay": "Max Hours / Day",
       "maxPerWeek": "Max Hours / Week",
+      "maxPerMonth": "Max Hours / Month",
       "maxConsecutive": "Max Consecutive Days"
     },
     "night": {
@@ -99,6 +100,16 @@
     }
   },
   "schedule": {
+    "title": "Schedule Management",
+    "weekView": "Week View",
+    "monthView": "Month View",
+    "weekGrid": "Week Grid",
+    "user": "User",
+    "clickToAssign": "Click to assign",
+    "noUsers": "No users available",
+    "noBusinessHours": "Business hours not set",
+    "closed": "Closed",
+    "staff": "Staff",
     "errors": {
       "endAfterStart": "End must be after Start",
       "breakTooLong": "Break exceeds duration",

@@ -162,6 +162,7 @@
       "minRest": "근무 간 최소 휴식(시간)",
       "maxPerDay": "일 최대 근무(시간)",
       "maxPerWeek": "주 최대 근무(시간)",
+      "maxPerMonth": "월 최대 근무(시간)",
       "maxConsecutive": "연속 근무 최대(일)"
     },
     "night": {
@@ -169,6 +170,16 @@
     }
   },
   "schedule": {
+    "title": "스케줄 관리",
+    "weekView": "주간 보기",
+    "monthView": "월간 보기",
+    "weekGrid": "주간 그리드",
+    "user": "사용자",
+    "clickToAssign": "클릭하여 배정",
+    "noUsers": "사용자가 없습니다",
+    "noBusinessHours": "영업 시간이 설정되지 않았습니다",
+    "closed": "휴무",
+    "staff": "직원",
     "errors": {
       "endAfterStart": "종료는 시작보다 커야 합니다",
       "breakTooLong": "휴식 시간이 근무 시간을 초과합니다",
