@@ -4,11 +4,12 @@ import { useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const { locale } = useParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   useEffect(() => {
     // 즉시 대시보드로 리다이렉트 (지연 제거)

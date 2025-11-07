@@ -1,4 +1,5 @@
 "use client";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -9,7 +10,7 @@ import { t, type Locale } from "@/lib/i18n";
 
 export default function VerifyEmailPage() {
   const { locale } = useParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { createClient } from "@/lib/supabase/server";
+import { buildAbsoluteUrl } from "@/lib/env";
 
 /**
  * 초대 재발송 API
@@ -245,6 +246,10 @@ async function resendInvitation(
         console.log("✅ 최종 확인: 사용자 삭제 완료");
       }
 
+      const inviteRedirectUrl = buildAbsoluteUrl(
+        `/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`
+      );
+
       const { error: emailError } = await supabase.auth.admin.inviteUserByEmail(
         invitation.invited_email,
         {
@@ -257,7 +262,7 @@ async function resendInvitation(
             invited_by: user.user_metadata?.name || user.email || "관리자",
             is_invited_user: true,
           },
-          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`,
+          redirectTo: inviteRedirectUrl,
         }
       );
 
@@ -295,7 +300,7 @@ async function resendInvitation(
         roleHint: invitation.role_hint,
         isExistingUser: !!existingUser,
         userId: signUpData.user?.id,
-        redirectTo: `http://localhost:3000/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`,
+        redirectTo: inviteRedirectUrl,
       });
 
       console.log("📧 이메일 발송 완료 - 수신함을 확인해주세요!");

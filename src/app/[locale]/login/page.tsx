@@ -15,6 +15,7 @@ import { SignInForm } from "@/features/auth/components/signin-form";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { type AuthApiResponse } from "@/lib/validations/auth";
 import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 import { useAuth } from "@/contexts/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +24,7 @@ function SignInContent() {
   const { locale } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
   const { user, loading, isProcessingInvite, setProcessingInvite } = useAuth();
   const { toast } = useToast();
 

@@ -1,4 +1,5 @@
 "use client";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -49,7 +50,7 @@ export default function EditStorePage() {
   const { userRole } = usePermissions();
   const router = useRouter();
   const { toast } = useToast();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
   const storeId = id as string;
 
   // URL 쿼리 파라미터에서 from 값 확인

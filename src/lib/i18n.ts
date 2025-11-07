@@ -5,7 +5,7 @@ export const locales = ["en", "ko", "ja"] as const;
 export type Locale = (typeof locales)[number];
 
 // 기본 언어
-export const defaultLocale: Locale = "ko";
+export const defaultLocale: Locale = "en";
 
 // 언어명 매핑
 export const localeNames: Record<Locale, string> = {
@@ -615,6 +615,11 @@ const translations = {
     "schedule.setAvailability": "가용성 설정",
     "schedule.requestSwap": "교대 요청",
     "schedule.deleteSchedule": "스케줄 삭제",
+    "schedule.transferSchedule": "다른 유저로 이전",
+    "schedule.transferTo": "이전할 유저 선택",
+    "schedule.transferToPlaceholder": "유저를 선택하세요",
+    "schedule.transferSuccess": "스케줄이 성공적으로 이전되었습니다",
+    "schedule.transferError": "스케줄 이전 중 오류가 발생했습니다",
     "availability.unavailable": "출근 불가",
     "availability.currentMonth": "이번 달",
     "availability.date": "날짜",
@@ -1129,6 +1134,11 @@ const translations = {
     "schedule.setAvailability": "Set Availability",
     "schedule.requestSwap": "Request Swap",
     "schedule.deleteSchedule": "Delete Schedule",
+    "schedule.transferSchedule": "Transfer to Another User",
+    "schedule.transferTo": "Select User to Transfer",
+    "schedule.transferToPlaceholder": "Select a user",
+    "schedule.transferSuccess": "Schedule transferred successfully",
+    "schedule.transferError": "Error occurred while transferring schedule",
     "availability.unavailable": "Unavailable",
     "availability.currentMonth": "Current Month",
     "availability.date": "Date",
@@ -1763,6 +1773,11 @@ const translations = {
     "schedule.setAvailability": "出勤可能設定",
     "schedule.requestSwap": "シフト交換依頼",
     "schedule.deleteSchedule": "スケジュール削除",
+    "schedule.transferSchedule": "他のユーザーに移転",
+    "schedule.transferTo": "移転先ユーザーを選択",
+    "schedule.transferToPlaceholder": "ユーザーを選択してください",
+    "schedule.transferSuccess": "スケジュールが正常に移転されました",
+    "schedule.transferError": "スケジュール移転中にエラーが発生しました",
     "availability.unavailable": "出勤不可",
     "availability.currentMonth": "今月",
     "availability.date": "日付",

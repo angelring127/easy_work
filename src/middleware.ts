@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/middleware";
-import { locales, defaultLocale, isValidLocale } from "@/lib/i18n-config";
+import { locales, defaultLocale, isValidLocale, type Locale } from "@/lib/i18n-config";
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -23,24 +23,37 @@ export async function middleware(request: NextRequest) {
   );
 
   if (!pathnameHasLocale) {
-    // 언어 검출
+    // 언어 검출 (우선순위: 쿠키 > Accept-Language 헤더 > 기본값)
     let locale = defaultLocale;
 
-    // 쿠키에서 언어 가져오기
+    // 1순위: 쿠키에서 언어 가져오기 (사용자가 명시적으로 선택한 언어)
     const cookieLocale = request.cookies.get("locale")?.value;
     if (cookieLocale && isValidLocale(cookieLocale)) {
       locale = cookieLocale;
     } else {
-      // Accept-Language 헤더에서 언어 검출
+      // 2순위: Accept-Language 헤더에서 디바이스 언어 검출
       const acceptLanguage = request.headers.get("accept-language");
       if (acceptLanguage) {
-        const preferredLocale = acceptLanguage
+        // 품질 값(q-value)을 고려하여 언어 목록 파싱 및 정렬
+        const languages = acceptLanguage
           .split(",")
-          .map((lang) => lang.split(";")[0].trim())
-          .find((lang) => locales.includes(lang.split("-")[0] as any));
+          .map((lang) => {
+            const parts = lang.trim().split(";");
+            const langCode = parts[0].trim();
+            const quality = parts[1]
+              ? parseFloat(parts[1].replace("q=", "").trim())
+              : 1.0;
+            return { langCode, quality };
+          })
+          .sort((a, b) => b.quality - a.quality); // 품질 값 기준 내림차순 정렬
 
-        if (preferredLocale) {
-          locale = preferredLocale.split("-")[0] as any;
+        // 지원하는 언어 중 가장 우선순위가 높은 언어 찾기
+        for (const { langCode } of languages) {
+          const baseLang = langCode.split("-")[0].toLowerCase();
+          if (isValidLocale(baseLang)) {
+            locale = baseLang as Locale;
+            break;
+          }
         }
       }
     }

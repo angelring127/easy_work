@@ -29,6 +29,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 import { useToast } from "@/hooks/use-toast";
 
 export default function StoresPage() {
@@ -38,7 +39,7 @@ export default function StoresPage() {
   const { userRole } = usePermissions();
   const router = useRouter();
   const { toast } = useToast();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
   useEffect(() => {

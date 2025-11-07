@@ -30,6 +30,7 @@ import {
   Settings,
 } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 
 export default function DashboardPage() {
   const { locale } = useParams();
@@ -40,7 +41,7 @@ export default function DashboardPage() {
     isLoading: storesLoading,
   } = useStore();
   const router = useRouter();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   // 권한 관련 훅
   const { userRole, roleDisplayName } = usePermissions();

@@ -144,6 +144,8 @@ export function WeekGrid({
   >([]);
   const [selectedWorkItem, setSelectedWorkItem] = useState<string>("");
   const [isModalLoading, setIsModalLoading] = useState(false);
+  const [showTransferMode, setShowTransferMode] = useState(false);
+  const [selectedTransferUserId, setSelectedTransferUserId] = useState<string>("");
 
   // 週の日付 범위 계산
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // 월요일 시작
@@ -382,9 +384,15 @@ export function WeekGrid({
       const startMin =
         parseInt(assignment.startTime.split(":")[0]) * 60 +
         parseInt(assignment.startTime.split(":")[1]);
-      const endMin =
+      let endMin =
         parseInt(assignment.endTime.split(":")[0]) * 60 +
         parseInt(assignment.endTime.split(":")[1]);
+
+      // 자정을 넘어가는 경우 처리 (예: 10:00 - 24:00)
+      if (endMin <= startMin) {
+        endMin += 24 * 60; // 24시간(1440분) 추가
+      }
+
       totalMinutes += endMin - startMin;
     });
 
@@ -402,20 +410,7 @@ export function WeekGrid({
     const user = users.find((u) => u.id === userId);
     if (user) {
       setModalCell({ userId, date, userName: user.name });
-
-      // 기존 스케줄이 있는지 확인
-      const existingAssignment = assignments.find(
-        (a) => a.userId === userId && a.date === date && a.status === "ASSIGNED"
-      );
-
-      if (existingAssignment) {
-        // 기존 스케줄이 있으면 해당 work_item_id를 선택
-        setSelectedWorkItem(existingAssignment.workItemId);
-      } else {
-        // 기존 스케줄이 없으면 선택 초기화
-        setSelectedWorkItem("");
-      }
-
+      setSelectedWorkItem(""); // 항상 선택 초기화
       setIsModalOpen(true);
     }
     setSelectedCell({ userId, date });
@@ -749,8 +744,10 @@ export function WeekGrid({
         onOpenChange={(open) => {
           setIsModalOpen(open);
           if (!open) {
-            // 모달이 닫힐 때 선택된 근무 항목 초기화
+            // 모달이 닫힐 때 선택된 근무 항목 및 이전 모드 초기화
             setSelectedWorkItem("");
+            setShowTransferMode(false);
+            setSelectedTransferUserId("");
           }
         }}
       >
@@ -799,18 +796,26 @@ export function WeekGrid({
                 return null;
               })()}
 
-            {/* 근무 항목 선택 */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {t("schedule.selectWorkItem", locale)}
-              </label>
-              <Select
-                value={selectedWorkItem}
-                disabled={isModalLoading}
-                onValueChange={async (value) => {
-                  setSelectedWorkItem(value);
+            {/* 액션 선택: 근무 항목 추가/수정 또는 이전 */}
+            {!showTransferMode ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  {t("schedule.selectWorkItem", locale)}
+                </label>
+                <Select
+                  value={selectedWorkItem}
+                  disabled={isModalLoading}
+                  onValueChange={async (value) => {
+                    setSelectedWorkItem(value);
 
-                  if (value === "DELETE_SCHEDULE") {
+                    if (value === "TRANSFER_SCHEDULE") {
+                      // 이전 모드 활성화
+                      setShowTransferMode(true);
+                      setSelectedWorkItem("");
+                      return;
+                    }
+
+                    if (value === "DELETE_SCHEDULE") {
                     // 스케줄 삭제 로직
                     if (!modalCell) return;
 
@@ -977,7 +982,7 @@ export function WeekGrid({
                       {formatTimeFromMinutes(item.end_min)})
                     </SelectItem>
                   ))}
-                  {/* 기존 스케줄이 있는 경우에만 삭제 옵션 표시 */}
+                  {/* 기존 스케줄이 있는 경우에만 삭제 및 이전 옵션 표시 */}
                   {modalCell &&
                     assignments.some(
                       (a) =>
@@ -985,13 +990,130 @@ export function WeekGrid({
                         a.date === modalCell.date &&
                         a.status === "ASSIGNED"
                     ) && (
-                      <SelectItem value="DELETE_SCHEDULE">
-                        {t("schedule.deleteSchedule", locale)}
-                      </SelectItem>
+                      <>
+                        <SelectItem value="TRANSFER_SCHEDULE">
+                          {t("schedule.transferSchedule", locale)}
+                        </SelectItem>
+                        <SelectItem value="DELETE_SCHEDULE">
+                          {t("schedule.deleteSchedule", locale)}
+                        </SelectItem>
+                      </>
                     )}
                 </SelectContent>
               </Select>
             </div>
+            ) : (
+              /* 스케줄 이전 모드 */
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    {t("schedule.transferTo", locale)}
+                  </label>
+                  <Select
+                    value={selectedTransferUserId}
+                    disabled={isModalLoading}
+                    onValueChange={async (value) => {
+                      if (!value || !modalCell) return;
+
+                      setSelectedTransferUserId(value);
+                      setIsModalLoading(true);
+
+                      try {
+                        // 기존 스케줄 찾기
+                        const existingAssignment = assignments.find(
+                          (a) =>
+                            a.userId === modalCell.userId &&
+                            a.date === modalCell.date &&
+                            a.status === "ASSIGNED"
+                        );
+
+                        if (!existingAssignment) {
+                          alert(t("schedule.noScheduleToDelete", locale));
+                          setIsModalLoading(false);
+                          return;
+                        }
+
+                        // 스케줄 이전 (user_id 변경)
+                        const response = await fetch(
+                          `/api/schedule/assignments/${existingAssignment.id}`,
+                          {
+                            method: "PATCH",
+                            headers: {
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                              user_id: value,
+                            }),
+                          }
+                        );
+
+                        if (response.ok) {
+                          const result = await response.json();
+                          if (result.success) {
+                            if (onScheduleChange) {
+                              onScheduleChange();
+                            }
+                            setIsModalOpen(false);
+                          } else {
+                            alert(
+                              `${t("schedule.transferError", locale)}: ${
+                                result.error || "Unknown error"
+                              }`
+                            );
+                          }
+                        } else {
+                          const errorData = await response.json().catch(() => ({
+                            error: `HTTP ${response.status}`,
+                          }));
+                          alert(
+                            `${t("schedule.transferError", locale)}: ${
+                              errorData.error || response.status
+                            }`
+                          );
+                        }
+                      } catch (error) {
+                        console.error("스케줄 이전 오류:", error);
+                        alert(t("schedule.transferError", locale));
+                      } finally {
+                        setIsModalLoading(false);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          isModalLoading
+                            ? t("schedule.processing", locale)
+                            : t("schedule.transferToPlaceholder", locale)
+                        }
+                      />
+                      {isModalLoading && (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users
+                        .filter((user) => user.id !== modalCell?.userId) // 현재 유저 제외
+                        .map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowTransferMode(false);
+                    setSelectedTransferUserId("");
+                  }}
+                  disabled={isModalLoading}
+                >
+                  {t("common.back", locale)}
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

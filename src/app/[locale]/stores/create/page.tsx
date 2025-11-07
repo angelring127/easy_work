@@ -1,4 +1,5 @@
 "use client";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -15,7 +16,7 @@ export default function CreateStorePage() {
   const { user, loading } = useAuth();
   const { userRole } = usePermissions();
   const router = useRouter();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
   useEffect(() => {

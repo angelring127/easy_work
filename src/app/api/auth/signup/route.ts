@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { UserRole } from "@/types/auth";
+import { getEmailVerificationRedirectUrl } from "@/lib/env";
 
 // 회원가입 요청 스키마
 const signUpSchema = z
@@ -51,9 +52,7 @@ export async function POST(request: NextRequest) {
           name: email.split("@")[0], // 이메일의 @ 앞부분을 기본 이름으로 사용
         },
         // 이메일 확인 후 리다이렉트할 URL (선택사항)
-        emailRedirectTo: `${
-          process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-        }/auth/callback`,
+        emailRedirectTo: getEmailVerificationRedirectUrl(),
       },
     });
 

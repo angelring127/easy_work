@@ -190,22 +190,7 @@ export default function SchedulePage() {
 
   const handleUserClick = (userId: string, date: string) => {
     console.log("사용자 클릭:", userId, date);
-    // 셀 클릭 시 해당 유저/날짜 대상 자동 배정 시도
-    if (!currentStore?.id) return;
-    const assign = async () => {
-      try {
-        const res = await fetch(
-          `/api/schedule/auto-assign?store_id=${currentStore.id}&from=${date}&to=${date}&user_id=${userId}&date=${date}`,
-          { method: "POST" }
-        );
-        const json = await res.json();
-        console.log("cell auto-assign:", json);
-        await loadScheduleData();
-      } catch (e) {
-        console.error("cell auto-assign error", e);
-      }
-    };
-    assign();
+    // 자동 배정 로직 제거 - 사용자가 수동으로 선택해야 함
   };
 
   const handleAvailabilityToggle = (

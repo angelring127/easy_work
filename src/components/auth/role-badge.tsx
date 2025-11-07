@@ -4,6 +4,7 @@ import { UserRole } from "@/types/auth";
 import { getRoleDisplayName } from "@/lib/auth/permissions";
 import { Badge } from "@/components/ui/badge";
 import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 import { useParams } from "next/navigation";
 
 interface RoleBadgeProps {
@@ -21,7 +22,7 @@ export function RoleBadge({
   className,
 }: RoleBadgeProps) {
   const { locale } = useParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   // 역할별 스타일 매핑
   const getRoleVariant = (role: UserRole) => {
@@ -84,6 +85,11 @@ function usePermissions() {
   const { useRole } = require("@/hooks/use-permissions");
   return useRole();
 }
+
+
+
+
+
 
 
 

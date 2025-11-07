@@ -11,6 +11,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { sessionManager } from "@/lib/auth/session-manager";
 import { UserRole, type UserProfile } from "@/types/auth";
+import { defaultLocale } from "@/lib/i18n-config";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -209,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
 
         // 로그인 페이지로 리다이렉트 (다국어 지원)
-        const currentLocale = window.location.pathname.split("/")[1] || "ko";
+        const currentLocale = window.location.pathname.split("/")[1] || defaultLocale;
         window.location.href = `/${currentLocale}/login`;
       },
       // 세션 갱신 시 콜백
@@ -245,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // 다국어 경로에서 현재 locale 추출
         const pathSegments = currentPath.split("/");
-        const currentLocale = pathSegments[1] || "ko";
+        const currentLocale = pathSegments[1] || defaultLocale;
 
         // 콜백 페이지에서 온 경우 대시보드로 리다이렉트
         if (currentPath.includes("/auth/callback")) {

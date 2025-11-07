@@ -14,11 +14,12 @@ import { SignUpForm } from "@/features/auth/components/signup-form";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { type AuthApiResponse } from "@/lib/validations/auth";
 import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 
 export default function SignUpPage() {
   const { locale } = useParams();
   const router = useRouter();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   const handleSignUpSuccess = (data: AuthApiResponse) => {
     // 회원가입 성공 시 이메일 인증 페이지로 리다이렉트

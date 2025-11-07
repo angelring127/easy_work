@@ -1,4 +1,5 @@
 "use client";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -23,7 +24,7 @@ export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { refreshStores } = useStore();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   const [isLoading, setIsLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(false);

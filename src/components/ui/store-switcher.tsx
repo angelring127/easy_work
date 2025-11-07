@@ -13,6 +13,7 @@ import {
 import { useStore } from "@/contexts/store-context";
 import { Store as StoreType } from "@/lib/supabase/types";
 import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 import { useParams } from "next/navigation";
 
 interface StoreSwitcherProps {
@@ -21,7 +22,7 @@ interface StoreSwitcherProps {
 
 export function StoreSwitcher({ className }: StoreSwitcherProps) {
   const { locale } = useParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
   const { currentStore, accessibleStores, selectStore, isLoading } = useStore();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -120,7 +121,7 @@ export function StoreSwitcher({ className }: StoreSwitcherProps) {
  */
 export function StoreDisplay({ className }: StoreSwitcherProps) {
   const { locale } = useParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
   const { currentStore } = useStore();
 
   if (!currentStore) {

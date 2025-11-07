@@ -18,7 +18,7 @@ export function LanguageSwitcher() {
   const [isPending, startTransition] = useTransition();
 
   // 현재 언어를 pathname에서 추출
-  const currentLocale = pathname.split("/")[1] || "ko";
+  const currentLocale = pathname.split("/")[1] || "en";
 
   const handleLocaleChange = (newLocale: string) => {
     if (newLocale === currentLocale) return;

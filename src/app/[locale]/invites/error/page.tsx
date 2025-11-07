@@ -1,4 +1,5 @@
 "use client";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -18,7 +19,7 @@ export default function InviteErrorPage() {
   const { locale } = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   const [errorInfo, setErrorInfo] = useState<{
     error: string;

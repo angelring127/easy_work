@@ -1,4 +1,5 @@
 "use client";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -64,7 +65,7 @@ export function StoreForm({
   store, // 레거시 지원
 }: StoreFormProps) {
   const { locale } = useParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
   const { toast } = useToast();
   const { addStore, updateStore } = useStore();
   const [isSubmitting, setIsSubmitting] = useState(false);

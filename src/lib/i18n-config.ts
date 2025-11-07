@@ -5,7 +5,7 @@ export const locales = ["en", "ko", "ja"] as const;
 export type Locale = (typeof locales)[number];
 
 // 기본 언어
-export const defaultLocale: Locale = "ko";
+export const defaultLocale: Locale = "en";
 
 // 언어명 매핑
 export const localeNames: Record<Locale, string> = {

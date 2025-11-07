@@ -1,4 +1,5 @@
 "use client";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -61,7 +62,7 @@ export default function StoreDetailPage() {
   const { canManageStore, canManageUsers, isManager } = useAdminAccess();
   const router = useRouter();
   const { toast } = useToast();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
   const storeId = id as string;
 
   const [store, setStore] = useState<StoreData | null>(null);

@@ -1,4 +1,5 @@
 "use client";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import { useState } from "react";
 import { UserRole, type UserProfile } from "@/types/auth";
@@ -40,7 +41,7 @@ export function UserRoleManager({
   className,
 }: UserRoleManagerProps) {
   const { locale } = useParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
@@ -190,7 +191,7 @@ export function UserRoleTable({
   className,
 }: UserRoleTableProps) {
   const { locale } = useParams();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   return (
     <div className={`space-y-4 ${className || ""}`}>

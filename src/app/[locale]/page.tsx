@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
@@ -15,7 +16,7 @@ export default function HomePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { setProcessingInvite } = useAuth();
-  const currentLocale = (locale as Locale) || "ko";
+  const currentLocale = (locale as Locale) || defaultLocale;
 
   useEffect(() => {
     // 초대 토큰 및 오류 처리
