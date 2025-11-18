@@ -15,12 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { t } from "@/lib/i18n";
+import { useStore } from "@/contexts/store-context";
 
 export default function SetupPasswordPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { refreshStores } = useStore();
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -30,6 +32,13 @@ export default function SetupPasswordPage() {
 
   const locale = params.locale as string;
   const token = searchParams.get("token");
+
+  console.log("=== /invites/setup-password/page.tsx 로드됨 (쿼리 파라미터 버전) ===");
+  console.log("페이지 파라미터:", {
+    locale,
+    token,
+    fullUrl: typeof window !== "undefined" ? window.location.href : "SSR",
+  });
 
   useEffect(() => {
     const checkUserAndInvitation = async () => {
@@ -118,6 +127,13 @@ export default function SetupPasswordPage() {
       }
 
       // 초대 수락 처리
+      console.log("초대 수락 처리 시작:", {
+        hasToken: !!token,
+        tokenLength: token?.length,
+        userEmail: user?.email,
+        passwordLength: password?.length,
+      });
+
       if (token) {
         const requestBody = {
           tokenHash: token,
@@ -126,30 +142,56 @@ export default function SetupPasswordPage() {
           password: password,
         };
 
+        console.log("=== 클라이언트: 초대 수락 API 요청 시작 ===");
         console.log("초대 수락 API 요청:", {
           tokenHash: token,
           name: requestBody.name,
           passwordLength: password.length,
+          requestBody,
         });
 
-        const response = await fetch("/api/invitations/accept", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        });
+        try {
+          const response = await fetch("/api/invitations/accept", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          });
 
-        const result = await response.json();
-        console.log("초대 수락 API 응답:", result);
+          console.log("초대 수락 API 응답 상태:", response.status, response.statusText);
 
-        if (!result.success) {
-          throw new Error(result.error);
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("초대 수락 API 오류 응답:", errorText);
+            throw new Error(`API 오류: ${response.status} ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          console.log("=== 클라이언트: 초대 수락 API 응답 ===");
+          console.log("초대 수락 API 응답:", result);
+
+          if (!result.success) {
+            throw new Error(result.error || "초대 수락에 실패했습니다");
+          }
+
+          // 초대 수락 성공 후 세션 새로고침
+          const supabase = createClient();
+          await supabase.auth.refreshSession();
+
+          // 매장 목록 새로고침 (초대 수락 후 store_users 레코드가 생성되었으므로)
+          console.log("초대 수락 후 매장 목록 새로고침 시작");
+          await refreshStores();
+          console.log("초대 수락 후 매장 목록 새로고침 완료");
+
+          // 잠시 대기하여 서버 상태 동기화
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } catch (apiError: any) {
+          console.error("초대 수락 API 호출 중 오류:", apiError);
+          throw apiError;
         }
-
-        // 초대 수락 성공 후 세션 새로고침
-        const supabase = createClient();
-        await supabase.auth.refreshSession();
+      } else {
+        console.warn("초대 수락 처리 건너뜀: token이 없습니다");
       }
 
       toast({

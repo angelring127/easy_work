@@ -76,10 +76,10 @@
    - 한국어/영어/일본어 완전 지원
 
 9. **환경 기반 이메일 확인 링크 구성** (2024-12-08 구현 완료)
-   - `src/lib/env.ts` 유틸리티로 환경 URL 정규화 로직을 중앙집중화
+   - `src/lib/env.ts` 유틸리티로 환경 URL 정규화 로직을 중앙집중화하고 로컬 호스트 값을 자동 필터링
    - 회원가입 API와 초대 재발송 API가 동일 유틸리티를 사용해 배포 환경에 맞는 절대 URL 생성
-   - 이메일 검증 링크가 `NEXT_PUBLIC_SITE_URL`/`SITE_URL`/`NEXT_PUBLIC_VERCEL_URL` 환경 변수 순으로 자동 결정
-   - 기본값을 `http://localhost:3000`으로 유지해 로컬 개발 지원
+   - 이메일 검증 링크가 `SITE_URL` → `NEXT_PUBLIC_SITE_URL` → `NEXT_PUBLIC_APP_URL` → `NEXT_PUBLIC_VERCEL_URL` → `VERCEL_URL` 순으로 탐색되며 로컬 주소는 운영 환경에서 자동으로 무시
+   - 기본값을 `https://easy-work-ten.vercel.app/`로 유지하면서 개발 환경에서는 로컬 URL을 허용
    - 불필요한 슬래시/프로토콜 정규화로 링크 신뢰성 향상
 
 ### 🔄 진행 예정 기능들

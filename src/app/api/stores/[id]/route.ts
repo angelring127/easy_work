@@ -23,6 +23,8 @@ const updateStoreSchema = z.object({
   max_hours_per_week: z.number().int().min(0).max(168).optional(),
   max_hours_per_month: z.number().min(1).max(999.99).optional(),
   max_consecutive_days: z.number().int().min(0).max(14).optional(),
+  max_morning_staff: z.number().int().min(0).max(999).optional(),
+  max_afternoon_staff: z.number().int().min(0).max(999).optional(),
   weekly_labor_budget_cents: z.number().int().min(0).optional(),
   night_shift_boundary_min: z.number().int().min(0).max(1440).optional(),
   shift_boundary_time_min: z.number().int().min(0).max(1440).optional(),

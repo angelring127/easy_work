@@ -125,6 +125,13 @@ async function getStores(
         { p_user_id: user.id }
       );
 
+      console.log("매장 목록 조회 - RLS 우회 함수 결과:", {
+        userId: user.id,
+        stores,
+        storesError,
+        storesCount: stores?.length || 0,
+      });
+
       // 함수가 없는 경우 대안 로직 사용
       if (
         storesError &&
@@ -139,34 +146,96 @@ async function getStores(
           .eq("status", "ACTIVE")
           .eq("owner_id", user.id);
 
-        const { data: userRoles } = await supabase
+        // user_store_roles에서 조회
+        const { data: userRoles, error: userRolesError } = await supabase
           .from("user_store_roles")
           .select("store_id, role, granted_at")
           .eq("user_id", user.id)
           .eq("status", "ACTIVE");
 
-        const { data: invitedStores } = await supabase
+        console.log("매장 목록 조회 - user_store_roles:", {
+          userId: user.id,
+          userRoles,
+          userRolesError,
+        });
+
+        // store_users에서도 조회 (일반 유저의 경우)
+        const { data: storeUsers, error: storeUsersError } = await supabase
+          .from("store_users")
+          .select("store_id, role, granted_at")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .eq("is_guest", false);
+
+        console.log("매장 목록 조회 - store_users:", {
+          userId: user.id,
+          storeUsers,
+          storeUsersError,
+        });
+
+        // 모든 매장 ID 수집 (중복 제거)
+        const storeIds = new Set<string>();
+        (ownedStores || []).forEach((store) => storeIds.add(store.id));
+        (userRoles || []).forEach((role) => storeIds.add(role.store_id));
+        (storeUsers || []).forEach((su) => storeIds.add(su.store_id));
+
+        console.log("매장 목록 조회 - 수집된 매장 ID:", {
+          ownedStoresCount: ownedStores?.length || 0,
+          userRolesCount: userRoles?.length || 0,
+          storeUsersCount: storeUsers?.length || 0,
+          totalStoreIds: Array.from(storeIds),
+        });
+
+        // 매장 정보 조회
+        const { data: allStoresData, error: allStoresError } = await supabase
           .from("stores")
           .select("*")
           .eq("status", "ACTIVE")
-          .in("id", userRoles?.map((r) => r.store_id) || []);
+          .in("id", Array.from(storeIds));
 
-        // 매장 목록 합치기
-        const allStores = [
-          ...(ownedStores || []).map((store) => ({
-            ...store,
-            user_role: "MASTER",
-            granted_at: store.created_at,
-          })),
-          ...(invitedStores || []).map((store) => {
-            const userRole = userRoles?.find((r) => r.store_id === store.id);
+        console.log("매장 목록 조회 - 매장 정보:", {
+          allStoresData,
+          allStoresError,
+        });
+
+        // 매장 목록 생성 (역할 정보 포함)
+        const allStores = (allStoresData || []).map((store) => {
+          // 소유한 매장인 경우
+          if (store.owner_id === user.id) {
             return {
               ...store,
-              user_role: userRole?.role || "PART_TIMER",
-              granted_at: userRole?.granted_at || store.created_at,
+              user_role: "MASTER",
+              granted_at: store.created_at,
             };
-          }),
-        ];
+          }
+
+          // user_store_roles에서 역할 찾기
+          const userRole = userRoles?.find((r) => r.store_id === store.id);
+          if (userRole) {
+            return {
+              ...store,
+              user_role: userRole.role,
+              granted_at: userRole.granted_at,
+            };
+          }
+
+          // store_users에서 역할 찾기
+          const storeUser = storeUsers?.find((su) => su.store_id === store.id);
+          if (storeUser) {
+            return {
+              ...store,
+              user_role: storeUser.role,
+              granted_at: storeUser.granted_at,
+            };
+          }
+
+          // 기본값
+          return {
+            ...store,
+            user_role: "PART_TIMER",
+            granted_at: store.created_at,
+          };
+        });
 
         stores = allStores.sort((a, b) => a.name.localeCompare(b.name));
         storesError = null;

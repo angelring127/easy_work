@@ -64,6 +64,7 @@ interface ScheduleAssignment {
   notes?: string;
   requiredRoles: string[];
   userRoles: string[];
+  unpaidBreakMin?: number;
 }
 
 interface UserAvailability {
@@ -140,12 +141,25 @@ export function WeekGrid({
       name: string;
       start_min: number;
       end_min: number;
+      unpaid_break_min?: number;
     }>
   >([]);
   const [selectedWorkItem, setSelectedWorkItem] = useState<string>("");
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [showTransferMode, setShowTransferMode] = useState(false);
   const [selectedTransferUserId, setSelectedTransferUserId] = useState<string>("");
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
+  const [warningData, setWarningData] = useState<{
+    userName: string;
+    currentHours: number;
+    desiredHours: number;
+    newHours: number;
+    totalHours: number;
+  } | null>(null);
+  const [pendingScheduleData, setPendingScheduleData] = useState<{
+    requestData: any;
+    existingAssignment: ScheduleAssignment | undefined;
+  } | null>(null);
 
   // 週の日付 범위 계산
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // 월요일 시작
@@ -373,8 +387,12 @@ export function WeekGrid({
     return { morning: morningCount, afternoon: afternoonCount };
   };
 
-  // 사용자의 총 스케줄 시간 계산
-  const getUserTotalHours = (userId: string): number => {
+  // 사용자의 총 스케줄 시간 계산 (Unpaid Break 제외)
+  const getUserTotalHours = (userId: string, includeNewAssignment?: {
+    startTime: string;
+    endTime: string;
+    unpaidBreakMin?: number;
+  }): number => {
     const userAssignments = assignments.filter(
       (a) => a.userId === userId && a.status === "ASSIGNED"
     );
@@ -393,8 +411,35 @@ export function WeekGrid({
         endMin += 24 * 60; // 24시간(1440분) 추가
       }
 
-      totalMinutes += endMin - startMin;
+      // 근무 시간 계산
+      const workMinutes = endMin - startMin;
+      
+      // Unpaid Break 시간 제외
+      const unpaidBreakMin = assignment.unpaidBreakMin || 0;
+      const paidMinutes = workMinutes - unpaidBreakMin;
+
+      totalMinutes += paidMinutes;
     });
+
+    // 새 스케줄 포함 계산
+    if (includeNewAssignment) {
+      const startMin =
+        parseInt(includeNewAssignment.startTime.split(":")[0]) * 60 +
+        parseInt(includeNewAssignment.startTime.split(":")[1]);
+      let endMin =
+        parseInt(includeNewAssignment.endTime.split(":")[0]) * 60 +
+        parseInt(includeNewAssignment.endTime.split(":")[1]);
+
+      if (endMin <= startMin) {
+        endMin += 24 * 60;
+      }
+
+      const workMinutes = endMin - startMin;
+      const unpaidBreakMin = includeNewAssignment.unpaidBreakMin || 0;
+      const paidMinutes = workMinutes - unpaidBreakMin;
+
+      totalMinutes += paidMinutes;
+    }
 
     return Math.round((totalMinutes / 60) * 10) / 10; // 소수점 첫째자리까지
   };
@@ -860,7 +905,11 @@ export function WeekGrid({
                     }
                   } else if (value && value !== "DELETE_SCHEDULE") {
                     // 스케줄 추가/수정 로직
-                    if (!modalCell) return;
+                    if (!modalCell || !modalCell.userId) {
+                      console.error("modalCell 또는 userId가 없습니다:", modalCell);
+                      alert(t("schedule.scheduleAddError", locale));
+                      return;
+                    }
 
                     setIsModalLoading(true);
 
@@ -877,18 +926,79 @@ export function WeekGrid({
                         (item) => item.id === value
                       );
 
+                      const startTime = selectedItem?.start_min
+                        ? formatTimeFromMinutes(selectedItem.start_min)
+                        : "09:00";
+                      const endTime = selectedItem?.end_min
+                        ? formatTimeFromMinutes(selectedItem.end_min)
+                        : "18:00";
+
                       const requestData = {
                         store_id: storeId,
                         user_id: modalCell.userId,
                         work_item_id: value,
                         date: modalCell.date,
-                        start_time: selectedItem?.start_min
-                          ? formatTimeFromMinutes(selectedItem.start_min)
-                          : "09:00",
-                        end_time: selectedItem?.end_min
-                          ? formatTimeFromMinutes(selectedItem.end_min)
-                          : "18:00",
+                        start_time: startTime,
+                        end_time: endTime,
                       };
+
+                      // Desired Weekly Hours 확인 (새 스케줄 추가 시에만)
+                      if (!existingAssignment) {
+                        try {
+                          // 사용자 정보 조회
+                          const userResponse = await fetch(
+                            `/api/stores/${storeId}/users/${modalCell.userId}`
+                          );
+                          const userResult = await userResponse.json();
+
+                          if (userResult.success && userResult.data?.desiredWeeklyHours) {
+                            const desiredHours = userResult.data.desiredWeeklyHours;
+                            const currentHours = getUserTotalHours(modalCell.userId);
+                            
+                            // 새 스케줄 시간 계산
+                            const startMin =
+                              parseInt(startTime.split(":")[0]) * 60 +
+                              parseInt(startTime.split(":")[1]);
+                            let endMin =
+                              parseInt(endTime.split(":")[0]) * 60 +
+                              parseInt(endTime.split(":")[1]);
+
+                            if (endMin <= startMin) {
+                              endMin += 24 * 60;
+                            }
+
+                            const workMinutes = endMin - startMin;
+                            const unpaidBreakMin = selectedItem?.unpaid_break_min || 0;
+                            const newHours = Math.round(((workMinutes - unpaidBreakMin) / 60) * 10) / 10;
+                            const totalHours = getUserTotalHours(modalCell.userId, {
+                              startTime,
+                              endTime,
+                              unpaidBreakMin,
+                            });
+
+                            // Desired Weekly Hours 초과 확인
+                            if (totalHours > desiredHours) {
+                              setWarningData({
+                                userName: modalCell.userName,
+                                currentHours,
+                                desiredHours,
+                                newHours,
+                                totalHours,
+                              });
+                              setPendingScheduleData({
+                                requestData,
+                                existingAssignment,
+                              });
+                              setShowWarningDialog(true);
+                              setIsModalLoading(false);
+                              return;
+                            }
+                          }
+                        } catch (error) {
+                          console.error("사용자 정보 조회 오류:", error);
+                          // 에러가 발생해도 스케줄 추가는 계속 진행
+                        }
+                      }
 
                       console.log("스케줄 요청 데이터:", requestData);
 
@@ -1113,6 +1223,141 @@ export function WeekGrid({
                   {t("common.back", locale)}
                 </Button>
               </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Desired Weekly Hours 초과 경고 모달 */}
+      <Dialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertCircle className="h-5 w-5" />
+              {t("schedule.warning.exceedDesiredHours", locale)}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {warningData && (
+              <>
+                <div className="text-sm text-muted-foreground">
+                  <p className="mb-2">
+                    <strong>{warningData.userName}</strong>{" "}
+                    {t("schedule.warning.exceedDesiredHoursMessage", locale)}
+                  </p>
+                  <div className="space-y-1 mt-3">
+                    <div className="flex justify-between">
+                      <span>{t("schedule.warning.currentHours", locale)}:</span>
+                      <span className="font-medium">{warningData.currentHours}h</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t("schedule.warning.newHours", locale)}:</span>
+                      <span className="font-medium">+{warningData.newHours}h</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-1">
+                      <span>{t("schedule.warning.totalHours", locale)}:</span>
+                      <span className="font-medium text-amber-600">
+                        {warningData.totalHours}h
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t("schedule.warning.desiredHours", locale)}:</span>
+                      <span className="font-medium">{warningData.desiredHours}h</span>
+                    </div>
+                    <div className="flex justify-between text-amber-600 font-semibold">
+                      <span>{t("schedule.warning.exceedBy", locale)}:</span>
+                      <span>
+                        +{(warningData.totalHours - warningData.desiredHours).toFixed(1)}h
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowWarningDialog(false);
+                      setWarningData(null);
+                      setPendingScheduleData(null);
+                      setIsModalLoading(false);
+                    }}
+                  >
+                    {t("common.cancel", locale)}
+                  </Button>
+                  <Button
+                    variant="default"
+                    onClick={async () => {
+                      if (!pendingScheduleData) return;
+
+                      setShowWarningDialog(false);
+                      setIsModalLoading(true);
+
+                      try {
+                        let response;
+
+                        if (pendingScheduleData.existingAssignment) {
+                          response = await fetch(
+                            `/api/schedule/assignments/${pendingScheduleData.existingAssignment.id}`,
+                            {
+                              method: "PATCH",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({
+                                work_item_id: pendingScheduleData.requestData.work_item_id,
+                                start_time: pendingScheduleData.requestData.start_time,
+                                end_time: pendingScheduleData.requestData.end_time,
+                              }),
+                            }
+                          );
+                        } else {
+                          response = await fetch("/api/schedule/assignments", {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify(pendingScheduleData.requestData),
+                          });
+                        }
+
+                        if (response.ok) {
+                          const result = await response.json();
+                          if (result.success) {
+                            if (onScheduleChange) {
+                              onScheduleChange();
+                            }
+                            setIsModalOpen(false);
+                          } else {
+                            console.error("API 오류:", result.error);
+                            alert(
+                              `${t("schedule.scheduleAddError", locale)}: ${
+                                result.error
+                              }`
+                            );
+                          }
+                        } else {
+                          const errorText = await response.text();
+                          console.error("HTTP 오류:", response.status, errorText);
+                          alert(
+                            `${t("schedule.scheduleAddError", locale)}: ${
+                              response.status
+                            }`
+                          );
+                        }
+                      } catch (error) {
+                        console.error("스케줄 처리 오류:", error);
+                        alert(t("schedule.scheduleAddError", locale));
+                      } finally {
+                        setIsModalLoading(false);
+                        setWarningData(null);
+                        setPendingScheduleData(null);
+                      }
+                    }}
+                  >
+                    {t("common.confirm", locale)}
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </DialogContent>

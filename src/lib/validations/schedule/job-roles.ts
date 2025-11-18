@@ -8,7 +8,10 @@ export const StoreJobRoleSchema = z.object({
     .min(1, "역할명은 필수입니다")
     .max(48, "역할명은 48자 이하여야 합니다"),
   code: z.string().max(32, "코드는 32자 이하여야 합니다").optional(),
-  description: z.string().max(160, "설명은 160자 이하여야 합니다").optional(),
+  description: z
+    .string()
+    .min(1, "설명은 필수입니다")
+    .max(160, "설명은 160자 이하여야 합니다"),
   active: z.boolean().default(true),
 });
 
@@ -40,7 +43,14 @@ export const WorkItemRequiredRolesSchema = z.object({
 export const UpdateStoreJobRoleSchema = z.object({
   name: z.string().min(1).max(48).optional(),
   code: z.string().max(32).optional(),
-  description: z.string().max(160).optional(),
+  description: z
+    .string()
+    .min(1, "설명은 필수입니다")
+    .max(160, "설명은 160자 이하여야 합니다")
+    .optional()
+    .refine((val) => val === undefined || val.trim().length > 0, {
+      message: "설명은 필수입니다",
+    }),
   active: z.boolean().optional(),
 });
 

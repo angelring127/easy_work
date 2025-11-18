@@ -52,9 +52,13 @@ export async function POST(request: NextRequest) {
           name: email.split("@")[0], // 이메일의 @ 앞부분을 기본 이름으로 사용
         },
         // 이메일 확인 후 리다이렉트할 URL (선택사항)
-        emailRedirectTo: getEmailVerificationRedirectUrl(),
+        // emailRedirectTo: getEmailVerificationRedirectUrl(),
+        emailRedirectTo:
+          "https://easy-work-ten.vercel.app/ko/auth/verify-email",
       },
     });
+
+    console.log("회원가입 결과:", data);
 
     if (error) {
       console.error("회원가입 처리 중 오류:", error);

@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { t } from "@/lib/i18n";
 import { Locale } from "@/lib/i18n-config";
@@ -46,11 +47,13 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
     name: string;
     roleHint: "PART_TIMER" | "SUB_MANAGER";
     expiresInDays: number;
+    isGuest: boolean;
   }>({
     email: "",
     name: "",
     roleHint: "PART_TIMER",
     expiresInDays: 7,
+    isGuest: false,
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -100,6 +103,7 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
         name: "",
         roleHint: "PART_TIMER",
         expiresInDays: 7,
+        isGuest: false,
       });
       toast({
         title: t("invite.createSuccess", locale),
@@ -185,6 +189,26 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
   });
 
   const handleCreateInvitation = () => {
+    // 게스트 사용자 등록인 경우
+    if (createForm.isGuest) {
+      if (!createForm.name) {
+        toast({
+          title: "이름을 입력해주세요",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      createInvitationMutation.mutate({
+        storeId,
+        name: createForm.name,
+        roleHint: createForm.roleHint,
+        isGuest: true,
+      });
+      return;
+    }
+
+    // 일반 이메일 초대인 경우
     if (!createForm.email) {
       toast({
         title: t("invite.emailRequired", locale),
@@ -196,8 +220,10 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
     createInvitationMutation.mutate({
       storeId,
       email: createForm.email,
+      name: createForm.name,
       roleHint: createForm.roleHint,
       expiresInDays: createForm.expiresInDays,
+      isGuest: false,
     });
   };
 
@@ -265,8 +291,32 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
               <DialogTitle>{t("invite.create", locale)}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isGuest"
+                  checked={createForm.isGuest}
+                  onCheckedChange={(checked) =>
+                    setCreateForm({
+                      ...createForm,
+                      isGuest: checked === true,
+                      email: checked ? "" : createForm.email, // 게스트 모드일 때 이메일 초기화
+                    })
+                  }
+                />
+                <Label
+                  htmlFor="isGuest"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  이메일 없이 등록 (게스트 사용자)
+                </Label>
+              </div>
               <div>
-                <Label htmlFor="name">{t("invite.name", locale)}</Label>
+                <Label htmlFor="name">
+                  {t("invite.name", locale)}
+                  {createForm.isGuest && (
+                    <span className="text-red-500 ml-1">*</span>
+                  )}
+                </Label>
                 <Input
                   id="name"
                   type="text"
@@ -275,10 +325,16 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                     setCreateForm({ ...createForm, name: e.target.value })
                   }
                   placeholder="홍길동"
+                  required={createForm.isGuest}
                 />
               </div>
               <div>
-                <Label htmlFor="email">{t("invite.email", locale)}</Label>
+                <Label htmlFor="email">
+                  {t("invite.email", locale)}
+                  {!createForm.isGuest && (
+                    <span className="text-red-500 ml-1">*</span>
+                  )}
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -287,7 +343,14 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                     setCreateForm({ ...createForm, email: e.target.value })
                   }
                   placeholder="example@email.com"
+                  disabled={createForm.isGuest}
+                  required={!createForm.isGuest}
                 />
+                {createForm.isGuest && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    게스트 사용자는 이메일 없이 등록됩니다.
+                  </p>
+                )}
               </div>
               <div>
                 <Label htmlFor="role">{t("invite.role", locale)}</Label>
@@ -313,41 +376,43 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="expiresIn">
-                  {t("invite.expiresIn", locale)}
-                </Label>
-                <Select
-                  value={createForm.expiresInDays.toString()}
-                  onValueChange={(value) =>
-                    setCreateForm({
-                      ...createForm,
-                      expiresInDays: parseInt(value),
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">
-                      1 {t("invite.days", locale)}
-                    </SelectItem>
-                    <SelectItem value="3">
-                      3 {t("invite.days", locale)}
-                    </SelectItem>
-                    <SelectItem value="7">
-                      7 {t("invite.days", locale)}
-                    </SelectItem>
-                    <SelectItem value="14">
-                      14 {t("invite.days", locale)}
-                    </SelectItem>
-                    <SelectItem value="30">
-                      30 {t("invite.days", locale)}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {!createForm.isGuest && (
+                <div>
+                  <Label htmlFor="expiresIn">
+                    {t("invite.expiresIn", locale)}
+                  </Label>
+                  <Select
+                    value={createForm.expiresInDays.toString()}
+                    onValueChange={(value) =>
+                      setCreateForm({
+                        ...createForm,
+                        expiresInDays: parseInt(value),
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">
+                        1 {t("invite.days", locale)}
+                      </SelectItem>
+                      <SelectItem value="3">
+                        3 {t("invite.days", locale)}
+                      </SelectItem>
+                      <SelectItem value="7">
+                        7 {t("invite.days", locale)}
+                      </SelectItem>
+                      <SelectItem value="14">
+                        14 {t("invite.days", locale)}
+                      </SelectItem>
+                      <SelectItem value="30">
+                        30 {t("invite.days", locale)}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <Button
                 onClick={handleCreateInvitation}
                 disabled={createInvitationMutation.isPending}

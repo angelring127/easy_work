@@ -671,9 +671,11 @@ export interface Invitation {
 
 export interface CreateInvitationRequest {
   storeId: string;
-  email: string;
+  email?: string;
+  name?: string;
   roleHint?: "PART_TIMER" | "SUB_MANAGER";
   expiresInDays?: number;
+  isGuest?: boolean;
 }
 
 export interface InvitationResponse {

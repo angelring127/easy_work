@@ -55,9 +55,83 @@ async function getUserDetail(
       );
     }
 
+    // 게스트 사용자인지 확인 (store_users.id로 조회)
+    const { data: guestUser, error: guestUserError } = await supabase
+      .from("store_users")
+      .select("*")
+      .eq("id", userId)
+      .eq("store_id", storeId)
+      .eq("is_guest", true)
+      .single();
+
+    // 게스트 사용자인 경우
+    if (guestUser && !guestUserError) {
+      // 게스트 사용자의 직무 역할 조회 (user_store_job_roles에서 store_users.id를 user_id로 사용)
+      const { data: jobRoles, error: jobRolesError } = await supabase
+        .from("user_store_job_roles")
+        .select(
+          `
+          *,
+          store_job_roles (
+            id,
+            name,
+            code,
+            description,
+            active
+          )
+        `
+        )
+        .eq("store_id", storeId)
+        .eq("user_id", guestUser.id); // store_users.id를 user_id로 사용
+
+      if (jobRolesError) {
+        console.error("게스트 사용자 직무 역할 조회 오류:", jobRolesError);
+      }
+
+      // 게스트 사용자 메타데이터에서 추가 정보 조회
+      const guestMetadata = (guestUser.metadata as any) || {};
+      const resignationDate = guestMetadata.resignation_date || null;
+      const desiredWeeklyHours = guestMetadata.desired_weekly_hours || null;
+
+      // 게스트 사용자의 출근이 어려운 요일 조회 (store_users.id를 user_id로 사용)
+      const { data: preferredWeekdays, error: weekdaysError } = await supabase
+        .from("user_difficult_weekdays")
+        .select("weekday, is_preferred")
+        .eq("store_id", storeId)
+        .eq("user_id", guestUser.id) // store_users.id를 user_id로 사용
+        .order("weekday");
+
+      if (weekdaysError) {
+        console.error("게스트 사용자 출근이 어려운 요일 조회 오류:", weekdaysError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: guestUser.id,
+          email: null,
+          name: guestUser.name,
+          role: guestUser.role,
+          status: "ACTIVE",
+          joinedAt: guestUser.granted_at,
+          isDefaultStore: false,
+          jobRoles: jobRoles || [],
+          resignationDate,
+          desiredWeeklyHours,
+          preferredWeekdays: preferredWeekdays || [],
+          avatarUrl: null,
+          isGuest: true,
+        },
+      });
+    }
+
+    // 일반 사용자 조회
+    // storeUser가 있으면 user_id를 사용, 없으면 userId를 auth.users.id로 사용
+    const authUserId = storeUser?.user_id || userId;
+    
     // 사용자 기본 정보 조회
     const { data: userInfo, error: userError } =
-      await supabase.auth.admin.getUserById(userId);
+      await supabase.auth.admin.getUserById(authUserId);
 
     if (userError || !userInfo.user) {
       return NextResponse.json(
@@ -74,7 +148,7 @@ async function getUserDetail(
       .from("user_store_roles")
       .select("*")
       .eq("store_id", storeId)
-      .eq("user_id", userId)
+      .eq("user_id", authUserId)
       .single();
 
     if (storeRoleError) {
@@ -88,6 +162,8 @@ async function getUserDetail(
     }
 
     // 사용자의 직무 역할 조회
+    // storeUser가 있으면 store_users.id를 사용, 없으면 auth.users.id를 사용
+    const jobRoleUserId = storeUser?.id || authUserId;
     const { data: jobRoles, error: jobRolesError } = await supabase
       .from("user_store_job_roles")
       .select(
@@ -103,7 +179,7 @@ async function getUserDetail(
       `
       )
       .eq("store_id", storeId)
-      .eq("user_id", userId);
+      .eq("user_id", jobRoleUserId);
 
     if (jobRolesError) {
       console.error("직무 역할 조회 오류:", jobRolesError);
@@ -114,22 +190,24 @@ async function getUserDetail(
     const resignationDate = userMetadata.resignation_date || null;
     const desiredWeeklyHours = userMetadata.desired_weekly_hours || null;
 
-    // 희망 근무 요일 조회
+    // 출근이 어려운 요일 조회
+    // storeUser가 있으면 store_users.id를 사용, 없으면 auth.users.id를 사용
+    const weekdaysUserId = storeUser?.id || authUserId;
     const { data: preferredWeekdays, error: weekdaysError } = await supabase
-      .from("user_preferred_weekdays")
+      .from("user_difficult_weekdays")
       .select("weekday, is_preferred")
       .eq("store_id", storeId)
-      .eq("user_id", userId)
+      .eq("user_id", weekdaysUserId)
       .order("weekday");
 
     if (weekdaysError) {
-      console.error("희망 근무 요일 조회 오류:", weekdaysError);
+      console.error("출근이 어려운 요일 조회 오류:", weekdaysError);
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        id: userInfo.user.id,
+        id: storeUser?.id || userInfo.user.id, // store_users.id를 우선 사용
         email: userInfo.user.email,
         name:
           userInfo.user.user_metadata?.name ||
@@ -200,6 +278,159 @@ async function updateUserProfile(
       );
     }
 
+    // 게스트 사용자인지 확인 (store_users.id로 조회)
+    const { data: guestUser, error: guestUserError } = await supabase
+      .from("store_users")
+      .select("*")
+      .eq("id", userId)
+      .eq("store_id", storeId)
+      .eq("is_guest", true)
+      .single();
+
+    // 게스트 사용자인 경우
+    if (guestUser && !guestUserError) {
+      // 게스트 사용자 업데이트 데이터 준비
+      const updateData: any = {};
+
+      // 직무 역할 업데이트 (user_store_job_roles는 외래 키 제약이 없으므로 store_users.id를 user_id로 사용)
+      if (validatedData.jobRoleIds !== undefined) {
+        // 기존 직무 역할 삭제
+        const { error: deleteError } = await supabase
+          .from("user_store_job_roles")
+          .delete()
+          .eq("store_id", storeId)
+          .eq("user_id", userId); // store_users.id를 user_id로 사용
+
+        if (deleteError) {
+          console.error("기존 직무 역할 삭제 오류:", deleteError);
+          return NextResponse.json(
+            {
+              success: false,
+              error: "직무 역할 업데이트에 실패했습니다",
+            },
+            { status: 500 }
+          );
+        }
+
+        // 새 직무 역할 추가
+        if (validatedData.jobRoleIds.length > 0) {
+          const roleData = validatedData.jobRoleIds.map((jobRoleId) => ({
+            store_id: storeId,
+            user_id: userId, // store_users.id를 user_id로 사용
+            job_role_id: jobRoleId,
+          }));
+
+          const { error: insertError } = await supabase
+            .from("user_store_job_roles")
+            .insert(roleData);
+
+          if (insertError) {
+            console.error("새 직무 역할 추가 오류:", insertError);
+            return NextResponse.json(
+              {
+                success: false,
+                error: "직무 역할 업데이트에 실패했습니다",
+              },
+              { status: 500 }
+            );
+          }
+        }
+      }
+
+      // 출근이 어려운 요일 업데이트 (게스트 사용자도 지원)
+      if (validatedData.preferredWeekdays !== undefined) {
+        // 기존 출근이 어려운 요일 삭제
+        const { error: deleteWeekdaysError } = await supabase
+          .from("user_difficult_weekdays")
+          .delete()
+          .eq("store_id", storeId)
+          .eq("user_id", userId); // store_users.id를 user_id로 사용
+
+        if (deleteWeekdaysError) {
+          console.error("기존 출근이 어려운 요일 삭제 오류:", deleteWeekdaysError);
+          return NextResponse.json(
+            {
+              success: false,
+              error: "user.difficultWeekday.deleteError",
+            },
+            { status: 500 }
+          );
+        }
+
+        // 새 출근이 어려운 요일 추가
+        if (validatedData.preferredWeekdays.length > 0) {
+          const weekdaysData = validatedData.preferredWeekdays.map((weekday) => ({
+            store_id: storeId,
+            user_id: userId, // store_users.id를 user_id로 사용
+            weekday: weekday.weekday,
+            is_preferred: weekday.isPreferred,
+            created_by: user.id, // 관리자 ID
+          }));
+
+          const { error: insertWeekdaysError } = await supabase
+            .from("user_difficult_weekdays")
+            .insert(weekdaysData);
+
+          if (insertWeekdaysError) {
+            console.error("새 출근이 어려운 요일 추가 오류:", insertWeekdaysError);
+            return NextResponse.json(
+              {
+                success: false,
+                error: "user.difficultWeekday.insertError",
+              },
+              { status: 500 }
+            );
+          }
+        }
+      }
+
+      // 게스트 사용자 메타데이터 업데이트 (퇴사 예정일, 희망 근무 시간)
+      const currentMetadata = (guestUser.metadata as any) || {};
+      const updatedMetadata: any = { ...currentMetadata };
+
+      if (validatedData.resignationDate !== undefined) {
+        updatedMetadata.resignation_date = validatedData.resignationDate;
+      }
+
+      if (validatedData.desiredWeeklyHours !== undefined) {
+        updatedMetadata.desired_weekly_hours = validatedData.desiredWeeklyHours;
+      }
+
+      // 메타데이터가 변경된 경우 store_users 테이블 업데이트
+      if (
+        validatedData.resignationDate !== undefined ||
+        validatedData.desiredWeeklyHours !== undefined
+      ) {
+        updateData.metadata = updatedMetadata;
+      }
+
+      // store_users 테이블 업데이트
+      if (Object.keys(updateData).length > 0) {
+        const { error: updateStoreUserError } = await supabase
+          .from("store_users")
+          .update(updateData)
+          .eq("id", userId)
+          .eq("store_id", storeId);
+
+        if (updateStoreUserError) {
+          console.error("게스트 사용자 업데이트 오류:", updateStoreUserError);
+          return NextResponse.json(
+            {
+              success: false,
+              error: "게스트 사용자 프로필 업데이트에 실패했습니다",
+            },
+            { status: 500 }
+          );
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "게스트 사용자 프로필이 성공적으로 업데이트되었습니다",
+      });
+    }
+
+    // 일반 사용자 조회
     // 사용자 존재 확인
     const { data: targetUser, error: targetUserError } =
       await supabase.auth.admin.getUserById(userId);
@@ -259,27 +490,27 @@ async function updateUserProfile(
       }
     }
 
-    // 희망 근무 요일 업데이트
+    // 출근이 어려운 요일 업데이트
     if (validatedData.preferredWeekdays !== undefined) {
-      // 기존 희망 근무 요일 삭제
+      // 기존 출근이 어려운 요일 삭제
       const { error: deleteWeekdaysError } = await supabase
-        .from("user_preferred_weekdays")
+        .from("user_difficult_weekdays")
         .delete()
         .eq("store_id", storeId)
         .eq("user_id", userId);
 
       if (deleteWeekdaysError) {
-        console.error("기존 희망 근무 요일 삭제 오류:", deleteWeekdaysError);
+        console.error("기존 출근이 어려운 요일 삭제 오류:", deleteWeekdaysError);
         return NextResponse.json(
           {
             success: false,
-            error: "희망 근무 요일 업데이트에 실패했습니다",
+            error: "difficultWeekday.deleteError",
           },
           { status: 500 }
         );
       }
 
-      // 새 희망 근무 요일 추가
+      // 새 출근이 어려운 요일 추가
       if (validatedData.preferredWeekdays.length > 0) {
         const weekdaysData = validatedData.preferredWeekdays.map((weekday) => ({
           store_id: storeId,
@@ -290,15 +521,15 @@ async function updateUserProfile(
         }));
 
         const { error: insertWeekdaysError } = await supabase
-          .from("user_preferred_weekdays")
+          .from("user_difficult_weekdays")
           .insert(weekdaysData);
 
         if (insertWeekdaysError) {
-          console.error("새 희망 근무 요일 추가 오류:", insertWeekdaysError);
+          console.error("새 출근이 어려운 요일 추가 오류:", insertWeekdaysError);
           return NextResponse.json(
             {
               success: false,
-              error: "희망 근무 요일 업데이트에 실패했습니다",
+              error: "user.difficultWeekday.insertError",
             },
             { status: 500 }
           );

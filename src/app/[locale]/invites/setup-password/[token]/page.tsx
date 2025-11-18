@@ -29,8 +29,16 @@ export default function SetupPasswordPage() {
   const token = params.token as string;
   const locale = params.locale as string;
 
+  console.log("=== /invites/setup-password/[token]/page.tsx 로드됨 (경로 파라미터 버전) ===");
+  console.log("페이지 파라미터:", {
+    locale,
+    token,
+    fullUrl: typeof window !== "undefined" ? window.location.href : "SSR",
+  });
+
   useEffect(() => {
     const checkUser = async () => {
+      console.log("[token]/page.tsx - checkUser 시작");
       const supabase = createClient();
 
       // URL 해시 확인 및 처리
@@ -166,17 +174,26 @@ export default function SetupPasswordPage() {
           router.push(`/${locale}/login`);
           return;
         } else {
+          console.log("사용자 정보 설정:", {
+            email: user.email,
+            id: user.id,
+          });
           setUser(user);
         }
 
         // 초대 정보 조회
+        console.log("초대 정보 조회 시작, token:", token?.substring(0, 20) + "...");
         try {
           const response = await fetch(`/api/invitations/info?token=${token}`);
+          console.log("초대 정보 API 응답 상태:", response.status);
           const result = await response.json();
+          console.log("초대 정보 API 응답:", result);
 
           if (result.success) {
-            setInvitationInfo(result.data.invitation);
+            console.log("초대 정보 설정:", result.data);
+            setInvitationInfo(result.data);
           } else {
+            console.error("초대 정보 조회 실패:", result.error);
             toast({
               title: "초대 정보를 찾을 수 없습니다",
               description: result.error,
@@ -208,7 +225,17 @@ export default function SetupPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log("=== [token] 페이지: handleSubmit 호출 ===");
+    console.log("handleSubmit - 상태 확인:", {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      hasUser: !!user,
+      userEmail: user?.email,
+      passwordLength: password?.length,
+    });
+
     if (password !== confirmPassword) {
+      console.log("handleSubmit - 패스워드 불일치");
       toast({
         title: "패스워드가 일치하지 않습니다",
         description: "패스워드를 다시 확인해주세요.",
@@ -218,6 +245,7 @@ export default function SetupPasswordPage() {
     }
 
     if (password.length < 6) {
+      console.log("handleSubmit - 패스워드 너무 짧음");
       toast({
         title: "패스워드가 너무 짧습니다",
         description: "최소 6자 이상 입력해주세요.",
@@ -227,30 +255,48 @@ export default function SetupPasswordPage() {
     }
 
     setIsLoading(true);
+    console.log("handleSubmit - 로딩 시작");
 
     try {
       const supabase = createClient();
 
       // 패스워드 업데이트
+      console.log("handleSubmit - 패스워드 업데이트 시작");
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
       });
 
       if (updateError) {
+        console.error("handleSubmit - 패스워드 업데이트 실패:", updateError);
         throw updateError;
       }
 
+      console.log("handleSubmit - 패스워드 업데이트 성공");
+
       // 초대 수락 처리
+      console.log("handleSubmit - 초대 수락 처리 시작:", {
+        hasToken: !!token,
+        tokenLength: token?.length,
+        userEmail: user?.email,
+      });
+
+      if (!token) {
+        console.error("handleSubmit - token이 없습니다!");
+        throw new Error("초대 토큰이 없습니다");
+      }
+
       const requestBody = {
         tokenHash: token,
         name: user.user_metadata?.name || user.email,
         password: password,
       };
 
+      console.log("=== [token] 페이지: 초대 수락 API 요청 시작 ===");
       console.log("초대 수락 API 호출:", {
         token: token.substring(0, 20) + "...",
         name: requestBody.name,
         hasPassword: !!password,
+        requestBody,
       });
 
       const response = await fetch("/api/invitations/accept", {
@@ -261,8 +307,17 @@ export default function SetupPasswordPage() {
         body: JSON.stringify(requestBody),
       });
 
+      console.log("초대 수락 API 응답 상태:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("초대 수락 API 오류 응답:", errorText);
+        throw new Error(`API 오류: ${response.status} ${response.statusText}`);
+      }
+
       const result = await response.json();
 
+      console.log("=== [token] 페이지: 초대 수락 API 응답 ===");
       console.log("초대 수락 API 응답:", {
         success: result.success,
         error: result.error,
@@ -292,12 +347,24 @@ export default function SetupPasswordPage() {
     }
   };
 
+  console.log("렌더링 상태 확인:", {
+    hasUser: !!user,
+    hasInvitationInfo: !!invitationInfo,
+    userEmail: user?.email,
+    invitationStore: invitationInfo?.stores?.name,
+  });
+
   if (!user || !invitationInfo) {
+    console.log("로딩 중 상태:", { hasUser: !!user, hasInvitationInfo: !!invitationInfo });
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>로딩 중...</CardTitle>
+            <CardDescription>
+              {!user && "사용자 정보를 확인하는 중..."}
+              {user && !invitationInfo && "초대 정보를 불러오는 중..."}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>

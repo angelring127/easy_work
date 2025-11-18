@@ -85,6 +85,20 @@ async function getStoreUsers(
       );
     }
 
+    // 게스트 사용자 조회 (store_users 테이블에서 is_guest = true인 레코드)
+    const { data: guestUsers, error: guestUsersError } = await supabase
+      .from("store_users")
+      .select("*")
+      .eq("store_id", storeId)
+      .eq("is_guest", true)
+      .eq("is_active", true)
+      .order("granted_at", { ascending: false });
+
+    if (guestUsersError) {
+      console.error("게스트 사용자 조회 오류:", guestUsersError);
+      // 게스트 사용자 조회 실패는 치명적이지 않으므로 계속 진행
+    }
+
     // 삭제된 사용자 정보도 포함하여 조회 (관리자용)
     const { data: allUserRoles, error: allRolesError } = await supabase
       .from("user_store_roles")
@@ -119,11 +133,31 @@ async function getStoreUsers(
       );
     }
 
+    // 일반 사용자의 store_users 레코드 조회
+    const generalUserIds = (userRoles || []).map((ur) => ur.user_id);
+    const { data: generalStoreUsers, error: generalStoreUsersError } = await supabase
+      .from("store_users")
+      .select("id, user_id, store_id, role, is_active")
+      .eq("store_id", storeId)
+      .in("user_id", generalUserIds)
+      .eq("is_guest", false)
+      .eq("is_active", true);
+
+    if (generalStoreUsersError) {
+      console.error("일반 사용자 store_users 조회 오류:", generalStoreUsersError);
+    }
+
     // 활성 사용자 정보에 실제 이메일/이름 추가
     const enrichedMembers = (userRoles || []).map((userRole) => {
       const user = users.users.find((u) => u.id === userRole.user_id);
+      // store_users 테이블에서 해당 사용자의 id 찾기
+      const storeUser = (generalStoreUsers || []).find(
+        (su) => su.user_id === userRole.user_id && su.store_id === storeId
+      );
+      
       return {
-        id: userRole.id,
+        // store_users.id를 사용 (없으면 user_store_roles.id를 fallback으로 사용)
+        id: storeUser?.id || userRole.id,
         user_id: userRole.user_id,
         store_id: userRole.store_id,
         role: userRole.role,
@@ -140,6 +174,31 @@ async function getStoreUsers(
         temp_start_date: null,
         temp_end_date: null,
         temp_reason: null,
+        is_guest: false, // 일반 사용자는 게스트가 아님
+      };
+    });
+
+    // 게스트 사용자 정보 추가
+    const guestMembers = (guestUsers || []).map((guestUser) => {
+      return {
+        id: guestUser.id,
+        user_id: null, // 게스트 사용자는 user_id가 NULL
+        store_id: guestUser.store_id,
+        role: guestUser.role,
+        status: "ACTIVE", // 게스트 사용자는 항상 ACTIVE
+        is_default_store: false,
+        granted_at: guestUser.granted_at,
+        updated_at: guestUser.granted_at, // updated_at이 없으면 granted_at 사용
+        deleted_at: null,
+        email: "", // 게스트 사용자는 이메일 없음
+        name: guestUser.name || null,
+        avatar_url: null,
+        user_created_at: guestUser.granted_at,
+        last_sign_in_at: null,
+        temp_start_date: null,
+        temp_end_date: null,
+        temp_reason: null,
+        is_guest: true, // 게스트 사용자 표시
       };
     });
 
@@ -167,8 +226,8 @@ async function getStoreUsers(
       temp_reason: null,
     }));
 
-    // 활성 사용자와 삭제된 사용자 결합
-    let allMembers = [...enrichedMembers, ...deletedMembers];
+    // 활성 사용자, 게스트 사용자, 삭제된 사용자 결합
+    let allMembers = [...enrichedMembers, ...guestMembers, ...deletedMembers];
 
     // 필터 적용 (클라이언트 사이드)
     if (role && role !== "all") {

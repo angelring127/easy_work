@@ -24,8 +24,136 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, name, storeId, roleHint, expiresInDays = 7 } = body;
+    const {
+      email,
+      name,
+      storeId,
+      roleHint,
+      expiresInDays = 7,
+      isGuest = false,
+    } = body;
 
+    // 게스트 사용자 등록인 경우
+    if (isGuest) {
+      // 게스트 사용자는 name과 roleHint만 필수
+      if (!name || !storeId || !roleHint) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "게스트 사용자 등록을 위해 이름, 매장 ID, 역할이 필요합니다.",
+          },
+          { status: 400 }
+        );
+      }
+
+      // 매장 확인
+      const { data: store, error: storeError } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("id", storeId)
+        .single();
+
+      if (storeError || !store) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "매장을 찾을 수 없습니다.",
+          },
+          { status: 404 }
+        );
+      }
+
+      // 권한 확인 (마스터 또는 서브 매니저만 게스트 사용자 등록 가능)
+      const { data: userRole } = await supabase
+        .from("user_store_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("store_id", storeId)
+        .single();
+
+      if (!userRole || !["MASTER", "SUB_MANAGER"].includes(userRole.role)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "게스트 사용자를 등록할 권한이 없습니다.",
+          },
+          { status: 403 }
+        );
+      }
+
+      // 같은 이름의 게스트 사용자가 이미 존재하는지 확인
+      const { data: existingGuest } = await supabase
+        .from("store_users")
+        .select("*")
+        .eq("store_id", storeId)
+        .eq("name", name)
+        .eq("is_guest", true)
+        .eq("is_active", true)
+        .single();
+
+      if (existingGuest) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "이미 같은 이름의 게스트 사용자가 등록되어 있습니다.",
+          },
+          { status: 409 }
+        );
+      }
+
+      // store_users 테이블에 게스트 사용자 직접 등록
+      const { data: guestUser, error: guestError } = await supabase
+        .from("store_users")
+        .insert({
+          store_id: storeId,
+          user_id: null,
+          name: name,
+          role: roleHint,
+          is_guest: true,
+          is_active: true,
+          granted_by: user.id,
+          granted_at: new Date().toISOString(),
+        })
+        .select("*")
+        .single();
+
+      if (guestError || !guestUser) {
+        console.error("게스트 사용자 등록 오류:", guestError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "게스트 사용자 등록에 실패했습니다.",
+          },
+          { status: 500 }
+        );
+      }
+
+      // 감사 로그 기록
+      try {
+        await supabase.rpc("log_store_audit", {
+          p_store_id: storeId,
+          p_action: "CREATE_GUEST_USER",
+          p_table_name: "store_users",
+          p_new_values: {
+            name: name,
+            role: roleHint,
+            is_guest: true,
+            granted_by: user.id,
+          },
+        });
+      } catch (auditError) {
+        console.error("감사 로그 기록 실패:", auditError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: { guestUser },
+        message: "게스트 사용자가 성공적으로 등록되었습니다",
+      });
+    }
+
+    // 기존 이메일 초대 로직 (isGuest === false)
     if (!email || !storeId || !roleHint) {
       return NextResponse.json(
         {

@@ -14,12 +14,23 @@ const acceptInvitationSchema = z.object({
  * POST /api/invitations/accept
  */
 async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
+  console.log("=== 초대 수락 API POST 요청 수신 ===");
+
   try {
     const body = await request.json();
+    console.log("초대 수락 API - 요청 본문 수신:", {
+      hasTokenHash: !!body.tokenHash,
+      hasName: !!body.name,
+      hasPassword: !!body.password,
+    });
 
     // 요청 데이터 검증
     const validationResult = acceptInvitationSchema.safeParse(body);
     if (!validationResult.success) {
+      console.error(
+        "초대 수락 API - 검증 실패:",
+        validationResult.error.errors
+      );
       return NextResponse.json(
         {
           success: false,
@@ -277,6 +288,9 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
       userRoleId,
       roleError,
       success: !roleError,
+      userId: authData.user.id,
+      storeId: invitation.store_id,
+      role: invitation.role_hint,
     });
 
     if (roleError) {
@@ -284,6 +298,21 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
         message: roleError.message,
         details: roleError.details,
         hint: roleError.hint,
+      });
+    } else {
+      // store_users 레코드가 생성되었는지 확인
+      const { data: storeUserCheck, error: storeUserCheckError } =
+        await supabase
+          .from("store_users")
+          .select("id, store_id, user_id, role, is_active")
+          .eq("user_id", authData.user.id)
+          .eq("store_id", invitation.store_id)
+          .eq("is_active", true)
+          .single();
+
+      console.log("초대 수락 후 store_users 확인:", {
+        storeUserCheck,
+        storeUserCheckError,
       });
     }
 

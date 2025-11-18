@@ -112,6 +112,15 @@ export function JobRolesManager({ storeId, locale }: JobRolesManagerProps) {
       return;
     }
 
+    if (!form.description.trim()) {
+      toast({
+        title: t("common.error", locale),
+        description: "설명은 필수입니다",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCreating(true);
     try {
       const response = await fetch("/api/store-job-roles", {
@@ -155,6 +164,15 @@ export function JobRolesManager({ storeId, locale }: JobRolesManagerProps) {
       toast({
         title: t("common.error", locale),
         description: t("jobRoles.nameRequired", locale),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!form.description.trim()) {
+      toast({
+        title: t("common.error", locale),
+        description: "설명은 필수입니다",
         variant: "destructive",
       });
       return;
@@ -310,7 +328,7 @@ export function JobRolesManager({ storeId, locale }: JobRolesManagerProps) {
                 </div>
                 <div>
                   <Label htmlFor="description">
-                    {t("jobRoles.roleDescription", locale)}
+                    {t("jobRoles.roleDescription", locale)} *
                   </Label>
                   <Textarea
                     id="description"
@@ -319,7 +337,13 @@ export function JobRolesManager({ storeId, locale }: JobRolesManagerProps) {
                       setForm({ ...form, description: e.target.value })
                     }
                     placeholder="역할에 대한 설명을 입력하세요"
+                    className={!form.description ? "border-red-500" : ""}
                   />
+                  {!form.description && (
+                    <p className="text-sm text-red-500 mt-1">
+                      설명은 필수입니다
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center space-x-2">
                   <Switch
@@ -443,7 +467,7 @@ export function JobRolesManager({ storeId, locale }: JobRolesManagerProps) {
             </div>
             <div>
               <Label htmlFor="edit-description">
-                {t("jobRoles.roleDescription", locale)}
+                {t("jobRoles.roleDescription", locale)} *
               </Label>
               <Textarea
                 id="edit-description"
@@ -452,7 +476,13 @@ export function JobRolesManager({ storeId, locale }: JobRolesManagerProps) {
                   setForm({ ...form, description: e.target.value })
                 }
                 placeholder="역할에 대한 설명을 입력하세요"
+                className={!form.description ? "border-red-500" : ""}
               />
+              {!form.description && (
+                <p className="text-sm text-red-500 mt-1">
+                  설명은 필수입니다
+                </p>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <Switch

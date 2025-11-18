@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       store_id: payload.storeId,
       name: payload.name,
       code: autoCode,
-      description: payload.description || null,
+      description: payload.description,
       active: payload.active,
     })
     .select();

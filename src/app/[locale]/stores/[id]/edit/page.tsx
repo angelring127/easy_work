@@ -583,6 +583,8 @@ function PoliciesEditor({
     schedule_unit: "week" as "week" | "month",
     currency_unit: "KRW" as CurrencyUnit,
     shift_boundary_time_min: 720, // 12:00 기본값
+    max_morning_staff: 0,
+    max_afternoon_staff: 0,
   });
 
   useEffect(() => {
@@ -604,6 +606,8 @@ function PoliciesEditor({
           schedule_unit: s.schedule_unit ?? "week",
           currency_unit: s.currency_unit ?? "KRW",
           shift_boundary_time_min: s.shift_boundary_time_min ?? 720,
+          max_morning_staff: s.max_morning_staff ?? 0,
+          max_afternoon_staff: s.max_afternoon_staff ?? 0,
         }));
       }
     })();
@@ -934,6 +938,52 @@ function PoliciesEditor({
           <p className="text-xs text-gray-500">
             주간 인건비 예산 ({getCurrencyName(form.currency_unit)} 단위, 0 =
             제한 없음)
+          </p>
+        </div>
+
+        {/* 오전 최대 근무 인원 */}
+        <div className="space-y-2">
+          <Label htmlFor="max_morning_staff">
+            {t("policies.max_morning_staff", locale)}
+          </Label>
+          <Input
+            id="max_morning_staff"
+            type="number"
+            min="0"
+            max="999"
+            value={form.max_morning_staff}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                max_morning_staff: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            {t("policies.max_morning_staff_desc", locale)}
+          </p>
+        </div>
+
+        {/* 오후 최대 근무 인원 */}
+        <div className="space-y-2">
+          <Label htmlFor="max_afternoon_staff">
+            {t("policies.max_afternoon_staff", locale)}
+          </Label>
+          <Input
+            id="max_afternoon_staff"
+            type="number"
+            min="0"
+            max="999"
+            value={form.max_afternoon_staff}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                max_afternoon_staff: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            {t("policies.max_afternoon_staff_desc", locale)}
           </p>
         </div>
       </div>

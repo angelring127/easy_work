@@ -653,6 +653,7 @@ export default function UserManagementPage({
                             <TableHead>{t("user.name", locale)}</TableHead>
                             <TableHead>{t("user.email", locale)}</TableHead>
                             <TableHead>{t("user.role", locale)}</TableHead>
+                            <TableHead>{t("user.guest", locale)}</TableHead>
                             <TableHead>{t("user.status", locale)}</TableHead>
                             <TableHead>{t("user.joinedAt", locale)}</TableHead>
                             <TableHead>{t("user.actions", locale)}</TableHead>
@@ -684,11 +685,15 @@ export default function UserManagementPage({
                                     <Button
                                       variant="link"
                                       className="p-0 h-auto font-medium text-left"
-                                      onClick={() =>
+                                      onClick={() => {
+                                        // 게스트 사용자는 store_users.id를 사용, 일반 사용자는 user_id 사용
+                                        const targetId = member.is_guest
+                                          ? member.id
+                                          : member.user_id;
                                         router.push(
-                                          `/${locale}/stores/${storeId}/users/${member.user_id}`
-                                        )
-                                      }
+                                          `/${locale}/stores/${storeId}/users/${targetId}`
+                                        );
+                                      }}
                                     >
                                       {member.name || t("user.noName", locale)}
                                     </Button>
@@ -703,11 +708,28 @@ export default function UserManagementPage({
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>{member.email}</TableCell>
+                              <TableCell>
+                                {member.email || (
+                                  <span className="text-muted-foreground">
+                                    -
+                                  </span>
+                                )}
+                              </TableCell>
                               <TableCell>
                                 <Badge variant="outline">
                                   {getRoleDisplayName(member.role)}
                                 </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {member.is_guest ? (
+                                  <Badge variant="secondary">
+                                    {t("user.guest", locale)}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline">
+                                    {t("user.normal", locale)}
+                                  </Badge>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Badge
@@ -727,11 +749,15 @@ export default function UserManagementPage({
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() =>
+                                    onClick={() => {
+                                      // 게스트 사용자는 store_users.id를 사용, 일반 사용자는 user_id 사용
+                                      const targetId = member.is_guest
+                                        ? member.id
+                                        : member.user_id;
                                       router.push(
-                                        `/${locale}/stores/${storeId}/users/${member.user_id}`
-                                      )
-                                    }
+                                        `/${locale}/stores/${storeId}/users/${targetId}`
+                                      );
+                                    }}
                                     disabled={isUserDeleted(member)}
                                   >
                                     {t("user.viewDetail", locale)}
@@ -752,7 +778,7 @@ export default function UserManagementPage({
                                             isUserDeleted(member)
                                           }
                                         >
-                                          비활성화
+                                          {t("user.deactivate", locale)}
                                         </Button>
                                       ) : (
                                         <Button
@@ -766,7 +792,7 @@ export default function UserManagementPage({
                                             isUserDeleted(member)
                                           }
                                         >
-                                          재활성화
+                                          {t("user.reactivate", locale)}
                                         </Button>
                                       )}
                                     </>

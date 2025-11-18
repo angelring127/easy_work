@@ -134,10 +134,13 @@ export default function SchedulePage() {
         if (storeUsersData.success) {
           const members = storeUsersData.data?.members || [];
           const transformedUsers = members.map((member: any) => ({
-            id: member.user_id,
+            // Guest 사용자의 경우 user_id가 null이므로 id(store_users.id)를 사용
+            id: member.id || member.user_id,
             name: member.name || member.email || "Unknown User",
-            email: member.email,
+            email: member.email || "",
             roles: [member.role], // 단일 역할을 배열로 변환
+            status: member.status,
+            deleted_at: member.deleted_at,
           }));
           console.log("변환된 사용자 목록:", transformedUsers);
           setStoreUsers(transformedUsers);

@@ -122,6 +122,15 @@ export function RolesEditor({ storeId, locale }: RolesEditorProps) {
       return;
     }
 
+    if (!form.description.trim()) {
+      toast({
+        title: t("common.error", locale),
+        description: "설명은 필수입니다",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // 중복 역할명 검사
     const existingRole = roles.find(
       (role) =>
@@ -146,7 +155,7 @@ export function RolesEditor({ storeId, locale }: RolesEditorProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: form.name.trim(),
-            description: form.description.trim() || null,
+            description: form.description.trim(),
             active: form.active,
           }),
         });
@@ -181,7 +190,7 @@ export function RolesEditor({ storeId, locale }: RolesEditorProps) {
           body: JSON.stringify({
             storeId,
             name: form.name.trim(),
-            description: form.description.trim() || null,
+            description: form.description.trim(),
             active: form.active,
           }),
         });
@@ -361,7 +370,7 @@ export function RolesEditor({ storeId, locale }: RolesEditorProps) {
 
             <div className="space-y-2">
               <Label htmlFor="role-description">
-                {t("jobRoles.description", locale)}
+                {t("jobRoles.description", locale)} *
               </Label>
               <Textarea
                 id="role-description"
@@ -371,7 +380,13 @@ export function RolesEditor({ storeId, locale }: RolesEditorProps) {
                 }
                 placeholder={t("jobRoles.descriptionPlaceholder", locale)}
                 rows={3}
+                className={!form.description.trim() ? "border-red-500" : ""}
               />
+              {!form.description.trim() && (
+                <p className="text-sm text-red-500 mt-1">
+                  설명은 필수입니다
+                </p>
+              )}
             </div>
 
             <div className="flex gap-2">

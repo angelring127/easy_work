@@ -45,8 +45,9 @@ interface UserDetailPageProps {
 
 interface UserDetail {
   id: string;
-  email: string;
+  email: string | null;
   name: string;
+  isGuest?: boolean;
   role: string;
   status: string;
   joinedAt: string;
@@ -220,9 +221,14 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
       });
     },
     onError: (error) => {
+      // 에러 메시지가 번역 키인지 확인
+      const errorMessage = error.message.startsWith("user.")
+        ? t(error.message, locale)
+        : error.message;
+      
       toast({
         title: t("user.profileUpdateError", locale),
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -388,13 +394,17 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
         : null;
     }
 
-    // 희망 근무 요일 변경 확인
+    // 출근이 어려운 요일 변경 확인 (빈 배열도 업데이트 가능)
     const currentWeekdays = userDetail?.preferredWeekdays || [];
     const hasWeekdayChanges =
       formData.preferredWeekdays.length !== currentWeekdays.length ||
       formData.preferredWeekdays.some((pw) => {
         const current = currentWeekdays.find((cw) => cw.weekday === pw.weekday);
         return !current || current.is_preferred !== pw.isPreferred;
+      }) ||
+      currentWeekdays.some((cw) => {
+        const form = formData.preferredWeekdays.find((pw) => pw.weekday === cw.weekday);
+        return !form;
       });
 
     if (hasWeekdayChanges) {
@@ -637,9 +647,15 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                         <h3 className="text-lg font-semibold">
                           {userDetail?.name || t("user.noName", locale)}
                         </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {userDetail?.email}
-                        </p>
+                        {userDetail?.isGuest ? (
+                          <Badge variant="secondary" className="mt-1">
+                            게스트 사용자
+                          </Badge>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            {userDetail?.email || "-"}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -801,14 +817,14 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
 
                 {/* 희망 근무 요일 */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle>{t("user.preferredWeekdays", locale)}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {t("user.preferredWeekdays.description", locale)}
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <CardHeader>
+                      <CardTitle>{t("user.preferredWeekdays", locale)}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {t("user.preferredWeekdays.description", locale)}
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                       {[
                         {
                           weekday: 0,

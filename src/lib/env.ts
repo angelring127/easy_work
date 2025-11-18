@@ -1,30 +1,74 @@
-const DEFAULT_SITE_URL = "http://localhost:3000";
+const DEFAULT_SITE_URL = "https://easy-work-ten.vercel.app/";
 
-const normalizeSiteUrl = (value?: string | null) => {
+type NormalizedSiteUrl = {
+  origin: string;
+  isLocal: boolean;
+};
+
+const parseSiteUrl = (value?: string | null): NormalizedSiteUrl | null => {
   if (!value) {
-    return DEFAULT_SITE_URL;
+    return null;
   }
 
   const trimmed = value.trim();
   if (!trimmed) {
-    return DEFAULT_SITE_URL;
+    return null;
   }
 
   const withProtocol = /^https?:\/\//i.test(trimmed)
     ? trimmed
     : `https://${trimmed}`;
 
-  return withProtocol.replace(/\/+$/, "");
+  try {
+    const url = new URL(withProtocol);
+    const hostname = url.hostname.toLowerCase();
+    const isLocal =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".local");
+
+    return {
+      origin: url.origin,
+      isLocal,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const resolvePreferredSiteUrl = () => {
+  const allowLocalHost = process.env.NODE_ENV !== "production";
+  let localFallback: string | null = null;
+
+  const candidateEnvValues = [
+    process.env.SITE_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_VERCEL_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+  ];
+
+  for (const candidate of candidateEnvValues) {
+    const normalized = parseSiteUrl(candidate);
+    if (!normalized) {
+      continue;
+    }
+
+    if (!normalized.isLocal) {
+      return normalized.origin;
+    }
+
+    if (allowLocalHost && !localFallback) {
+      localFallback = normalized.origin;
+    }
+  }
+
+  return localFallback;
 };
 
 export const getSiteBaseUrl = () => {
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.SITE_URL ??
-    process.env.NEXT_PUBLIC_VERCEL_URL ??
-    DEFAULT_SITE_URL;
-
-  return normalizeSiteUrl(siteUrl);
+  const resolved = resolvePreferredSiteUrl();
+  return resolved ?? DEFAULT_SITE_URL;
 };
 
 export const buildAbsoluteUrl = (path: string) => {
@@ -39,5 +83,3 @@ export const buildAbsoluteUrl = (path: string) => {
 export const getEmailVerificationRedirectUrl = () => {
   return buildAbsoluteUrl("/auth/callback");
 };
-
-

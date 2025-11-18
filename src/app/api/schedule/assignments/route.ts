@@ -65,7 +65,15 @@ export async function GET(request: NextRequest) {
           name,
           start_min,
           end_min,
+          unpaid_break_min,
           role_hint
+        ),
+        store_users!inner(
+          id,
+          name,
+          user_id,
+          is_guest,
+          role
         )
       `
       )
@@ -103,21 +111,34 @@ export async function GET(request: NextRequest) {
 
     // 데이터 변환
     const transformedData =
-      data?.map((assignment) => ({
-        id: assignment.id,
-        storeId: assignment.store_id,
-        userId: assignment.user_id,
-        userName: "",
-        workItemId: assignment.work_item_id,
-        workItemName: assignment.work_items?.name,
-        date: assignment.date,
-        startTime: assignment.start_time,
-        endTime: assignment.end_time,
-        status: assignment.status,
-        notes: assignment.notes,
-        createdAt: assignment.created_at,
-        updatedAt: assignment.updated_at,
-      })) || [];
+      data?.map((assignment) => {
+        const storeUser = assignment.store_users;
+        const userName = storeUser?.name || "Unknown User";
+        const userRoles = storeUser?.role ? [storeUser.role] : [];
+        
+        return {
+          id: assignment.id,
+          storeId: assignment.store_id,
+          userId: assignment.user_id,
+          userName: userName,
+          workItemId: assignment.work_item_id,
+          workItemName: assignment.work_items?.name,
+          date: assignment.date,
+          startTime: assignment.start_time,
+          endTime: assignment.end_time,
+          status: assignment.status,
+          notes: assignment.notes,
+          createdAt: assignment.created_at,
+          updatedAt: assignment.updated_at,
+          requiredRoles: assignment.work_items?.role_hint 
+            ? (Array.isArray(assignment.work_items.role_hint) 
+                ? assignment.work_items.role_hint 
+                : [assignment.work_items.role_hint])
+            : [],
+          userRoles: userRoles,
+          unpaidBreakMin: assignment.work_items?.unpaid_break_min || 0,
+        };
+      }) || [];
 
     return NextResponse.json({
       success: true,
@@ -170,19 +191,104 @@ export async function POST(request: NextRequest) {
       .eq("status", "ACTIVE")
       .single();
 
-    if (roleError || !userRole || !["MASTER", "SUB"].includes(userRole.role)) {
+    if (roleError || !userRole || !["MASTER", "SUB", "SUB_MANAGER"].includes(userRole.role)) {
       return NextResponse.json(
         { success: false, error: "Insufficient permissions" },
         { status: 403 }
       );
     }
 
+    // user_id가 store_users.id인지 확인 (Guest 사용자 포함)
+    // 먼저 store_users.id로 직접 조회
+    let { data: storeUser, error: storeUserError } = await supabase
+      .from("store_users")
+      .select("id, name, is_guest, is_active, user_id")
+      .eq("id", user_id)
+      .eq("store_id", store_id)
+      .single();
+
+    console.log("POST 스케줄 배정 - user_id 확인:", {
+      userId: user_id,
+      storeId: store_id,
+      storeUserError,
+      storeUser,
+    });
+
+    // store_users.id로 찾지 못한 경우, 일반 유저일 수 있으므로 user_id로 조회
+    if (storeUserError || !storeUser) {
+      // 일반 유저의 경우: user_id가 auth.users.id일 수 있음
+      // store_users 테이블에서 user_id로 조회
+      const { data: storeUserByUserId, error: storeUserByUserIdError } = await supabase
+        .from("store_users")
+        .select("id, name, is_guest, is_active, user_id")
+        .eq("user_id", user_id)
+        .eq("store_id", store_id)
+        .eq("is_guest", false)
+        .eq("is_active", true)
+        .single();
+
+      if (storeUserByUserId && !storeUserByUserIdError) {
+        console.log("POST 스케줄 배정 - store_users에서 user_id로 찾음:", storeUserByUserId);
+        storeUser = storeUserByUserId;
+        storeUserError = null;
+      } else {
+        console.log("POST 스케줄 배정 - store_users에 레코드가 없음, user_store_roles에서 확인:", {
+          userId: user_id,
+          storeId: store_id,
+        });
+        // store_users에 레코드가 없는 경우, user_store_roles에서 역할 정보를 가져와서 생성
+        const { data: userRole, error: userRoleError } = await supabase
+          .from("user_store_roles")
+          .select("role, status")
+          .eq("user_id", user_id)
+          .eq("store_id", store_id)
+          .eq("status", "ACTIVE")
+          .single();
+
+        if (userRole && !userRoleError) {
+          console.log("POST 스케줄 배정 - user_store_roles 조회 결과:", userRole);
+          // store_users 레코드 생성
+          const { data: newStoreUser, error: createError } = await supabase
+            .from("store_users")
+            .insert({
+              store_id: store_id,
+              user_id: user_id,
+              role: userRole.role,
+              is_guest: false,
+              is_active: true,
+              granted_by: user.user.id,
+            })
+            .select("id, name, is_guest, is_active, user_id")
+            .single();
+
+          console.log("POST 스케줄 배정 - store_users 레코드 생성 결과:", { newStoreUser, createError });
+
+          if (newStoreUser && !createError) {
+            storeUser = newStoreUser;
+            storeUserError = null;
+          }
+        } else {
+          console.log("POST 스케줄 배정 - user_store_roles 조회 실패:", { userRole, userRoleError });
+        }
+      }
+    }
+
+    if (storeUserError || !storeUser || !storeUser.is_active) {
+      return NextResponse.json(
+        { success: false, error: "Invalid user or user not found in store" },
+        { status: 400 }
+      );
+    }
+
+    // user_id를 store_users.id로 사용 (일반 유저의 경우 변환됨)
+    const finalUserId = storeUser.id;
+
     // 출근 불가 확인
     const { data: availability, error: availabilityError } = await supabase
       .from("user_availability")
       .select("id")
       .eq("store_id", store_id)
-      .eq("user_id", user_id)
+      .eq("user_id", finalUserId)
       .eq("date", date)
       .single();
 
@@ -198,7 +304,7 @@ export async function POST(request: NextRequest) {
       .from("schedule_assignments")
       .select("id")
       .eq("store_id", store_id)
-      .eq("user_id", user_id)
+      .eq("user_id", finalUserId)
       .eq("date", date)
       .eq("status", "ASSIGNED")
       .single();
@@ -224,7 +330,7 @@ export async function POST(request: NextRequest) {
       .from("schedule_assignments")
       .insert({
         store_id,
-        user_id,
+        user_id: finalUserId,
         work_item_id,
         date,
         start_time,
