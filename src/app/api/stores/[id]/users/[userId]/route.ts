@@ -126,8 +126,41 @@ async function getUserDetail(
     }
 
     // 일반 사용자 조회
-    // storeUser가 있으면 user_id를 사용, 없으면 userId를 auth.users.id로 사용
-    const authUserId = storeUser?.user_id || userId;
+    // store_users 테이블에서 userId로 조회 (store_users.id 또는 store_users.user_id로 조회)
+    let storeUser = null;
+    let authUserId = userId;
+
+    // 먼저 store_users.id로 조회 시도
+    const { data: storeUserById, error: storeUserByIdError } = await supabase
+      .from("store_users")
+      .select("id, user_id, is_guest, is_active")
+      .eq("id", userId)
+      .eq("store_id", storeId)
+      .eq("is_guest", false)
+      .single();
+
+    if (storeUserById && !storeUserByIdError) {
+      storeUser = storeUserById;
+      authUserId = storeUser.user_id || userId;
+    } else {
+      // store_users.id로 찾지 못한 경우, store_users.user_id로 조회 (userId가 auth.users.id일 수 있음)
+      const { data: storeUserByUserId, error: storeUserByUserIdError } = await supabase
+        .from("store_users")
+        .select("id, user_id, is_guest, is_active")
+        .eq("user_id", userId)
+        .eq("store_id", storeId)
+        .eq("is_guest", false)
+        .eq("is_active", true)
+        .single();
+
+      if (storeUserByUserId && !storeUserByUserIdError) {
+        storeUser = storeUserByUserId;
+        authUserId = storeUser.user_id || userId;
+      } else {
+        // store_users에 레코드가 없는 경우, userId를 auth.users.id로 사용
+        authUserId = userId;
+      }
+    }
     
     // 사용자 기본 정보 조회
     const { data: userInfo, error: userError } =

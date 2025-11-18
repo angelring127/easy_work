@@ -586,6 +586,25 @@ const translations = {
     "schedule.warning.totalHours": "총 근무 시간",
     "schedule.warning.desiredHours": "희망 주 근무 시간",
     "schedule.warning.exceedBy": "초과 시간",
+    "schedule.warning.difficultDay": "출근 어려운 요일 경고",
+    "schedule.warning.difficultDayMessage":
+      "이 스케줄은 해당 사용자가 출근하기 어려운 요일입니다.",
+    "schedule.warning.difficultDayName": "출근 어려운 요일",
+    "schedule.warning.maxStaff": "최대 근무 인원 초과 경고",
+    "schedule.warning.maxStaffMessage":
+      "이 스케줄을 추가하면 해당 시간대의 최대 근무 인원을 초과합니다.",
+    "schedule.warning.maxMorningStaff": "오전 최대 인원",
+    "schedule.warning.maxAfternoonStaff": "오후 최대 인원",
+    "schedule.warning.currentMorningStaff": "현재 오전 인원",
+    "schedule.warning.currentAfternoonStaff": "현재 오후 인원",
+    "schedule.warning.transferDesiredHours":
+      "스케줄 이전 - 희망 주 근무 시간 초과 경고",
+    "schedule.warning.transferDesiredHoursMessage":
+      "이 스케줄을 이전하면 님의 이번 주 총 근무 시간이 희망 주 근무 시간을 초과합니다.",
+    "schedule.warning.transferDifficultDay":
+      "스케줄 이전 - 출근 어려운 요일 경고",
+    "schedule.warning.transferDifficultDayMessage":
+      "이 스케줄은 대상 사용자가 출근하기 어려운 요일입니다.",
     // schedule management
     "schedule.title": "스케줄 관리",
     "schedule.noStoreSelected": "매장을 선택해주세요",
@@ -1155,6 +1174,25 @@ const translations = {
     "schedule.warning.totalHours": "Total Hours",
     "schedule.warning.desiredHours": "Desired Weekly Hours",
     "schedule.warning.exceedBy": "Exceed By",
+    "schedule.warning.difficultDay": "Difficult Work Day Warning",
+    "schedule.warning.difficultDayMessage":
+      "This schedule is on a day that is difficult for this user to work.",
+    "schedule.warning.difficultDayName": "Difficult Day",
+    "schedule.warning.maxStaff": "Maximum Staff Limit Warning",
+    "schedule.warning.maxStaffMessage":
+      "Adding this schedule will exceed the maximum staff limit for this time period.",
+    "schedule.warning.maxMorningStaff": "Max Morning Staff",
+    "schedule.warning.maxAfternoonStaff": "Max Afternoon Staff",
+    "schedule.warning.currentMorningStaff": "Current Morning Staff",
+    "schedule.warning.currentAfternoonStaff": "Current Afternoon Staff",
+    "schedule.warning.transferDesiredHours":
+      "Transfer Schedule - Exceed Desired Hours Warning",
+    "schedule.warning.transferDesiredHoursMessage":
+      "'s total weekly hours will exceed their desired weekly hours after transferring this schedule.",
+    "schedule.warning.transferDifficultDay":
+      "Transfer Schedule - Difficult Work Day Warning",
+    "schedule.warning.transferDifficultDayMessage":
+      "This schedule is on a day that is difficult for the target user to work.",
     // schedule management
     "schedule.title": "Schedule Management",
     "schedule.noStoreSelected": "Please select a store",
@@ -1828,6 +1866,25 @@ const translations = {
     "schedule.warning.totalHours": "総勤務時間",
     "schedule.warning.desiredHours": "希望週勤務時間",
     "schedule.warning.exceedBy": "超過時間",
+    "schedule.warning.difficultDay": "出勤困難な曜日警告",
+    "schedule.warning.difficultDayMessage":
+      "このスケジュールは、このユーザーが出勤するのが困難な曜日です。",
+    "schedule.warning.difficultDayName": "出勤困難な曜日",
+    "schedule.warning.maxStaff": "最大勤務人数超過警告",
+    "schedule.warning.maxStaffMessage":
+      "このスケジュールを追加すると、該当時間帯の最大勤務人数を超過します。",
+    "schedule.warning.maxMorningStaff": "午前最大人数",
+    "schedule.warning.maxAfternoonStaff": "午後最大人数",
+    "schedule.warning.currentMorningStaff": "現在の午前人数",
+    "schedule.warning.currentAfternoonStaff": "現在の午後人数",
+    "schedule.warning.transferDesiredHours":
+      "スケジュール移転 - 希望週勤務時間超過警告",
+    "schedule.warning.transferDesiredHoursMessage":
+      "このスケジュールを移転すると、さんの今週の総勤務時間が希望週勤務時間を超過します。",
+    "schedule.warning.transferDifficultDay":
+      "スケジュール移転 - 出勤困難な曜日警告",
+    "schedule.warning.transferDifficultDayMessage":
+      "このスケジュールは、対象ユーザーが出勤するのが困難な曜日です。",
     // schedule management
     "schedule.title": "スケジュール管理",
     "schedule.noStoreSelected": "店舗を選択してください",

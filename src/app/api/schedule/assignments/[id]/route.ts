@@ -42,10 +42,10 @@ export async function PATCH(
   }
 
   try {
-    // 기존 배정 조회
+    // 기존 배정 조회 (고유 제약 조건 확인을 위해 모든 필드 조회)
     const { data: existingAssignment, error: fetchError } = await supabase
       .from("schedule_assignments")
-      .select("store_id, user_id, date")
+      .select("store_id, user_id, date, start_time, end_time")
       .eq("id", id)
       .single();
 
@@ -296,10 +296,49 @@ export async function PATCH(
       );
     }
 
+    // 고유 제약 조건 확인: 수정하려는 값이 다른 스케줄과 중복되지 않는지 확인
+    // (기존 스케줄 자체는 제외)
+    const updateData = { ...parsed.data };
+    const checkStoreId = existingAssignment.store_id;
+    const checkUserId = updateData.user_id || finalUserId;
+    const checkDate = existingAssignment.date; // date는 수정 불가
+    const checkStartTime = updateData.start_time || existingAssignment.start_time;
+    const checkEndTime = updateData.end_time || existingAssignment.end_time;
+
+    // 기존 스케줄과 동일한 값인지 확인
+    const isSameValues = 
+      checkUserId === finalUserId &&
+      checkStartTime === existingAssignment.start_time &&
+      checkEndTime === existingAssignment.end_time;
+
+    // 값이 변경된 경우에만 중복 확인
+    if (!isSameValues) {
+      const { data: conflictingAssignment, error: conflictError } = await supabase
+        .from("schedule_assignments")
+        .select("id")
+        .eq("store_id", checkStoreId)
+        .eq("user_id", checkUserId)
+        .eq("date", checkDate)
+        .eq("start_time", checkStartTime)
+        .eq("end_time", checkEndTime)
+        .neq("id", id) // 기존 스케줄 제외
+        .single();
+
+      if (conflictingAssignment && !conflictError) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: "A schedule with the same user, date, and time already exists" 
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // 스케줄 배정 수정
     const { data: updatedAssignment, error: updateError } = await supabase
       .from("schedule_assignments")
-      .update(parsed.data)
+      .update(updateData)
       .eq("id", id)
       .select()
       .single();

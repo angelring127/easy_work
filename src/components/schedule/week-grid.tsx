@@ -125,6 +125,8 @@ export function WeekGrid({
   const [loading, setLoading] = useState(false);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [shiftBoundaryTimeMin, setShiftBoundaryTimeMin] = useState<number>(720); // 기본값: 12:00
+  const [maxMorningStaff, setMaxMorningStaff] = useState<number>(0); // 0 = 제한 없음
+  const [maxAfternoonStaff, setMaxAfternoonStaff] = useState<number>(0); // 0 = 제한 없음
   const [selectedCell, setSelectedCell] = useState<{
     userId: string;
     date: string;
@@ -150,11 +152,20 @@ export function WeekGrid({
   const [selectedTransferUserId, setSelectedTransferUserId] = useState<string>("");
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [warningData, setWarningData] = useState<{
+    type: 'DESIRED_HOURS' | 'DIFFICULT_DAY' | 'MAX_STAFF' | 'TRANSFER_DESIRED_HOURS' | 'TRANSFER_DIFFICULT_DAY';
     userName: string;
-    currentHours: number;
-    desiredHours: number;
-    newHours: number;
-    totalHours: number;
+    // DESIRED_HOURS, TRANSFER_DESIRED_HOURS용
+    currentHours?: number;
+    desiredHours?: number;
+    newHours?: number;
+    totalHours?: number;
+    // DIFFICULT_DAY, TRANSFER_DIFFICULT_DAY용
+    difficultDayName?: string;
+    weekday?: number;
+    // MAX_STAFF용
+    shiftType?: 'morning' | 'afternoon';
+    currentStaff?: number;
+    maxStaff?: number;
   } | null>(null);
   const [pendingScheduleData, setPendingScheduleData] = useState<{
     requestData: any;
@@ -172,13 +183,15 @@ export function WeekGrid({
       try {
         setLoading(true);
 
-        // 매장 정보 조회 (shift_boundary_time_min 포함)
+        // 매장 정보 조회 (shift_boundary_time_min, max_morning_staff, max_afternoon_staff 포함)
         const storeResponse = await fetch(`/api/stores/${storeId}`);
         const storeData = await storeResponse.json();
         if (storeData.success && storeData.data) {
           setShiftBoundaryTimeMin(
             storeData.data.shift_boundary_time_min ?? 720
           );
+          setMaxMorningStaff(storeData.data.max_morning_staff ?? 0);
+          setMaxAfternoonStaff(storeData.data.max_afternoon_staff ?? 0);
         }
 
         // 영업 시간 조회
@@ -942,18 +955,17 @@ export function WeekGrid({
                         end_time: endTime,
                       };
 
-                      // Desired Weekly Hours 확인 (새 스케줄 추가 시에만)
+                      // 경고 확인 (새 스케줄 추가 시에만)
                       if (!existingAssignment) {
                         try {
-                          // 사용자 정보 조회
+                          // 사용자 정보 조회 (store_users 기반)
                           const userResponse = await fetch(
                             `/api/stores/${storeId}/users/${modalCell.userId}`
                           );
                           const userResult = await userResponse.json();
 
-                          if (userResult.success && userResult.data?.desiredWeeklyHours) {
-                            const desiredHours = userResult.data.desiredWeeklyHours;
-                            const currentHours = getUserTotalHours(modalCell.userId);
+                          if (userResult.success && userResult.data) {
+                            const userData = userResult.data;
                             
                             // 새 스케줄 시간 계산
                             const startMin =
@@ -976,14 +988,30 @@ export function WeekGrid({
                               unpaidBreakMin,
                             });
 
-                            // Desired Weekly Hours 초과 확인
-                            if (totalHours > desiredHours) {
+                            // 1. Difficult Work Days 확인
+                            const scheduleDate = new Date(modalCell.date);
+                            const scheduleWeekday = scheduleDate.getDay(); // 0=일요일, 6=토요일
+                            const preferredWeekdays = userData.preferredWeekdays || [];
+                            const isDifficultDay = preferredWeekdays.some(
+                              (pw: { weekday: number; is_preferred: boolean }) =>
+                                pw.weekday === scheduleWeekday && pw.is_preferred === true
+                            );
+
+                            if (isDifficultDay) {
+                              const weekdayNames = [
+                                t("user.weekdays.sunday", locale),
+                                t("user.weekdays.monday", locale),
+                                t("user.weekdays.tuesday", locale),
+                                t("user.weekdays.wednesday", locale),
+                                t("user.weekdays.thursday", locale),
+                                t("user.weekdays.friday", locale),
+                                t("user.weekdays.saturday", locale),
+                              ];
                               setWarningData({
+                                type: 'DIFFICULT_DAY',
                                 userName: modalCell.userName,
-                                currentHours,
-                                desiredHours,
-                                newHours,
-                                totalHours,
+                                difficultDayName: weekdayNames[scheduleWeekday],
+                                weekday: scheduleWeekday,
                               });
                               setPendingScheduleData({
                                 requestData,
@@ -992,6 +1020,82 @@ export function WeekGrid({
                               setShowWarningDialog(true);
                               setIsModalLoading(false);
                               return;
+                            }
+
+                            // 2. Desired Weekly Hours 초과 확인
+                            if (userData.desiredWeeklyHours) {
+                              const desiredHours = userData.desiredWeeklyHours;
+                              const currentHours = getUserTotalHours(modalCell.userId);
+
+                              if (totalHours > desiredHours) {
+                                setWarningData({
+                                  type: 'DESIRED_HOURS',
+                                  userName: modalCell.userName,
+                                  currentHours,
+                                  desiredHours,
+                                  newHours,
+                                  totalHours,
+                                });
+                                setPendingScheduleData({
+                                  requestData,
+                                  existingAssignment,
+                                });
+                                setShowWarningDialog(true);
+                                setIsModalLoading(false);
+                                return;
+                              }
+                            }
+
+                            // 3. Max Morning/Afternoon Staff 확인
+                            const scheduleDay = weekDays.find(
+                              (day) => format(day, "yyyy-MM-dd") === modalCell.date
+                            );
+                            if (scheduleDay) {
+                              const { morning: currentMorning, afternoon: currentAfternoon } = getShiftCounts(scheduleDay);
+                              
+                              // 새 스케줄이 오전인지 오후인지 확인
+                              const startMinForShift = parseInt(startTime.split(":")[0]) * 60 + parseInt(startTime.split(":")[1]);
+                              const isMorningShift = startMinForShift < shiftBoundaryTimeMin;
+                              
+                              // 새 스케줄 추가 후 인원 수 계산
+                              const newMorningCount = isMorningShift ? currentMorning + 1 : currentMorning;
+                              const newAfternoonCount = !isMorningShift ? currentAfternoon + 1 : currentAfternoon;
+
+                              // 오전 최대 인원 초과 확인
+                              if (maxMorningStaff > 0 && newMorningCount > maxMorningStaff) {
+                                setWarningData({
+                                  type: 'MAX_STAFF',
+                                  userName: modalCell.userName,
+                                  shiftType: 'morning',
+                                  currentStaff: currentMorning,
+                                  maxStaff: maxMorningStaff,
+                                });
+                                setPendingScheduleData({
+                                  requestData,
+                                  existingAssignment,
+                                });
+                                setShowWarningDialog(true);
+                                setIsModalLoading(false);
+                                return;
+                              }
+
+                              // 오후 최대 인원 초과 확인
+                              if (maxAfternoonStaff > 0 && newAfternoonCount > maxAfternoonStaff) {
+                                setWarningData({
+                                  type: 'MAX_STAFF',
+                                  userName: modalCell.userName,
+                                  shiftType: 'afternoon',
+                                  currentStaff: currentAfternoon,
+                                  maxStaff: maxAfternoonStaff,
+                                });
+                                setPendingScheduleData({
+                                  requestData,
+                                  existingAssignment,
+                                });
+                                setShowWarningDialog(true);
+                                setIsModalLoading(false);
+                                return;
+                              }
                             }
                           }
                         } catch (error) {
@@ -1143,6 +1247,105 @@ export function WeekGrid({
                           return;
                         }
 
+                        // 이전 대상 사용자 정보 조회 (store_users 기반)
+                        try {
+                          const targetUserResponse = await fetch(
+                            `/api/stores/${storeId}/users/${value}`
+                          );
+                          const targetUserResult = await targetUserResponse.json();
+
+                          if (targetUserResult.success && targetUserResult.data) {
+                            const targetUserData = targetUserResult.data;
+                            const targetUserName = users.find(u => u.id === value)?.name || targetUserData.name;
+
+                            // 1. Difficult Work Days 확인
+                            const scheduleDate = new Date(modalCell.date);
+                            const scheduleWeekday = scheduleDate.getDay(); // 0=일요일, 6=토요일
+                            const preferredWeekdays = targetUserData.preferredWeekdays || [];
+                            const isDifficultDay = preferredWeekdays.some(
+                              (pw: { weekday: number; is_preferred: boolean }) =>
+                                pw.weekday === scheduleWeekday && pw.is_preferred === true
+                            );
+
+                            if (isDifficultDay) {
+                              const weekdayNames = [
+                                t("user.weekdays.sunday", locale),
+                                t("user.weekdays.monday", locale),
+                                t("user.weekdays.tuesday", locale),
+                                t("user.weekdays.wednesday", locale),
+                                t("user.weekdays.thursday", locale),
+                                t("user.weekdays.friday", locale),
+                                t("user.weekdays.saturday", locale),
+                              ];
+                              setWarningData({
+                                type: 'TRANSFER_DIFFICULT_DAY',
+                                userName: targetUserName,
+                                difficultDayName: weekdayNames[scheduleWeekday],
+                                weekday: scheduleWeekday,
+                              });
+                              setPendingScheduleData({
+                                requestData: {
+                                  user_id: value,
+                                },
+                                existingAssignment,
+                              });
+                              setShowWarningDialog(true);
+                              setIsModalLoading(false);
+                              return;
+                            }
+
+                            // 2. Desired Weekly Hours 초과 확인
+                            if (targetUserData.desiredWeeklyHours) {
+                              const desiredHours = targetUserData.desiredWeeklyHours;
+                              const currentHours = getUserTotalHours(value);
+                              
+                              // 기존 스케줄 시간 계산
+                              const startMin =
+                                parseInt(existingAssignment.startTime.split(":")[0]) * 60 +
+                                parseInt(existingAssignment.startTime.split(":")[1]);
+                              let endMin =
+                                parseInt(existingAssignment.endTime.split(":")[0]) * 60 +
+                                parseInt(existingAssignment.endTime.split(":")[1]);
+
+                              if (endMin <= startMin) {
+                                endMin += 24 * 60;
+                              }
+
+                              const workMinutes = endMin - startMin;
+                              const unpaidBreakMin = existingAssignment.unpaidBreakMin || 0;
+                              const newHours = Math.round(((workMinutes - unpaidBreakMin) / 60) * 10) / 10;
+                              const totalHours = getUserTotalHours(value, {
+                                startTime: existingAssignment.startTime,
+                                endTime: existingAssignment.endTime,
+                                unpaidBreakMin,
+                              });
+
+                              if (totalHours > desiredHours) {
+                                setWarningData({
+                                  type: 'TRANSFER_DESIRED_HOURS',
+                                  userName: targetUserName,
+                                  currentHours,
+                                  desiredHours,
+                                  newHours,
+                                  totalHours,
+                                });
+                                setPendingScheduleData({
+                                  requestData: {
+                                    user_id: value,
+                                  },
+                                  existingAssignment,
+                                });
+                                setShowWarningDialog(true);
+                                setIsModalLoading(false);
+                                return;
+                              }
+                            }
+                          }
+                        } catch (error) {
+                          console.error("이전 대상 사용자 정보 조회 오류:", error);
+                          // 에러가 발생해도 스케줄 이전은 계속 진행
+                        }
+
                         // 스케줄 이전 (user_id 변경)
                         const response = await fetch(
                           `/api/schedule/assignments/${existingAssignment.id}`,
@@ -1228,50 +1431,112 @@ export function WeekGrid({
         </DialogContent>
       </Dialog>
 
-      {/* Desired Weekly Hours 초과 경고 모달 */}
+      {/* 경고 모달 (타입별 다른 메시지) */}
       <Dialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-600">
               <AlertCircle className="h-5 w-5" />
-              {t("schedule.warning.exceedDesiredHours", locale)}
+              {warningData && (
+                <>
+                  {warningData.type === 'DESIRED_HOURS' && t("schedule.warning.exceedDesiredHours", locale)}
+                  {warningData.type === 'DIFFICULT_DAY' && t("schedule.warning.difficultDay", locale)}
+                  {warningData.type === 'MAX_STAFF' && t("schedule.warning.maxStaff", locale)}
+                  {warningData.type === 'TRANSFER_DESIRED_HOURS' && t("schedule.warning.transferDesiredHours", locale)}
+                  {warningData.type === 'TRANSFER_DIFFICULT_DAY' && t("schedule.warning.transferDifficultDay", locale)}
+                </>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {warningData && (
               <>
-                <div className="text-sm text-muted-foreground">
-                  <p className="mb-2">
-                    <strong>{warningData.userName}</strong>{" "}
-                    {t("schedule.warning.exceedDesiredHoursMessage", locale)}
-                  </p>
-                  <div className="space-y-1 mt-3">
-                    <div className="flex justify-between">
-                      <span>{t("schedule.warning.currentHours", locale)}:</span>
-                      <span className="font-medium">{warningData.currentHours}h</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>{t("schedule.warning.newHours", locale)}:</span>
-                      <span className="font-medium">+{warningData.newHours}h</span>
-                    </div>
-                    <div className="flex justify-between border-t pt-1">
-                      <span>{t("schedule.warning.totalHours", locale)}:</span>
-                      <span className="font-medium text-amber-600">
-                        {warningData.totalHours}h
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>{t("schedule.warning.desiredHours", locale)}:</span>
-                      <span className="font-medium">{warningData.desiredHours}h</span>
-                    </div>
-                    <div className="flex justify-between text-amber-600 font-semibold">
-                      <span>{t("schedule.warning.exceedBy", locale)}:</span>
-                      <span>
-                        +{(warningData.totalHours - warningData.desiredHours).toFixed(1)}h
-                      </span>
+                {/* DESIRED_HOURS 또는 TRANSFER_DESIRED_HOURS */}
+                {(warningData.type === 'DESIRED_HOURS' || warningData.type === 'TRANSFER_DESIRED_HOURS') && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2">
+                      <strong>{warningData.userName}</strong>{" "}
+                      {warningData.type === 'DESIRED_HOURS' 
+                        ? t("schedule.warning.exceedDesiredHoursMessage", locale)
+                        : t("schedule.warning.transferDesiredHoursMessage", locale)}
+                    </p>
+                    <div className="space-y-1 mt-3">
+                      <div className="flex justify-between">
+                        <span>{t("schedule.warning.currentHours", locale)}:</span>
+                        <span className="font-medium">{warningData.currentHours}h</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>{t("schedule.warning.newHours", locale)}:</span>
+                        <span className="font-medium">+{warningData.newHours}h</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1">
+                        <span>{t("schedule.warning.totalHours", locale)}:</span>
+                        <span className="font-medium text-amber-600">
+                          {warningData.totalHours}h
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>{t("schedule.warning.desiredHours", locale)}:</span>
+                        <span className="font-medium">{warningData.desiredHours}h</span>
+                      </div>
+                      <div className="flex justify-between text-amber-600 font-semibold">
+                        <span>{t("schedule.warning.exceedBy", locale)}:</span>
+                        <span>
+                          +{((warningData.totalHours || 0) - (warningData.desiredHours || 0)).toFixed(1)}h
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* DIFFICULT_DAY 또는 TRANSFER_DIFFICULT_DAY */}
+                {(warningData.type === 'DIFFICULT_DAY' || warningData.type === 'TRANSFER_DIFFICULT_DAY') && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2">
+                      <strong>{warningData.userName}</strong>{" "}
+                      {warningData.type === 'DIFFICULT_DAY'
+                        ? t("schedule.warning.difficultDayMessage", locale)
+                        : t("schedule.warning.transferDifficultDayMessage", locale)}
+                    </p>
+                    <div className="space-y-1 mt-3">
+                      <div className="flex justify-between">
+                        <span>{t("schedule.warning.difficultDayName", locale)}:</span>
+                        <span className="font-medium text-amber-600">
+                          {warningData.difficultDayName}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MAX_STAFF */}
+                {warningData.type === 'MAX_STAFF' && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2">
+                      {t("schedule.warning.maxStaffMessage", locale)}
+                    </p>
+                    <div className="space-y-1 mt-3">
+                      <div className="flex justify-between">
+                        <span>
+                          {warningData.shiftType === 'morning'
+                            ? t("schedule.warning.maxMorningStaff", locale)
+                            : t("schedule.warning.maxAfternoonStaff", locale)}:
+                        </span>
+                        <span className="font-medium">{warningData.maxStaff}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>
+                          {warningData.shiftType === 'morning'
+                            ? t("schedule.warning.currentMorningStaff", locale)
+                            : t("schedule.warning.currentAfternoonStaff", locale)}:
+                        </span>
+                        <span className="font-medium text-amber-600">
+                          {warningData.currentStaff} → {((warningData.currentStaff || 0) + 1)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-2 justify-end">
                   <Button
                     variant="outline"
@@ -1296,6 +1561,19 @@ export function WeekGrid({
                         let response;
 
                         if (pendingScheduleData.existingAssignment) {
+                          // 스케줄 수정 또는 이전
+                          const patchData: any = {};
+                          
+                          if (pendingScheduleData.requestData.user_id) {
+                            // 스케줄 이전 (user_id 변경)
+                            patchData.user_id = pendingScheduleData.requestData.user_id;
+                          } else {
+                            // 스케줄 수정 (work_item_id, start_time, end_time 변경)
+                            patchData.work_item_id = pendingScheduleData.requestData.work_item_id;
+                            patchData.start_time = pendingScheduleData.requestData.start_time;
+                            patchData.end_time = pendingScheduleData.requestData.end_time;
+                          }
+
                           response = await fetch(
                             `/api/schedule/assignments/${pendingScheduleData.existingAssignment.id}`,
                             {
@@ -1303,14 +1581,11 @@ export function WeekGrid({
                               headers: {
                                 "Content-Type": "application/json",
                               },
-                              body: JSON.stringify({
-                                work_item_id: pendingScheduleData.requestData.work_item_id,
-                                start_time: pendingScheduleData.requestData.start_time,
-                                end_time: pendingScheduleData.requestData.end_time,
-                              }),
+                              body: JSON.stringify(patchData),
                             }
                           );
                         } else {
+                          // 새 스케줄 추가
                           response = await fetch("/api/schedule/assignments", {
                             method: "POST",
                             headers: {
