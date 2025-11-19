@@ -355,6 +355,7 @@ export default function SchedulePage() {
               storeId={currentStore.id}
               locale={currentLocale}
               canManage={canManage}
+              storeUsers={storeUsers}
               onAvailabilityChange={(date, isUnavailable, reason) => {
                 console.log(
                   "출근 불가 상태 변경:",

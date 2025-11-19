@@ -152,7 +152,7 @@ export function WeekGrid({
   const [selectedTransferUserId, setSelectedTransferUserId] = useState<string>("");
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [warningData, setWarningData] = useState<{
-    type: 'DESIRED_HOURS' | 'DIFFICULT_DAY' | 'MAX_STAFF' | 'TRANSFER_DESIRED_HOURS' | 'TRANSFER_DIFFICULT_DAY';
+    type: 'DESIRED_HOURS' | 'DIFFICULT_DAY' | 'MAX_STAFF' | 'TRANSFER_DESIRED_HOURS' | 'TRANSFER_DIFFICULT_DAY' | 'UNAVAILABLE';
     userName: string;
     // DESIRED_HOURS, TRANSFER_DESIRED_HOURS용
     currentHours?: number;
@@ -166,6 +166,9 @@ export function WeekGrid({
     shiftType?: 'morning' | 'afternoon';
     currentStaff?: number;
     maxStaff?: number;
+    // UNAVAILABLE용
+    date?: string;
+    reason?: string;
   } | null>(null);
   const [pendingScheduleData, setPendingScheduleData] = useState<{
     requestData: any;
@@ -659,39 +662,41 @@ export function WeekGrid({
                           handleCellClick(user.id, dayStr);
                         }}
                       >
-                        {isUnavailable ? (
-                          // 출근 불가 상태
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex flex-col items-center justify-center h-full text-red-600">
-                                <AlertCircle className="h-4 w-4 mb-1" />
-                                <span className="text-xs font-medium text-center">
-                                  {t("availability.unavailable", locale)}
-                                </span>
-                                {availability.reason && (
-                                  <span className="text-xs text-red-500 truncate w-full text-center mt-1">
-                                    {availability.reason}
+                        <div className="space-y-1">
+                          {/* Unavailable 표시 (스케줄과 함께 표시) */}
+                          {isUnavailable && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 p-1 rounded bg-red-50 border border-red-200 text-red-600">
+                                  <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                                  <span className="text-xs font-medium truncate">
+                                    {t("availability.unavailable", locale)}
                                   </span>
-                                )}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                <div className="font-medium">
-                                  {t("availability.unavailable", locale)}
+                                  {availability.reason && (
+                                    <span className="text-xs text-red-500 truncate">
+                                      - {availability.reason}
+                                    </span>
+                                  )}
                                 </div>
-                                {availability.reason && (
-                                  <div className="text-muted-foreground">
-                                    {availability.reason}
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-sm">
+                                  <div className="font-medium">
+                                    {t("availability.unavailable", locale)}
                                   </div>
-                                )}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : dayAssignments.length > 0 ? (
-                          // 배정된 근무들
-                          <div className="space-y-1">
-                            {dayAssignments.map((assignment) => (
+                                  {availability.reason && (
+                                    <div className="text-muted-foreground">
+                                      {availability.reason}
+                                    </div>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {/* 배정된 근무들 */}
+                          {dayAssignments.length > 0 ? (
+                            dayAssignments.map((assignment) => (
                               <Tooltip key={assignment.id}>
                                 <TooltipTrigger asChild>
                                   <div
@@ -763,21 +768,25 @@ export function WeekGrid({
                                   </div>
                                 </TooltipContent>
                               </Tooltip>
-                            ))}
-                          </div>
-                        ) : isBusinessDay ? (
-                          // 빈 근무 셀
-                          <div className="flex items-center justify-center h-full text-muted-foreground opacity-50">
-                            <span className="text-xs">-</span>
-                          </div>
-                        ) : (
-                          // 휴무일
-                          <div className="flex items-center justify-center h-full text-muted-foreground opacity-30">
-                            <span className="text-xs">
-                              {t("schedule.closed", locale)}
-                            </span>
-                          </div>
-                        )}
+                            ))
+                          ) : isBusinessDay ? (
+                            // 빈 근무 셀 (unavailable이 없을 때만 표시)
+                            !isUnavailable && (
+                              <div className="flex items-center justify-center h-full text-muted-foreground opacity-50">
+                                <span className="text-xs">-</span>
+                              </div>
+                            )
+                          ) : (
+                            // 휴무일 (unavailable이 없을 때만 표시)
+                            !isUnavailable && (
+                              <div className="flex items-center justify-center h-full text-muted-foreground opacity-30">
+                                <span className="text-xs">
+                                  {t("schedule.closed", locale)}
+                                </span>
+                              </div>
+                            )
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -1129,6 +1138,47 @@ export function WeekGrid({
                             }),
                           }
                         );
+                        
+                        // PATCH 응답도 동일하게 처리
+                        if (response.ok) {
+                          const result = await response.json();
+                          if (result.success) {
+                            // 경고가 있는 경우 모달 표시
+                            if (result.warning) {
+                              const availability = getAvailabilityForUserDate(
+                                modalCell?.userId || "",
+                                modalCell?.date || ""
+                              );
+                              setWarningData({
+                                type: 'UNAVAILABLE',
+                                userName: modalCell?.userName || "",
+                                date: modalCell?.date || "",
+                                reason: availability?.reason,
+                              });
+                              setPendingScheduleData({
+                                requestData: {
+                                  work_item_id: value,
+                                  start_time: selectedItem?.start_min
+                                    ? formatTimeFromMinutes(selectedItem.start_min)
+                                    : "09:00",
+                                  end_time: selectedItem?.end_min
+                                    ? formatTimeFromMinutes(selectedItem.end_min)
+                                    : "18:00",
+                                },
+                                existingAssignment,
+                              });
+                              setShowWarningDialog(true);
+                              setIsModalLoading(false);
+                              return;
+                            }
+                            
+                            if (onScheduleChange) {
+                              onScheduleChange();
+                            }
+                            setIsModalOpen(false);
+                            return;
+                          }
+                        }
                       } else {
                         // 기존 스케줄이 없으면 추가 (POST)
                         console.log("새 스케줄 추가");
@@ -1147,6 +1197,27 @@ export function WeekGrid({
                         const result = await response.json();
                         console.log("API 응답 데이터:", result);
                         if (result.success) {
+                          // 경고가 있는 경우 모달 표시
+                          if (result.warning) {
+                            const availability = getAvailabilityForUserDate(
+                              modalCell?.userId || "",
+                              modalCell?.date || ""
+                            );
+                            setWarningData({
+                              type: 'UNAVAILABLE',
+                              userName: modalCell?.userName || "",
+                              date: modalCell?.date || "",
+                              reason: availability?.reason,
+                            });
+                            setPendingScheduleData({
+                              requestData,
+                              existingAssignment,
+                            });
+                            setShowWarningDialog(true);
+                            setIsModalLoading(false);
+                            return;
+                          }
+                          
                           if (onScheduleChange) {
                             onScheduleChange();
                           }
@@ -1162,6 +1233,33 @@ export function WeekGrid({
                       } else {
                         const errorText = await response.text();
                         console.error("HTTP 오류:", response.status, errorText);
+                        
+                        // unavailable 에러인 경우 경고 모달로 처리
+                        try {
+                          const errorJson = JSON.parse(errorText);
+                          if (errorJson.error === "User is unavailable for this date") {
+                            const availability = getAvailabilityForUserDate(
+                              modalCell?.userId || "",
+                              modalCell?.date || ""
+                            );
+                            setWarningData({
+                              type: 'UNAVAILABLE',
+                              userName: modalCell?.userName || "",
+                              date: modalCell?.date || "",
+                              reason: availability?.reason,
+                            });
+                            setPendingScheduleData({
+                              requestData,
+                              existingAssignment,
+                            });
+                            setShowWarningDialog(true);
+                            setIsModalLoading(false);
+                            return;
+                          }
+                        } catch (e) {
+                          // JSON 파싱 실패 시 기존 에러 처리
+                        }
+                        
                         alert(
                           `${t("schedule.scheduleAddError", locale)}: ${
                             response.status
@@ -1444,6 +1542,7 @@ export function WeekGrid({
                   {warningData.type === 'MAX_STAFF' && t("schedule.warning.maxStaff", locale)}
                   {warningData.type === 'TRANSFER_DESIRED_HOURS' && t("schedule.warning.transferDesiredHours", locale)}
                   {warningData.type === 'TRANSFER_DIFFICULT_DAY' && t("schedule.warning.transferDifficultDay", locale)}
+                  {warningData.type === 'UNAVAILABLE' && t("schedule.warning.unavailable", locale)}
                 </>
               )}
             </DialogTitle>
@@ -1534,6 +1633,32 @@ export function WeekGrid({
                           {warningData.currentStaff} → {((warningData.currentStaff || 0) + 1)}
                         </span>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* UNAVAILABLE */}
+                {warningData.type === 'UNAVAILABLE' && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2">
+                      <strong>{warningData.userName}</strong>{" "}
+                      {t("schedule.warning.unavailableMessage", locale)}
+                    </p>
+                    <div className="space-y-1 mt-3">
+                      <div className="flex justify-between">
+                        <span>{t("availability.date", locale)}:</span>
+                        <span className="font-medium">
+                          {warningData.date ? new Date(warningData.date).toLocaleDateString() : ""}
+                        </span>
+                      </div>
+                      {warningData.reason && (
+                        <div className="flex justify-between">
+                          <span>{t("availability.reason", locale)}:</span>
+                          <span className="font-medium text-amber-600">
+                            {warningData.reason}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -283,21 +283,16 @@ export async function POST(request: NextRequest) {
     // user_id를 store_users.id로 사용 (일반 유저의 경우 변환됨)
     const finalUserId = storeUser.id;
 
-    // 출근 불가 확인
+    // 출근 불가 확인 (경고만 표시, 배정은 진행)
     const { data: availability, error: availabilityError } = await supabase
       .from("user_availability")
-      .select("id")
+      .select("id, reason")
       .eq("store_id", store_id)
       .eq("user_id", finalUserId)
       .eq("date", date)
       .single();
 
-    if (availability && !availabilityError) {
-      return NextResponse.json(
-        { success: false, error: "User is unavailable for this date" },
-        { status: 400 }
-      );
-    }
+    const isUnavailable = availability && !availabilityError;
 
     // 기존 배정이 있으면 삭제 후 새로 생성 (upsert 방식)
     const { data: existingAssignment, error: conflictError } = await supabase
@@ -352,6 +347,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: newAssignment,
+      warning: isUnavailable
+        ? "User is unavailable for this date"
+        : undefined,
     });
   } catch (error) {
     console.error("스케줄 배정 생성 중 오류:", error);

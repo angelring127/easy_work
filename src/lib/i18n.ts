@@ -597,6 +597,9 @@ const translations = {
     "schedule.warning.maxAfternoonStaff": "오후 최대 인원",
     "schedule.warning.currentMorningStaff": "현재 오전 인원",
     "schedule.warning.currentAfternoonStaff": "현재 오후 인원",
+    "schedule.warning.unavailable": "출근 불가 경고",
+    "schedule.warning.unavailableMessage":
+      "님은 해당 날짜에 출근 불가로 표시되어 있습니다.",
     "schedule.warning.transferDesiredHours":
       "스케줄 이전 - 희망 주 근무 시간 초과 경고",
     "schedule.warning.transferDesiredHoursMessage":
@@ -623,6 +626,13 @@ const translations = {
     "availability.title": "출근 불가 캘린더",
     "availability.markUnavailable": "출근 불가로 표시",
     "availability.markAvailable": "출근 가능으로 표시",
+    "availability.removeUnavailable": "출근 불가 해제",
+    "availability.selectAction": "액션 선택",
+    "availability.selectUser": "사용자 선택",
+    "availability.currentUser": "현재 사용자",
+    "availability.user": "사용자",
+    "availability.selectUserToRemove": "해제할 사용자 선택",
+    "availability.confirmRemove": "해제",
     "availability.reason": "사유 (선택사항)",
     "availability.reasonPlaceholder": "출근 불가 사유를 입력하세요",
     "availability.confirmMarkUnavailable":
@@ -665,6 +675,8 @@ const translations = {
     "schedule.processing": "처리 중...",
     "schedule.scheduleAdded": "스케줄이 추가되었습니다",
     "schedule.scheduleAddError": "스케줄 추가 중 오류가 발생했습니다",
+    "schedule.unavailableWarning":
+      "경고: 해당 날짜에 사용자가 출근 불가로 표시되어 있습니다.",
     "schedule.scheduleDeleted": "스케줄이 삭제되었습니다",
     "schedule.scheduleDeleteError": "스케줄 삭제 중 오류가 발생했습니다",
     "schedule.noScheduleToDelete": "삭제할 스케줄이 없습니다",
@@ -1185,6 +1197,9 @@ const translations = {
     "schedule.warning.maxAfternoonStaff": "Max Afternoon Staff",
     "schedule.warning.currentMorningStaff": "Current Morning Staff",
     "schedule.warning.currentAfternoonStaff": "Current Afternoon Staff",
+    "schedule.warning.unavailable": "Unavailable Warning",
+    "schedule.warning.unavailableMessage":
+      "is marked as unavailable for this date.",
     "schedule.warning.transferDesiredHours":
       "Transfer Schedule - Exceed Desired Hours Warning",
     "schedule.warning.transferDesiredHoursMessage":
@@ -1212,6 +1227,13 @@ const translations = {
     "availability.title": "Availability Calendar",
     "availability.markUnavailable": "Mark as Unavailable",
     "availability.markAvailable": "Mark as Available",
+    "availability.removeUnavailable": "Remove Unavailable",
+    "availability.selectAction": "Select Action",
+    "availability.selectUser": "Select User",
+    "availability.currentUser": "Current User",
+    "availability.user": "User",
+    "availability.selectUserToRemove": "Select User to Remove",
+    "availability.confirmRemove": "Remove",
     "availability.reason": "Reason (Optional)",
     "availability.reasonPlaceholder": "Enter reason for unavailability",
     "availability.confirmMarkUnavailable": "Mark this date as unavailable?",
@@ -1251,6 +1273,8 @@ const translations = {
     "schedule.processing": "Processing...",
     "schedule.scheduleAdded": "Schedule has been added",
     "schedule.scheduleAddError": "Error occurred while adding schedule",
+    "schedule.unavailableWarning":
+      "Warning: User is marked as unavailable for this date.",
     "schedule.scheduleDeleted": "Schedule has been deleted",
     "schedule.scheduleDeleteError": "Error occurred while deleting schedule",
     "schedule.noScheduleToDelete": "No schedule to delete",
@@ -1877,6 +1901,9 @@ const translations = {
     "schedule.warning.maxAfternoonStaff": "午後最大人数",
     "schedule.warning.currentMorningStaff": "現在の午前人数",
     "schedule.warning.currentAfternoonStaff": "現在の午後人数",
+    "schedule.warning.unavailable": "出勤不可警告",
+    "schedule.warning.unavailableMessage":
+      "さんはこの日付に出勤不可としてマークされています。",
     "schedule.warning.transferDesiredHours":
       "スケジュール移転 - 希望週勤務時間超過警告",
     "schedule.warning.transferDesiredHoursMessage":
@@ -1903,6 +1930,13 @@ const translations = {
     "availability.title": "出勤不可カレンダー",
     "availability.markUnavailable": "出勤不可としてマーク",
     "availability.markAvailable": "出勤可能としてマーク",
+    "availability.removeUnavailable": "出勤不可解除",
+    "availability.selectAction": "アクション選択",
+    "availability.selectUser": "ユーザー選択",
+    "availability.currentUser": "現在のユーザー",
+    "availability.user": "ユーザー",
+    "availability.selectUserToRemove": "解除するユーザー選択",
+    "availability.confirmRemove": "解除",
     "availability.reason": "理由（任意）",
     "availability.reasonPlaceholder": "出勤不可の理由を入力してください",
     "availability.confirmMarkUnavailable":
@@ -1945,6 +1979,8 @@ const translations = {
     "schedule.processing": "処理中...",
     "schedule.scheduleAdded": "スケジュールが追加されました",
     "schedule.scheduleAddError": "スケジュール追加中にエラーが発生しました",
+    "schedule.unavailableWarning":
+      "警告: この日付にユーザーが出勤不可としてマークされています。",
     "schedule.scheduleDeleted": "スケジュールが削除されました",
     "schedule.scheduleDeleteError": "スケジュール削除中にエラーが発生しました",
     "schedule.noScheduleToDelete": "削除するスケジュールがありません",

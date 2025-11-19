@@ -260,21 +260,6 @@ export async function PATCH(
         );
       }
 
-      // 출근 불가 확인
-      const { data: availability, error: availabilityError } = await supabase
-        .from("user_availability")
-        .select("id")
-        .eq("store_id", existingAssignment.store_id)
-        .eq("user_id", storeUser.id)
-        .eq("date", existingAssignment.date)
-        .single();
-
-      if (availability && !availabilityError) {
-        return NextResponse.json(
-          { success: false, error: "User is unavailable for this date" },
-          { status: 400 }
-        );
-      }
     }
     
     // user_id가 제공되지 않았거나 변경되지 않은 경우, finalUserId 사용
@@ -351,9 +336,24 @@ export async function PATCH(
       );
     }
 
+    // unavailable 체크 (날짜나 사용자가 변경된 경우)
+    // 위에서 정의된 checkDate와 checkUserId 재사용
+    const { data: availability } = await supabase
+      .from("user_availability")
+      .select("id")
+      .eq("store_id", existingAssignment.store_id)
+      .eq("user_id", checkUserId) // 위에서 정의됨 (288번 줄)
+      .eq("date", checkDate) // 위에서 정의됨 (289번 줄)
+      .single();
+    
+    const isUnavailable = availability !== null;
+
     return NextResponse.json({
       success: true,
       data: updatedAssignment,
+      warning: isUnavailable
+        ? "User is unavailable for this date"
+        : undefined,
     });
   } catch (error) {
     console.error("스케줄 배정 수정 중 오류:", error);

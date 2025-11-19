@@ -41,9 +41,46 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // user_id가 제공된 경우 store_users.id로 변환
+    let finalUserId = user_id;
+    if (user_id) {
+      // 먼저 store_users.id로 직접 조회
+      let { data: storeUser } = await supabase
+        .from("store_users")
+        .select("id")
+        .eq("id", user_id)
+        .eq("store_id", store_id)
+        .single();
+
+      // store_users.id로 찾지 못한 경우, auth.users.id일 수 있으므로 user_id로 조회
+      if (!storeUser) {
+        const { data: storeUserByUserId } = await supabase
+          .from("store_users")
+          .select("id")
+          .eq("user_id", user_id)
+          .eq("store_id", store_id)
+          .eq("is_guest", false)
+          .eq("is_active", true)
+          .single();
+
+        if (storeUserByUserId) {
+          finalUserId = storeUserByUserId.id;
+        }
+      }
+    }
+
+    // store_users와 조인하여 사용자 이름 가져오기
     let query = supabase
       .from("user_availability")
-      .select(`*`)
+      .select(`
+        *,
+        store_users!inner(
+          id,
+          name,
+          user_id,
+          is_guest
+        )
+      `)
       .eq("store_id", store_id);
 
     // 날짜 범위 필터
@@ -55,8 +92,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 사용자 필터
-    if (user_id) {
-      query = query.eq("user_id", user_id);
+    if (finalUserId) {
+      query = query.eq("user_id", finalUserId);
     }
 
     const { data, error } = await query.order("date", { ascending: true });
@@ -69,18 +106,47 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 사용자 이름 조회 (store_users에 이름이 없으면 auth.users에서 조회)
+    const userIds = data?.map((a: any) => a.store_users?.user_id).filter(Boolean) || [];
+    let userNamesMap: Record<string, string> = {};
+    
+    if (userIds.length > 0) {
+      const { data: users } = await supabase.auth.admin.listUsers();
+      if (users) {
+        users.users.forEach((u) => {
+          const name = u.user_metadata?.name || u.email || "";
+          userNamesMap[u.id] = name;
+        });
+      }
+    }
+
     // 데이터 변환
     const transformedData =
-      data?.map((availability) => ({
-        id: availability.id,
-        storeId: availability.store_id,
-        userId: availability.user_id,
-        userName: "",
-        date: availability.date,
-        reason: availability.reason,
-        createdAt: availability.created_at,
-        updatedAt: availability.updated_at,
-      })) || [];
+      data?.map((availability: any) => {
+        const storeUser = availability.store_users;
+        let userName = "";
+        
+        if (storeUser) {
+          if (storeUser.is_guest) {
+            // 게스트 사용자는 store_users.name 사용
+            userName = storeUser.name || "";
+          } else if (storeUser.user_id) {
+            // 일반 사용자는 auth.users에서 이름 가져오기
+            userName = userNamesMap[storeUser.user_id] || "";
+          }
+        }
+        
+        return {
+          id: availability.id,
+          storeId: availability.store_id,
+          userId: availability.user_id,
+          userName: userName,
+          date: availability.date,
+          reason: availability.reason,
+          createdAt: availability.created_at,
+          updatedAt: availability.updated_at,
+        };
+      }) || [];
 
     return NextResponse.json({
       success: true,
@@ -126,10 +192,78 @@ export async function POST(request: NextRequest) {
 
   try {
     // user_id가 "current"인 경우 현재 사용자 ID로 대체
-    const actualUserId = user_id === "current" ? user.user.id : user_id;
+    let targetAuthUserId = user_id === "current" ? user.user.id : user_id;
+
+    // user_id를 store_users.id로 변환 (Guest 사용자 포함)
+    // 먼저 store_users.id로 직접 조회
+    let { data: storeUser, error: storeUserError } = await supabase
+      .from("store_users")
+      .select("id, name, is_guest, is_active, user_id")
+      .eq("id", targetAuthUserId)
+      .eq("store_id", store_id)
+      .single();
+
+    // store_users.id로 찾지 못한 경우, 일반 유저일 수 있으므로 user_id로 조회
+    if (storeUserError || !storeUser) {
+      // 일반 유저의 경우: user_id가 auth.users.id일 수 있음
+      // store_users 테이블에서 user_id로 조회
+      const { data: storeUserByUserId, error: storeUserByUserIdError } = await supabase
+        .from("store_users")
+        .select("id, name, is_guest, is_active, user_id")
+        .eq("user_id", targetAuthUserId)
+        .eq("store_id", store_id)
+        .eq("is_guest", false)
+        .eq("is_active", true)
+        .single();
+
+      if (storeUserByUserId && !storeUserByUserIdError) {
+        storeUser = storeUserByUserId;
+        storeUserError = null;
+      } else {
+        // store_users에 레코드가 없는 경우, user_store_roles에서 역할 정보를 가져와서 생성
+        const { data: userRole, error: userRoleError } = await supabase
+          .from("user_store_roles")
+          .select("role, status")
+          .eq("user_id", targetAuthUserId)
+          .eq("store_id", store_id)
+          .eq("status", "ACTIVE")
+          .single();
+
+        if (userRole && !userRoleError) {
+          // store_users 레코드 생성
+          const { data: newStoreUser, error: createError } = await supabase
+            .from("store_users")
+            .insert({
+              store_id: store_id,
+              user_id: targetAuthUserId,
+              role: userRole.role,
+              is_guest: false,
+              is_active: true,
+              granted_by: user.user.id,
+            })
+            .select("id, name, is_guest, is_active, user_id")
+            .single();
+
+          if (newStoreUser && !createError) {
+            storeUser = newStoreUser;
+            storeUserError = null;
+          }
+        }
+      }
+    }
+
+    if (storeUserError || !storeUser || !storeUser.is_active) {
+      return NextResponse.json(
+        { success: false, error: "Invalid user or user not found in store" },
+        { status: 400 }
+      );
+    }
+
+    // user_id를 store_users.id로 사용 (일반 유저의 경우 변환됨)
+    const finalUserId = storeUser.id;
 
     // 권한 확인: 본인 또는 매장 관리자만 등록 가능
-    const isOwnData = user.user.id === actualUserId;
+    const isOwnData = user.user.id === targetAuthUserId;
     const isManager = await checkManagerPermission(
       supabase,
       store_id,
@@ -148,7 +282,7 @@ export async function POST(request: NextRequest) {
       .from("schedule_assignments")
       .select("id")
       .eq("store_id", store_id)
-      .eq("user_id", actualUserId)
+      .eq("user_id", finalUserId)
       .eq("date", date)
       .eq("status", "ASSIGNED")
       .single();
@@ -169,7 +303,7 @@ export async function POST(request: NextRequest) {
       .from("user_availability")
       .upsert({
         store_id,
-        user_id: actualUserId,
+        user_id: finalUserId,
         date,
         reason,
         created_by: user.user.id,
@@ -226,11 +360,49 @@ export async function DELETE(request: NextRequest) {
   }
 
   // user_id가 "current"인 경우 현재 사용자 ID로 대체
-  const actualUserId = user_id === "current" ? user.user.id : user_id;
+  let targetAuthUserId = user_id === "current" ? user.user.id : user_id;
 
   try {
+    // user_id를 store_users.id로 변환 (Guest 사용자 포함)
+    // 먼저 store_users.id로 직접 조회
+    let { data: storeUser, error: storeUserError } = await supabase
+      .from("store_users")
+      .select("id, name, is_guest, is_active, user_id")
+      .eq("id", targetAuthUserId)
+      .eq("store_id", store_id)
+      .single();
+
+    // store_users.id로 찾지 못한 경우, 일반 유저일 수 있으므로 user_id로 조회
+    if (storeUserError || !storeUser) {
+      // 일반 유저의 경우: user_id가 auth.users.id일 수 있음
+      // store_users 테이블에서 user_id로 조회
+      const { data: storeUserByUserId, error: storeUserByUserIdError } = await supabase
+        .from("store_users")
+        .select("id, name, is_guest, is_active, user_id")
+        .eq("user_id", targetAuthUserId)
+        .eq("store_id", store_id)
+        .eq("is_guest", false)
+        .eq("is_active", true)
+        .single();
+
+      if (storeUserByUserId && !storeUserByUserIdError) {
+        storeUser = storeUserByUserId;
+        storeUserError = null;
+      }
+    }
+
+    if (storeUserError || !storeUser) {
+      return NextResponse.json(
+        { success: false, error: "Invalid user or user not found in store" },
+        { status: 400 }
+      );
+    }
+
+    // user_id를 store_users.id로 사용 (일반 유저의 경우 변환됨)
+    const finalUserId = storeUser.id;
+
     // 권한 확인: 본인 또는 매장 관리자만 삭제 가능
-    const isOwnData = user.user.id === actualUserId;
+    const isOwnData = user.user.id === targetAuthUserId;
     const isManager = await checkManagerPermission(
       supabase,
       store_id,
@@ -249,7 +421,7 @@ export async function DELETE(request: NextRequest) {
       .from("user_availability")
       .delete()
       .eq("store_id", store_id)
-      .eq("user_id", actualUserId)
+      .eq("user_id", finalUserId)
       .eq("date", date);
 
     if (deleteError) {
