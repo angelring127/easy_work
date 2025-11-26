@@ -5,6 +5,7 @@ import { z } from "zod";
 
 // 사용자 프로필 수정 스키마
 const updateUserProfileSchema = z.object({
+  name: z.string().min(1, "이름은 필수입니다").max(255, "이름은 255자 이하여야 합니다").optional(),
   jobRoleIds: z.array(z.string().uuid()).optional(),
   resignationDate: z.string().optional().nullable(),
   desiredWeeklyHours: z.number().int().min(0).max(168).optional().nullable(),
@@ -133,7 +134,7 @@ async function getUserDetail(
     // 먼저 store_users.id로 조회 시도
     const { data: storeUserById, error: storeUserByIdError } = await supabase
       .from("store_users")
-      .select("id, user_id, is_guest, is_active")
+      .select("id, user_id, is_guest, is_active, name")
       .eq("id", userId)
       .eq("store_id", storeId)
       .eq("is_guest", false)
@@ -146,7 +147,7 @@ async function getUserDetail(
       // store_users.id로 찾지 못한 경우, store_users.user_id로 조회 (userId가 auth.users.id일 수 있음)
       const { data: storeUserByUserId, error: storeUserByUserIdError } = await supabase
         .from("store_users")
-        .select("id, user_id, is_guest, is_active")
+        .select("id, user_id, is_guest, is_active, name")
         .eq("user_id", userId)
         .eq("store_id", storeId)
         .eq("is_guest", false)
@@ -243,8 +244,11 @@ async function getUserDetail(
         id: storeUser?.id || userInfo.user.id, // store_users.id를 우선 사용
         email: userInfo.user.email,
         name:
+          storeUser?.name ||
+          userInfo.user.user_metadata?.invited_name ||
           userInfo.user.user_metadata?.name ||
-          userInfo.user.email?.split("@")[0],
+          userInfo.user.email?.split("@")[0] ||
+          "",
         role: storeRole.role,
         status: storeRole.status,
         joinedAt: storeRole.granted_at,
@@ -324,6 +328,11 @@ async function updateUserProfile(
     if (guestUser && !guestUserError) {
       // 게스트 사용자 업데이트 데이터 준비
       const updateData: any = {};
+
+      // 이름 업데이트
+      if (validatedData.name !== undefined) {
+        updateData.name = validatedData.name.trim();
+      }
 
       // 직무 역할 업데이트 (user_store_job_roles는 외래 키 제약이 없으므로 store_users.id를 user_id로 사용)
       if (validatedData.jobRoleIds !== undefined) {
@@ -464,9 +473,45 @@ async function updateUserProfile(
     }
 
     // 일반 사용자 조회
+    // store_users 테이블에서 userId로 조회 (store_users.id 또는 store_users.user_id로 조회)
+    let storeUser = null;
+    let authUserId = userId;
+
+    // 먼저 store_users.id로 조회 시도
+    const { data: storeUserById, error: storeUserByIdError } = await supabase
+      .from("store_users")
+      .select("id, user_id, is_guest, is_active, name")
+      .eq("id", userId)
+      .eq("store_id", storeId)
+      .eq("is_guest", false)
+      .single();
+
+    if (storeUserById && !storeUserByIdError) {
+      storeUser = storeUserById;
+      authUserId = storeUser.user_id || userId;
+    } else {
+      // store_users.id로 찾지 못한 경우, store_users.user_id로 조회 (userId가 auth.users.id일 수 있음)
+      const { data: storeUserByUserId, error: storeUserByUserIdError } = await supabase
+        .from("store_users")
+        .select("id, user_id, is_guest, is_active, name")
+        .eq("user_id", userId)
+        .eq("store_id", storeId)
+        .eq("is_guest", false)
+        .eq("is_active", true)
+        .single();
+
+      if (storeUserByUserId && !storeUserByUserIdError) {
+        storeUser = storeUserByUserId;
+        authUserId = storeUser.user_id || userId;
+      } else {
+        // store_users에 레코드가 없는 경우, userId를 auth.users.id로 사용
+        authUserId = userId;
+      }
+    }
+
     // 사용자 존재 확인
     const { data: targetUser, error: targetUserError } =
-      await supabase.auth.admin.getUserById(userId);
+      await supabase.auth.admin.getUserById(authUserId);
 
     if (targetUserError || !targetUser.user) {
       return NextResponse.json(
@@ -478,6 +523,67 @@ async function updateUserProfile(
       );
     }
 
+    // store_users.id를 사용 (일반 사용자의 경우 store_users.id가 필요)
+    const finalStoreUserId = storeUser?.id || userId;
+
+    // 이름 업데이트
+    if (validatedData.name !== undefined) {
+      const userName = validatedData.name.trim();
+
+      // store_users 테이블의 name 필드 업데이트
+      let storeUserNameError = null;
+      
+      if (storeUser?.id) {
+        // store_users.id로 업데이트
+        const { error } = await supabase
+          .from("store_users")
+          .update({ name: userName })
+          .eq("id", storeUser.id)
+          .eq("store_id", storeId);
+        storeUserNameError = error;
+      } else if (authUserId) {
+        // store_users.id가 없으면 user_id로 업데이트 시도
+        const { error } = await supabase
+          .from("store_users")
+          .update({ name: userName })
+          .eq("user_id", authUserId)
+          .eq("store_id", storeId)
+          .eq("is_active", true);
+        storeUserNameError = error;
+      }
+
+      if (storeUserNameError) {
+        console.error("store_users 이름 업데이트 오류:", storeUserNameError);
+        // store_users 업데이트 실패해도 auth.users는 업데이트 시도
+      }
+
+      // auth.users의 user_metadata.name 업데이트
+      const currentMetadata = targetUser.user.user_metadata || {};
+      const { error: authNameError } = await supabase.auth.admin.updateUserById(
+        authUserId,
+        {
+          user_metadata: {
+            ...currentMetadata,
+            name: userName,
+          },
+        }
+      );
+
+      if (authNameError) {
+        console.error("사용자 메타데이터 이름 업데이트 오류:", authNameError);
+        // auth.users 업데이트 실패 시 에러 반환
+        if (storeUserNameError) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "이름 업데이트에 실패했습니다",
+            },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
     // 직무 역할 업데이트
     if (validatedData.jobRoleIds !== undefined) {
       // 기존 직무 역할 삭제
@@ -485,7 +591,7 @@ async function updateUserProfile(
         .from("user_store_job_roles")
         .delete()
         .eq("store_id", storeId)
-        .eq("user_id", userId);
+        .eq("user_id", finalStoreUserId);
 
       if (deleteError) {
         console.error("기존 직무 역할 삭제 오류:", deleteError);
@@ -502,7 +608,7 @@ async function updateUserProfile(
       if (validatedData.jobRoleIds.length > 0) {
         const roleData = validatedData.jobRoleIds.map((jobRoleId) => ({
           store_id: storeId,
-          user_id: userId,
+          user_id: finalStoreUserId,
           job_role_id: jobRoleId,
         }));
 
@@ -530,7 +636,7 @@ async function updateUserProfile(
         .from("user_difficult_weekdays")
         .delete()
         .eq("store_id", storeId)
-        .eq("user_id", userId);
+        .eq("user_id", finalStoreUserId);
 
       if (deleteWeekdaysError) {
         console.error("기존 출근이 어려운 요일 삭제 오류:", deleteWeekdaysError);
@@ -547,7 +653,7 @@ async function updateUserProfile(
       if (validatedData.preferredWeekdays.length > 0) {
         const weekdaysData = validatedData.preferredWeekdays.map((weekday) => ({
           store_id: storeId,
-          user_id: userId,
+          user_id: finalStoreUserId,
           weekday: weekday.weekday,
           is_preferred: weekday.isPreferred,
           created_by: user.id,

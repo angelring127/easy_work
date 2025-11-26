@@ -250,6 +250,9 @@ async function resendInvitation(
         `/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`
       );
 
+      // 이름이 없으면 이메일의 @ 앞부분을 기본값으로 사용
+      const userName = invitation.invited_email.split("@")[0] || "";
+
       const { error: emailError } = await supabase.auth.admin.inviteUserByEmail(
         invitation.invited_email,
         {
@@ -260,6 +263,7 @@ async function resendInvitation(
             token_hash: invitation.token_hash,
             type: "store_invitation",
             invited_by: user.user_metadata?.name || user.email || "관리자",
+            invited_name: userName, // 초대된 사용자 이름 추가
             is_invited_user: true,
           },
           redirectTo: inviteRedirectUrl,

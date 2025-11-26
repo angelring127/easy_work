@@ -300,11 +300,24 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
         hint: roleError.hint,
       });
     } else {
+      // store_users 레코드에 이름 저장 (이름이 없으면 이메일의 @ 앞부분 사용)
+      const userName = name?.trim() || authData.user.email?.split("@")[0] || "";
+      const { error: nameUpdateError } = await supabase
+        .from("store_users")
+        .update({ name: userName })
+        .eq("user_id", authData.user.id)
+        .eq("store_id", invitation.store_id)
+        .eq("is_active", true);
+
+      if (nameUpdateError) {
+        console.error("store_users 이름 업데이트 실패:", nameUpdateError);
+      }
+
       // store_users 레코드가 생성되었는지 확인
       const { data: storeUserCheck, error: storeUserCheckError } =
         await supabase
           .from("store_users")
-          .select("id, store_id, user_id, role, is_active")
+          .select("id, store_id, user_id, role, is_active, name")
           .eq("user_id", authData.user.id)
           .eq("store_id", invitation.store_id)
           .eq("is_active", true)
@@ -313,14 +326,16 @@ async function acceptInvitation(request: NextRequest): Promise<NextResponse> {
       console.log("초대 수락 후 store_users 확인:", {
         storeUserCheck,
         storeUserCheckError,
+        nameUpdated: !nameUpdateError,
       });
     }
 
     // 3. 사용자 메타데이터에 패스워드 변경 필요 플래그 및 이름 추가
+    const userName = name?.trim() || authData.user.email?.split("@")[0] || "";
     const currentMetadata = authData.user.user_metadata || {};
     const updatedMetadata = {
       ...currentMetadata,
-      name: name, // 초대 시 입력한 이름 추가
+      name: userName, // 초대 시 입력한 이름 추가
       needs_password_change: true,
       last_invitation_accepted: new Date().toISOString(),
     };

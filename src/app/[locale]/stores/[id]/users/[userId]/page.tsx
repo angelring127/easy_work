@@ -104,6 +104,9 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
     preferredWeekdays: [] as Array<{ weekday: number; isPreferred: boolean }>,
   });
 
+  // 이름 입력 상태
+  const [userName, setUserName] = useState("");
+
   // 확인 다이얼로그 상태
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -188,12 +191,15 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
           isPreferred: pw.is_preferred,
         })),
       });
+      // 이름 상태도 초기화
+      setUserName(userDetail.name || "");
     }
   }, [userDetail]);
 
   // 프로필 업데이트
   const updateProfileMutation = useMutation({
     mutationFn: async (data: {
+      name?: string;
       jobRoleIds?: string[];
       resignationDate?: string | null;
       desiredWeeklyHours?: number | null;
@@ -643,10 +649,45 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                             : "?"}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <h3 className="text-lg font-semibold">
-                          {userDetail?.name || t("user.noName", locale)}
-                        </h3>
+                      <div className="flex-1">
+                        {canManageUsers && (
+                          <div className="space-y-2 mb-3">
+                            <Label htmlFor="user-name">
+                              {t("user.name", locale)}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="user-name"
+                                value={userName}
+                                onChange={(e) => setUserName(e.target.value)}
+                                placeholder={t("user.name", locale)}
+                                className="flex-1"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  if (userName.trim()) {
+                                    updateProfileMutation.mutate({
+                                      name: userName.trim(),
+                                    });
+                                  }
+                                }}
+                                disabled={updateProfileMutation.isPending || !userName.trim()}
+                              >
+                                {updateProfileMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Save className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        {!canManageUsers && (
+                          <h3 className="text-lg font-semibold">
+                            {userDetail?.name || t("user.noName", locale)}
+                          </h3>
+                        )}
                         {userDetail?.isGuest ? (
                           <Badge variant="secondary" className="mt-1">
                             게스트 사용자

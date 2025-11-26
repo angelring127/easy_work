@@ -346,6 +346,9 @@ export async function POST(request: NextRequest) {
           }&type=invite`,
         });
 
+        // 이름이 없으면 이메일의 @ 앞부분을 기본값으로 사용
+        const userName = name?.trim() || email.split("@")[0] || "";
+
         const { error: emailError } =
           await supabase.auth.admin.inviteUserByEmail(email, {
             data: {
@@ -355,7 +358,7 @@ export async function POST(request: NextRequest) {
               token_hash: (invitation as any).token_hash,
               type: "store_invitation",
               invited_by: user.user_metadata?.name || user.email || "관리자",
-              invited_name: name || "", // 초대된 사용자 이름 추가
+              invited_name: userName, // 초대된 사용자 이름 추가
               is_invited_user: true,
             },
             redirectTo: `${

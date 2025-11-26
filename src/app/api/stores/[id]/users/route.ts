@@ -137,7 +137,7 @@ async function getStoreUsers(
     const generalUserIds = (userRoles || []).map((ur) => ur.user_id);
     const { data: generalStoreUsers, error: generalStoreUsersError } = await supabase
       .from("store_users")
-      .select("id, user_id, store_id, role, is_active")
+      .select("id, user_id, store_id, role, is_active, name")
       .eq("store_id", storeId)
       .in("user_id", generalUserIds)
       .eq("is_guest", false)
@@ -167,7 +167,7 @@ async function getStoreUsers(
         updated_at: userRole.updated_at,
         deleted_at: userRole.deleted_at,
         email: user?.email || "",
-        name: user?.user_metadata?.name || null,
+        name: storeUser?.name || user?.user_metadata?.invited_name || user?.user_metadata?.name || null,
         avatar_url: user?.user_metadata?.avatar_url || null,
         user_created_at: user?.created_at || "",
         last_sign_in_at: user?.last_sign_in_at || null,

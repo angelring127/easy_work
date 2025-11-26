@@ -24,6 +24,7 @@ export default function SetupPasswordPage() {
   const { toast } = useToast();
   const { refreshStores } = useStore();
 
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -62,6 +63,12 @@ export default function SetupPasswordPage() {
 
         setUser(currentUser);
 
+        // 초대 시 입력한 이름이 있으면 기본값으로 설정
+        const invitedName = currentUser?.user_metadata?.invited_name?.trim();
+        if (invitedName) {
+          setName(invitedName);
+        }
+
         // 초대 정보 가져오기
         if (token) {
           const response = await fetch(`/api/invitations/info?token=${token}`);
@@ -93,6 +100,15 @@ export default function SetupPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!name || name.trim().length === 0) {
+      toast({
+        title: "이름을 입력해주세요",
+        description: "이름은 필수 입력 항목입니다.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (password !== confirmPassword) {
       toast({
@@ -137,8 +153,7 @@ export default function SetupPasswordPage() {
       if (token) {
         const requestBody = {
           tokenHash: token,
-          name:
-            user.user_metadata?.name || user.email?.split("@")[0] || "사용자",
+          name: name.trim(),
           password: password,
         };
 
@@ -245,6 +260,18 @@ export default function SetupPasswordPage() {
                 value={user.email}
                 disabled
                 className="bg-gray-50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="name">이름 *</Label>
+              <Input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="이름을 입력하세요"
+                required
               />
             </div>
 
