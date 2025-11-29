@@ -34,6 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { t, type Locale } from "@/lib/i18n";
 import {
   format,
@@ -149,10 +151,18 @@ export function WeekGrid({
   const [selectedWorkItem, setSelectedWorkItem] = useState<string>("");
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [showTransferMode, setShowTransferMode] = useState(false);
-  const [selectedTransferUserId, setSelectedTransferUserId] = useState<string>("");
+  const [selectedTransferUserId, setSelectedTransferUserId] =
+    useState<string>("");
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [warningData, setWarningData] = useState<{
-    type: 'DESIRED_HOURS' | 'DIFFICULT_DAY' | 'MAX_STAFF' | 'TRANSFER_DESIRED_HOURS' | 'TRANSFER_DIFFICULT_DAY' | 'UNAVAILABLE';
+    type:
+      | "DESIRED_HOURS"
+      | "DIFFICULT_DAY"
+      | "MAX_STAFF"
+      | "TRANSFER_DESIRED_HOURS"
+      | "TRANSFER_DIFFICULT_DAY"
+      | "UNAVAILABLE"
+      | "MULTI_DAY";
     userName: string;
     // DESIRED_HOURS, TRANSFER_DESIRED_HOURS용
     currentHours?: number;
@@ -163,17 +173,43 @@ export function WeekGrid({
     difficultDayName?: string;
     weekday?: number;
     // MAX_STAFF용
-    shiftType?: 'morning' | 'afternoon';
+    shiftType?: "morning" | "afternoon";
     currentStaff?: number;
     maxStaff?: number;
     // UNAVAILABLE용
     date?: string;
     reason?: string;
+    // MULTI_DAY용
+    multiDayWarnings?: Array<{
+      date: string;
+      warnings: Array<{
+        type: "DESIRED_HOURS" | "DIFFICULT_DAY" | "MAX_STAFF" | "UNAVAILABLE";
+        data: any;
+      }>;
+    }>;
   } | null>(null);
   const [pendingScheduleData, setPendingScheduleData] = useState<{
     requestData: any;
     existingAssignment: ScheduleAssignment | undefined;
   } | null>(null);
+  const [isMultiDayModalOpen, setIsMultiDayModalOpen] = useState(false);
+  const [multiDayModalUser, setMultiDayModalUser] = useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
+  const [multiDayWarnings, setMultiDayWarnings] = useState<
+    Array<{
+      date: string;
+      warnings: Array<{
+        type: "DESIRED_HOURS" | "DIFFICULT_DAY" | "MAX_STAFF" | "UNAVAILABLE";
+        data: any;
+      }>;
+    }>
+  >([]);
+  const [userDifficultDays, setUserDifficultDays] = useState<
+    Map<string, Set<number>>
+  >(new Map());
 
   // 週の日付 범위 계산
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // 월요일 시작
@@ -329,11 +365,57 @@ export function WeekGrid({
         roles: assignment?.userRoles || [],
       };
     })
-    .filter((user) => user !== null) as Array<{
+    .filter((user) => user !== null)
+    .sort((a, b) => {
+      // 이름순 정렬 (export와 동일한 순서)
+      return a.name.localeCompare(b.name);
+    }) as Array<{
     id: string;
     name: string;
     roles: string[];
   }>;
+
+  // 사용자별 difficult days 조회
+  useEffect(() => {
+    const fetchUserDifficultDays = async () => {
+      if (!storeId || users.length === 0) return;
+
+      const difficultDaysMap = new Map<string, Set<number>>();
+
+      await Promise.all(
+        users.map(async (user) => {
+          try {
+            const response = await fetch(
+              `/api/stores/${storeId}/users/${user.id}`
+            );
+            const result = await response.json();
+
+            if (result.success && result.data?.preferredWeekdays) {
+              const difficultDays = new Set<number>();
+              result.data.preferredWeekdays.forEach(
+                (pw: { weekday: number; is_preferred: boolean }) => {
+                  if (pw.is_preferred) {
+                    difficultDays.add(pw.weekday);
+                  }
+                }
+              );
+              difficultDaysMap.set(user.id, difficultDays);
+            }
+          } catch (error) {
+            console.error(
+              `사용자 ${user.id}의 difficult days 조회 오류:`,
+              error
+            );
+          }
+        })
+      );
+
+      setUserDifficultDays(difficultDaysMap);
+    };
+
+    fetchUserDifficultDays();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, allUserIds.size]);
 
   // 특정 사용자의 특정 날짜 출근 불가 상태 조회
   const getAvailabilityForUserDate = (
@@ -404,11 +486,14 @@ export function WeekGrid({
   };
 
   // 사용자의 총 스케줄 시간 계산 (Unpaid Break 제외)
-  const getUserTotalHours = (userId: string, includeNewAssignment?: {
-    startTime: string;
-    endTime: string;
-    unpaidBreakMin?: number;
-  }): number => {
+  const getUserTotalHours = (
+    userId: string,
+    includeNewAssignment?: {
+      startTime: string;
+      endTime: string;
+      unpaidBreakMin?: number;
+    }
+  ): number => {
     const userAssignments = assignments.filter(
       (a) => a.userId === userId && a.status === "ASSIGNED"
     );
@@ -429,7 +514,7 @@ export function WeekGrid({
 
       // 근무 시간 계산
       const workMinutes = endMin - startMin;
-      
+
       // Unpaid Break 시간 제외
       const unpaidBreakMin = assignment.unpaidBreakMin || 0;
       const paidMinutes = workMinutes - unpaidBreakMin;
@@ -476,6 +561,17 @@ export function WeekGrid({
     }
     setSelectedCell({ userId, date });
     onUserClick?.(userId, date);
+  };
+
+  // 유저명 클릭 핸들러 (복수 요일 선택 모달)
+  const handleUserNameClick = (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    if (user && canManage) {
+      setMultiDayModalUser({ userId, userName: user.name });
+      setSelectedDays(new Set());
+      setMultiDayWarnings([]);
+      setIsMultiDayModalOpen(true);
+    }
   };
 
   // 출근 불가 토글 핸들러
@@ -578,7 +674,14 @@ export function WeekGrid({
               {users.map((user) => (
                 <div key={user.id} className="grid grid-cols-8 gap-1 mb-1">
                   {/* 사용자 정보 */}
-                  <div className="p-2 border rounded-md bg-muted/50">
+                  <div
+                    className={`p-2 border rounded-md bg-muted/50 ${
+                      canManage
+                        ? "cursor-pointer hover:bg-muted/70 transition-colors"
+                        : ""
+                    }`}
+                    onClick={() => handleUserNameClick(user.id)}
+                  >
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
                         <AvatarFallback className="text-xs">
@@ -644,6 +747,11 @@ export function WeekGrid({
                       selectedCell?.userId === user.id &&
                       selectedCell?.date === dayStr;
 
+                    // Difficult day 체크
+                    const userDifficultDaysSet = userDifficultDays.get(user.id);
+                    const isDifficultDay =
+                      userDifficultDaysSet?.has(dayOfWeek) || false;
+
                     return (
                       <div
                         key={dayIndex}
@@ -657,6 +765,11 @@ export function WeekGrid({
                               : "bg-muted/20"
                           }
                           ${isUnavailable ? "bg-red-50 border-red-200" : ""}
+                          ${
+                            isDifficultDay && !isUnavailable
+                              ? "bg-yellow-50 border-yellow-200"
+                              : ""
+                          }
                         `}
                         onClick={() => {
                           handleCellClick(user.id, dayStr);
@@ -695,12 +808,12 @@ export function WeekGrid({
                           )}
 
                           {/* 배정된 근무들 */}
-                          {dayAssignments.length > 0 ? (
-                            dayAssignments.map((assignment) => (
-                              <Tooltip key={assignment.id}>
-                                <TooltipTrigger asChild>
-                                  <div
-                                    className={`
+                          {dayAssignments.length > 0
+                            ? dayAssignments.map((assignment) => (
+                                <Tooltip key={assignment.id}>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      className={`
                                       p-1.5 rounded text-xs cursor-pointer
                                       ${
                                         assignment.status === "CONFIRMED"
@@ -708,84 +821,82 @@ export function WeekGrid({
                                           : "bg-blue-100 text-blue-800 border border-blue-200"
                                       }
                                     `}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // 스케줄 클릭 시에도 모달 열기
-                                      handleCellClick(user.id, dayStr);
-                                      onAssignmentClick?.(assignment);
-                                    }}
-                                  >
-                                    <div className="flex items-center gap-1 mb-0.5">
-                                      <Clock className="h-3 w-3 flex-shrink-0" />
-                                      <span className="font-medium truncate">
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // 스케줄 클릭 시에도 모달 열기
+                                        handleCellClick(user.id, dayStr);
+                                        onAssignmentClick?.(assignment);
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-1 mb-0.5">
+                                        <Clock className="h-3 w-3 flex-shrink-0" />
+                                        <span className="font-medium truncate">
+                                          {assignment.workItemName}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs opacity-75">
+                                        {formatTime(assignment.startTime)} -{" "}
+                                        {formatTime(assignment.endTime)}
+                                      </div>
+                                      {(assignment.requiredRoles?.length ?? 0) >
+                                        0 && (
+                                        <div className="flex gap-1 mt-1 flex-wrap">
+                                          {(assignment.requiredRoles || [])
+                                            .slice(0, 2)
+                                            .map((role, roleIndex) => (
+                                              <Badge
+                                                key={roleIndex}
+                                                variant="outline"
+                                                className="text-xs px-1 py-0"
+                                              >
+                                                {role}
+                                              </Badge>
+                                            ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-sm">
+                                      <div className="font-medium">
                                         {assignment.workItemName}
-                                      </span>
-                                    </div>
-                                    <div className="text-xs opacity-75">
-                                      {formatTime(assignment.startTime)} -{" "}
-                                      {formatTime(assignment.endTime)}
-                                    </div>
-                                    {(assignment.requiredRoles?.length ?? 0) >
-                                      0 && (
-                                      <div className="flex gap-1 mt-1 flex-wrap">
-                                        {(assignment.requiredRoles || [])
-                                          .slice(0, 2)
-                                          .map((role, roleIndex) => (
-                                            <Badge
-                                              key={roleIndex}
-                                              variant="outline"
-                                              className="text-xs px-1 py-0"
-                                            >
-                                              {role}
-                                            </Badge>
-                                          ))}
                                       </div>
-                                    )}
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div className="text-sm">
-                                    <div className="font-medium">
-                                      {assignment.workItemName}
-                                    </div>
-                                    <div className="text-muted-foreground">
-                                      {formatTime(assignment.startTime)} -{" "}
-                                      {formatTime(assignment.endTime)}
-                                    </div>
-                                    {(assignment.requiredRoles?.length ?? 0) >
-                                      0 && (
-                                      <div className="mt-1">
-                                        <div className="text-xs font-medium">
-                                          Required Roles:
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {(
-                                            assignment.requiredRoles || []
-                                          ).join(", ")}
-                                        </div>
+                                      <div className="text-muted-foreground">
+                                        {formatTime(assignment.startTime)} -{" "}
+                                        {formatTime(assignment.endTime)}
                                       </div>
-                                    )}
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            ))
-                          ) : isBusinessDay ? (
-                            // 빈 근무 셀 (unavailable이 없을 때만 표시)
-                            !isUnavailable && (
-                              <div className="flex items-center justify-center h-full text-muted-foreground opacity-50">
-                                <span className="text-xs">-</span>
-                              </div>
-                            )
-                          ) : (
-                            // 휴무일 (unavailable이 없을 때만 표시)
-                            !isUnavailable && (
-                              <div className="flex items-center justify-center h-full text-muted-foreground opacity-30">
-                                <span className="text-xs">
-                                  {t("schedule.closed", locale)}
-                                </span>
-                              </div>
-                            )
-                          )}
+                                      {(assignment.requiredRoles?.length ?? 0) >
+                                        0 && (
+                                        <div className="mt-1">
+                                          <div className="text-xs font-medium">
+                                            Required Roles:
+                                          </div>
+                                          <div className="text-xs text-muted-foreground">
+                                            {(
+                                              assignment.requiredRoles || []
+                                            ).join(", ")}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ))
+                            : isBusinessDay
+                            ? // 빈 근무 셀 (unavailable이 없을 때만 표시)
+                              !isUnavailable && (
+                                <div className="flex items-center justify-center h-full text-muted-foreground opacity-50">
+                                  <span className="text-xs">-</span>
+                                </div>
+                              )
+                            : // 휴무일 (unavailable이 없을 때만 표시)
+                              !isUnavailable && (
+                                <div className="flex items-center justify-center h-full text-muted-foreground opacity-30">
+                                  <span className="text-xs">
+                                    {t("schedule.closed", locale)}
+                                  </span>
+                                </div>
+                              )}
                         </div>
                       </div>
                     );
@@ -883,144 +994,376 @@ export function WeekGrid({
                     }
 
                     if (value === "DELETE_SCHEDULE") {
-                    // 스케줄 삭제 로직
-                    if (!modalCell) return;
+                      // 스케줄 삭제 로직
+                      if (!modalCell) return;
 
-                    setIsModalLoading(true);
-                    try {
-                      const existingAssignment = assignments.find(
-                        (a) =>
-                          a.userId === modalCell.userId &&
-                          a.date === modalCell.date
-                      );
+                      setIsModalLoading(true);
+                      try {
+                        const existingAssignment = assignments.find(
+                          (a) =>
+                            a.userId === modalCell.userId &&
+                            a.date === modalCell.date
+                        );
 
-                      if (!existingAssignment) {
-                        alert(t("schedule.noScheduleToDelete", locale));
-                        return;
-                      }
-
-                      const response = await fetch(
-                        `/api/schedule/assignments/${existingAssignment.id}`,
-                        {
-                          method: "DELETE",
+                        if (!existingAssignment) {
+                          alert(t("schedule.noScheduleToDelete", locale));
+                          return;
                         }
-                      );
 
-                      if (response.ok) {
-                        const result = await response.json();
-                        if (result.success) {
-                          if (onScheduleChange) {
-                            onScheduleChange();
+                        const response = await fetch(
+                          `/api/schedule/assignments/${existingAssignment.id}`,
+                          {
+                            method: "DELETE",
                           }
-                          setIsModalOpen(false);
+                        );
+
+                        if (response.ok) {
+                          const result = await response.json();
+                          if (result.success) {
+                            if (onScheduleChange) {
+                              onScheduleChange();
+                            }
+                            setIsModalOpen(false);
+                          } else {
+                            alert(t("schedule.scheduleDeleteError", locale));
+                          }
                         } else {
                           alert(t("schedule.scheduleDeleteError", locale));
                         }
-                      } else {
+                      } catch (error) {
+                        console.error("스케줄 삭제 오류:", error);
                         alert(t("schedule.scheduleDeleteError", locale));
+                      } finally {
+                        setIsModalLoading(false);
                       }
-                    } catch (error) {
-                      console.error("스케줄 삭제 오류:", error);
-                      alert(t("schedule.scheduleDeleteError", locale));
-                    } finally {
-                      setIsModalLoading(false);
-                    }
-                  } else if (value && value !== "DELETE_SCHEDULE") {
-                    // 스케줄 추가/수정 로직
-                    if (!modalCell || !modalCell.userId) {
-                      console.error("modalCell 또는 userId가 없습니다:", modalCell);
-                      alert(t("schedule.scheduleAddError", locale));
-                      return;
-                    }
+                    } else if (value && value !== "DELETE_SCHEDULE") {
+                      // 스케줄 추가/수정 로직
+                      if (!modalCell || !modalCell.userId) {
+                        console.error(
+                          "modalCell 또는 userId가 없습니다:",
+                          modalCell
+                        );
+                        alert(t("schedule.scheduleAddError", locale));
+                        return;
+                      }
 
-                    setIsModalLoading(true);
+                      setIsModalLoading(true);
 
-                    // 기존 스케줄이 있는지 확인
-                    const existingAssignment = assignments.find(
-                      (a) =>
-                        a.userId === modalCell.userId &&
-                        a.date === modalCell.date &&
-                        a.status === "ASSIGNED"
-                    );
-
-                    try {
-                      const selectedItem = workItems.find(
-                        (item) => item.id === value
+                      // 기존 스케줄이 있는지 확인
+                      const existingAssignment = assignments.find(
+                        (a) =>
+                          a.userId === modalCell.userId &&
+                          a.date === modalCell.date &&
+                          a.status === "ASSIGNED"
                       );
 
-                      const startTime = selectedItem?.start_min
-                        ? formatTimeFromMinutes(selectedItem.start_min)
-                        : "09:00";
-                      const endTime = selectedItem?.end_min
-                        ? formatTimeFromMinutes(selectedItem.end_min)
-                        : "18:00";
+                      try {
+                        const selectedItem = workItems.find(
+                          (item) => item.id === value
+                        );
 
-                      const requestData = {
-                        store_id: storeId,
-                        user_id: modalCell.userId,
-                        work_item_id: value,
-                        date: modalCell.date,
-                        start_time: startTime,
-                        end_time: endTime,
-                      };
+                        const startTime = selectedItem?.start_min
+                          ? formatTimeFromMinutes(selectedItem.start_min)
+                          : "09:00";
+                        const endTime = selectedItem?.end_min
+                          ? formatTimeFromMinutes(selectedItem.end_min)
+                          : "18:00";
 
-                      // 경고 확인 (새 스케줄 추가 시에만)
-                      if (!existingAssignment) {
-                        try {
-                          // 사용자 정보 조회 (store_users 기반)
-                          const userResponse = await fetch(
-                            `/api/stores/${storeId}/users/${modalCell.userId}`
-                          );
-                          const userResult = await userResponse.json();
+                        const requestData = {
+                          store_id: storeId,
+                          user_id: modalCell.userId,
+                          work_item_id: value,
+                          date: modalCell.date,
+                          start_time: startTime,
+                          end_time: endTime,
+                        };
 
-                          if (userResult.success && userResult.data) {
-                            const userData = userResult.data;
-                            
-                            // 새 스케줄 시간 계산
-                            const startMin =
-                              parseInt(startTime.split(":")[0]) * 60 +
-                              parseInt(startTime.split(":")[1]);
-                            let endMin =
-                              parseInt(endTime.split(":")[0]) * 60 +
-                              parseInt(endTime.split(":")[1]);
-
-                            if (endMin <= startMin) {
-                              endMin += 24 * 60;
-                            }
-
-                            const workMinutes = endMin - startMin;
-                            const unpaidBreakMin = selectedItem?.unpaid_break_min || 0;
-                            const newHours = Math.round(((workMinutes - unpaidBreakMin) / 60) * 10) / 10;
-                            const totalHours = getUserTotalHours(modalCell.userId, {
-                              startTime,
-                              endTime,
-                              unpaidBreakMin,
-                            });
-
-                            // 1. Difficult Work Days 확인
-                            const scheduleDate = new Date(modalCell.date);
-                            const scheduleWeekday = scheduleDate.getDay(); // 0=일요일, 6=토요일
-                            const preferredWeekdays = userData.preferredWeekdays || [];
-                            const isDifficultDay = preferredWeekdays.some(
-                              (pw: { weekday: number; is_preferred: boolean }) =>
-                                pw.weekday === scheduleWeekday && pw.is_preferred === true
+                        // 경고 확인 (새 스케줄 추가 시에만)
+                        if (!existingAssignment) {
+                          try {
+                            // 사용자 정보 조회 (store_users 기반)
+                            const userResponse = await fetch(
+                              `/api/stores/${storeId}/users/${modalCell.userId}`
                             );
+                            const userResult = await userResponse.json();
 
-                            if (isDifficultDay) {
-                              const weekdayNames = [
-                                t("user.weekdays.sunday", locale),
-                                t("user.weekdays.monday", locale),
-                                t("user.weekdays.tuesday", locale),
-                                t("user.weekdays.wednesday", locale),
-                                t("user.weekdays.thursday", locale),
-                                t("user.weekdays.friday", locale),
-                                t("user.weekdays.saturday", locale),
-                              ];
+                            if (userResult.success && userResult.data) {
+                              const userData = userResult.data;
+
+                              // 새 스케줄 시간 계산
+                              const startMin =
+                                parseInt(startTime.split(":")[0]) * 60 +
+                                parseInt(startTime.split(":")[1]);
+                              let endMin =
+                                parseInt(endTime.split(":")[0]) * 60 +
+                                parseInt(endTime.split(":")[1]);
+
+                              if (endMin <= startMin) {
+                                endMin += 24 * 60;
+                              }
+
+                              const workMinutes = endMin - startMin;
+                              const unpaidBreakMin =
+                                selectedItem?.unpaid_break_min || 0;
+                              const newHours =
+                                Math.round(
+                                  ((workMinutes - unpaidBreakMin) / 60) * 10
+                                ) / 10;
+                              const totalHours = getUserTotalHours(
+                                modalCell.userId,
+                                {
+                                  startTime,
+                                  endTime,
+                                  unpaidBreakMin,
+                                }
+                              );
+
+                              // 1. Difficult Work Days 확인
+                              const scheduleDate = new Date(modalCell.date);
+                              const scheduleWeekday = scheduleDate.getDay(); // 0=일요일, 6=토요일
+                              const preferredWeekdays =
+                                userData.preferredWeekdays || [];
+                              const isDifficultDay = preferredWeekdays.some(
+                                (pw: {
+                                  weekday: number;
+                                  is_preferred: boolean;
+                                }) =>
+                                  pw.weekday === scheduleWeekday &&
+                                  pw.is_preferred === true
+                              );
+
+                              if (isDifficultDay) {
+                                const weekdayNames = [
+                                  t("user.weekdays.sunday", locale),
+                                  t("user.weekdays.monday", locale),
+                                  t("user.weekdays.tuesday", locale),
+                                  t("user.weekdays.wednesday", locale),
+                                  t("user.weekdays.thursday", locale),
+                                  t("user.weekdays.friday", locale),
+                                  t("user.weekdays.saturday", locale),
+                                ];
+                                setWarningData({
+                                  type: "DIFFICULT_DAY",
+                                  userName: modalCell.userName,
+                                  difficultDayName:
+                                    weekdayNames[scheduleWeekday],
+                                  weekday: scheduleWeekday,
+                                });
+                                setPendingScheduleData({
+                                  requestData,
+                                  existingAssignment,
+                                });
+                                setShowWarningDialog(true);
+                                setIsModalLoading(false);
+                                return;
+                              }
+
+                              // 2. Desired Weekly Hours 초과 확인
+                              if (userData.desiredWeeklyHours) {
+                                const desiredHours =
+                                  userData.desiredWeeklyHours;
+                                const currentHours = getUserTotalHours(
+                                  modalCell.userId
+                                );
+
+                                if (totalHours > desiredHours) {
+                                  setWarningData({
+                                    type: "DESIRED_HOURS",
+                                    userName: modalCell.userName,
+                                    currentHours,
+                                    desiredHours,
+                                    newHours,
+                                    totalHours,
+                                  });
+                                  setPendingScheduleData({
+                                    requestData,
+                                    existingAssignment,
+                                  });
+                                  setShowWarningDialog(true);
+                                  setIsModalLoading(false);
+                                  return;
+                                }
+                              }
+
+                              // 3. Max Morning/Afternoon Staff 확인
+                              const scheduleDay = weekDays.find(
+                                (day) =>
+                                  format(day, "yyyy-MM-dd") === modalCell.date
+                              );
+                              if (scheduleDay) {
+                                const {
+                                  morning: currentMorning,
+                                  afternoon: currentAfternoon,
+                                } = getShiftCounts(scheduleDay);
+
+                                // 새 스케줄이 오전인지 오후인지 확인
+                                const startMinForShift =
+                                  parseInt(startTime.split(":")[0]) * 60 +
+                                  parseInt(startTime.split(":")[1]);
+                                const isMorningShift =
+                                  startMinForShift < shiftBoundaryTimeMin;
+
+                                // 새 스케줄 추가 후 인원 수 계산
+                                const newMorningCount = isMorningShift
+                                  ? currentMorning + 1
+                                  : currentMorning;
+                                const newAfternoonCount = !isMorningShift
+                                  ? currentAfternoon + 1
+                                  : currentAfternoon;
+
+                                // 오전 최대 인원 초과 확인
+                                if (
+                                  maxMorningStaff > 0 &&
+                                  newMorningCount > maxMorningStaff
+                                ) {
+                                  setWarningData({
+                                    type: "MAX_STAFF",
+                                    userName: modalCell.userName,
+                                    shiftType: "morning",
+                                    currentStaff: currentMorning,
+                                    maxStaff: maxMorningStaff,
+                                  });
+                                  setPendingScheduleData({
+                                    requestData,
+                                    existingAssignment,
+                                  });
+                                  setShowWarningDialog(true);
+                                  setIsModalLoading(false);
+                                  return;
+                                }
+
+                                // 오후 최대 인원 초과 확인
+                                if (
+                                  maxAfternoonStaff > 0 &&
+                                  newAfternoonCount > maxAfternoonStaff
+                                ) {
+                                  setWarningData({
+                                    type: "MAX_STAFF",
+                                    userName: modalCell.userName,
+                                    shiftType: "afternoon",
+                                    currentStaff: currentAfternoon,
+                                    maxStaff: maxAfternoonStaff,
+                                  });
+                                  setPendingScheduleData({
+                                    requestData,
+                                    existingAssignment,
+                                  });
+                                  setShowWarningDialog(true);
+                                  setIsModalLoading(false);
+                                  return;
+                                }
+                              }
+                            }
+                          } catch (error) {
+                            console.error("사용자 정보 조회 오류:", error);
+                            // 에러가 발생해도 스케줄 추가는 계속 진행
+                          }
+                        }
+
+                        console.log("스케줄 요청 데이터:", requestData);
+
+                        let response;
+
+                        if (existingAssignment) {
+                          // 기존 스케줄이 있으면 수정 (PATCH)
+                          console.log(
+                            "기존 스케줄 수정:",
+                            existingAssignment.id
+                          );
+                          response = await fetch(
+                            `/api/schedule/assignments/${existingAssignment.id}`,
+                            {
+                              method: "PATCH",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({
+                                work_item_id: value,
+                                start_time: selectedItem?.start_min
+                                  ? formatTimeFromMinutes(
+                                      selectedItem.start_min
+                                    )
+                                  : "09:00",
+                                end_time: selectedItem?.end_min
+                                  ? formatTimeFromMinutes(selectedItem.end_min)
+                                  : "18:00",
+                              }),
+                            }
+                          );
+
+                          // PATCH 응답도 동일하게 처리
+                          if (response.ok) {
+                            const result = await response.json();
+                            if (result.success) {
+                              // 경고가 있는 경우 모달 표시
+                              if (result.warning) {
+                                const availability = getAvailabilityForUserDate(
+                                  modalCell?.userId || "",
+                                  modalCell?.date || ""
+                                );
+                                setWarningData({
+                                  type: "UNAVAILABLE",
+                                  userName: modalCell?.userName || "",
+                                  date: modalCell?.date || "",
+                                  reason: availability?.reason,
+                                });
+                                setPendingScheduleData({
+                                  requestData: {
+                                    work_item_id: value,
+                                    start_time: selectedItem?.start_min
+                                      ? formatTimeFromMinutes(
+                                          selectedItem.start_min
+                                        )
+                                      : "09:00",
+                                    end_time: selectedItem?.end_min
+                                      ? formatTimeFromMinutes(
+                                          selectedItem.end_min
+                                        )
+                                      : "18:00",
+                                  },
+                                  existingAssignment,
+                                });
+                                setShowWarningDialog(true);
+                                setIsModalLoading(false);
+                                return;
+                              }
+
+                              if (onScheduleChange) {
+                                onScheduleChange();
+                              }
+                              setIsModalOpen(false);
+                              return;
+                            }
+                          }
+                        } else {
+                          // 기존 스케줄이 없으면 추가 (POST)
+                          console.log("새 스케줄 추가");
+                          response = await fetch("/api/schedule/assignments", {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify(requestData),
+                          });
+                        }
+
+                        console.log("API 응답 상태:", response.status);
+
+                        if (response.ok) {
+                          const result = await response.json();
+                          console.log("API 응답 데이터:", result);
+                          if (result.success) {
+                            // 경고가 있는 경우 모달 표시
+                            if (result.warning) {
+                              const availability = getAvailabilityForUserDate(
+                                modalCell?.userId || "",
+                                modalCell?.date || ""
+                              );
                               setWarningData({
-                                type: 'DIFFICULT_DAY',
-                                userName: modalCell.userName,
-                                difficultDayName: weekdayNames[scheduleWeekday],
-                                weekday: scheduleWeekday,
+                                type: "UNAVAILABLE",
+                                userName: modalCell?.userName || "",
+                                date: modalCell?.date || "",
+                                reason: availability?.reason,
                               });
                               setPendingScheduleData({
                                 requestData,
@@ -1031,289 +1374,109 @@ export function WeekGrid({
                               return;
                             }
 
-                            // 2. Desired Weekly Hours 초과 확인
-                            if (userData.desiredWeeklyHours) {
-                              const desiredHours = userData.desiredWeeklyHours;
-                              const currentHours = getUserTotalHours(modalCell.userId);
-
-                              if (totalHours > desiredHours) {
-                                setWarningData({
-                                  type: 'DESIRED_HOURS',
-                                  userName: modalCell.userName,
-                                  currentHours,
-                                  desiredHours,
-                                  newHours,
-                                  totalHours,
-                                });
-                                setPendingScheduleData({
-                                  requestData,
-                                  existingAssignment,
-                                });
-                                setShowWarningDialog(true);
-                                setIsModalLoading(false);
-                                return;
-                              }
+                            if (onScheduleChange) {
+                              onScheduleChange();
                             }
-
-                            // 3. Max Morning/Afternoon Staff 확인
-                            const scheduleDay = weekDays.find(
-                              (day) => format(day, "yyyy-MM-dd") === modalCell.date
+                            setIsModalOpen(false);
+                          } else {
+                            console.error("API 오류:", result.error);
+                            alert(
+                              `${t("schedule.scheduleAddError", locale)}: ${
+                                result.error
+                              }`
                             );
-                            if (scheduleDay) {
-                              const { morning: currentMorning, afternoon: currentAfternoon } = getShiftCounts(scheduleDay);
-                              
-                              // 새 스케줄이 오전인지 오후인지 확인
-                              const startMinForShift = parseInt(startTime.split(":")[0]) * 60 + parseInt(startTime.split(":")[1]);
-                              const isMorningShift = startMinForShift < shiftBoundaryTimeMin;
-                              
-                              // 새 스케줄 추가 후 인원 수 계산
-                              const newMorningCount = isMorningShift ? currentMorning + 1 : currentMorning;
-                              const newAfternoonCount = !isMorningShift ? currentAfternoon + 1 : currentAfternoon;
-
-                              // 오전 최대 인원 초과 확인
-                              if (maxMorningStaff > 0 && newMorningCount > maxMorningStaff) {
-                                setWarningData({
-                                  type: 'MAX_STAFF',
-                                  userName: modalCell.userName,
-                                  shiftType: 'morning',
-                                  currentStaff: currentMorning,
-                                  maxStaff: maxMorningStaff,
-                                });
-                                setPendingScheduleData({
-                                  requestData,
-                                  existingAssignment,
-                                });
-                                setShowWarningDialog(true);
-                                setIsModalLoading(false);
-                                return;
-                              }
-
-                              // 오후 최대 인원 초과 확인
-                              if (maxAfternoonStaff > 0 && newAfternoonCount > maxAfternoonStaff) {
-                                setWarningData({
-                                  type: 'MAX_STAFF',
-                                  userName: modalCell.userName,
-                                  shiftType: 'afternoon',
-                                  currentStaff: currentAfternoon,
-                                  maxStaff: maxAfternoonStaff,
-                                });
-                                setPendingScheduleData({
-                                  requestData,
-                                  existingAssignment,
-                                });
-                                setShowWarningDialog(true);
-                                setIsModalLoading(false);
-                                return;
-                              }
-                            }
                           }
-                        } catch (error) {
-                          console.error("사용자 정보 조회 오류:", error);
-                          // 에러가 발생해도 스케줄 추가는 계속 진행
-                        }
-                      }
+                        } else {
+                          const errorText = await response.text();
+                          console.error(
+                            "HTTP 오류:",
+                            response.status,
+                            errorText
+                          );
 
-                      console.log("스케줄 요청 데이터:", requestData);
-
-                      let response;
-
-                      if (existingAssignment) {
-                        // 기존 스케줄이 있으면 수정 (PATCH)
-                        console.log("기존 스케줄 수정:", existingAssignment.id);
-                        response = await fetch(
-                          `/api/schedule/assignments/${existingAssignment.id}`,
-                          {
-                            method: "PATCH",
-                            headers: {
-                              "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({
-                              work_item_id: value,
-                              start_time: selectedItem?.start_min
-                                ? formatTimeFromMinutes(selectedItem.start_min)
-                                : "09:00",
-                              end_time: selectedItem?.end_min
-                                ? formatTimeFromMinutes(selectedItem.end_min)
-                                : "18:00",
-                            }),
-                          }
-                        );
-                        
-                        // PATCH 응답도 동일하게 처리
-                        if (response.ok) {
-                          const result = await response.json();
-                          if (result.success) {
-                            // 경고가 있는 경우 모달 표시
-                            if (result.warning) {
+                          // unavailable 에러인 경우 경고 모달로 처리
+                          try {
+                            const errorJson = JSON.parse(errorText);
+                            if (
+                              errorJson.error ===
+                              "User is unavailable for this date"
+                            ) {
                               const availability = getAvailabilityForUserDate(
                                 modalCell?.userId || "",
                                 modalCell?.date || ""
                               );
                               setWarningData({
-                                type: 'UNAVAILABLE',
+                                type: "UNAVAILABLE",
                                 userName: modalCell?.userName || "",
                                 date: modalCell?.date || "",
                                 reason: availability?.reason,
                               });
                               setPendingScheduleData({
-                                requestData: {
-                                  work_item_id: value,
-                                  start_time: selectedItem?.start_min
-                                    ? formatTimeFromMinutes(selectedItem.start_min)
-                                    : "09:00",
-                                  end_time: selectedItem?.end_min
-                                    ? formatTimeFromMinutes(selectedItem.end_min)
-                                    : "18:00",
-                                },
+                                requestData,
                                 existingAssignment,
                               });
                               setShowWarningDialog(true);
                               setIsModalLoading(false);
                               return;
                             }
-                            
-                            if (onScheduleChange) {
-                              onScheduleChange();
-                            }
-                            setIsModalOpen(false);
-                            return;
+                          } catch (e) {
+                            // JSON 파싱 실패 시 기존 에러 처리
                           }
-                        }
-                      } else {
-                        // 기존 스케줄이 없으면 추가 (POST)
-                        console.log("새 스케줄 추가");
-                        response = await fetch("/api/schedule/assignments", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify(requestData),
-                        });
-                      }
 
-                      console.log("API 응답 상태:", response.status);
-
-                      if (response.ok) {
-                        const result = await response.json();
-                        console.log("API 응답 데이터:", result);
-                        if (result.success) {
-                          // 경고가 있는 경우 모달 표시
-                          if (result.warning) {
-                            const availability = getAvailabilityForUserDate(
-                              modalCell?.userId || "",
-                              modalCell?.date || ""
-                            );
-                            setWarningData({
-                              type: 'UNAVAILABLE',
-                              userName: modalCell?.userName || "",
-                              date: modalCell?.date || "",
-                              reason: availability?.reason,
-                            });
-                            setPendingScheduleData({
-                              requestData,
-                              existingAssignment,
-                            });
-                            setShowWarningDialog(true);
-                            setIsModalLoading(false);
-                            return;
-                          }
-                          
-                          if (onScheduleChange) {
-                            onScheduleChange();
-                          }
-                          setIsModalOpen(false);
-                        } else {
-                          console.error("API 오류:", result.error);
                           alert(
                             `${t("schedule.scheduleAddError", locale)}: ${
-                              result.error
+                              response.status
                             }`
                           );
                         }
-                      } else {
-                        const errorText = await response.text();
-                        console.error("HTTP 오류:", response.status, errorText);
-                        
-                        // unavailable 에러인 경우 경고 모달로 처리
-                        try {
-                          const errorJson = JSON.parse(errorText);
-                          if (errorJson.error === "User is unavailable for this date") {
-                            const availability = getAvailabilityForUserDate(
-                              modalCell?.userId || "",
-                              modalCell?.date || ""
-                            );
-                            setWarningData({
-                              type: 'UNAVAILABLE',
-                              userName: modalCell?.userName || "",
-                              date: modalCell?.date || "",
-                              reason: availability?.reason,
-                            });
-                            setPendingScheduleData({
-                              requestData,
-                              existingAssignment,
-                            });
-                            setShowWarningDialog(true);
-                            setIsModalLoading(false);
-                            return;
-                          }
-                        } catch (e) {
-                          // JSON 파싱 실패 시 기존 에러 처리
-                        }
-                        
-                        alert(
-                          `${t("schedule.scheduleAddError", locale)}: ${
-                            response.status
-                          }`
-                        );
+                      } catch (error) {
+                        console.error("스케줄 처리 오류:", error);
+                        alert(t("schedule.scheduleAddError", locale));
+                      } finally {
+                        setIsModalLoading(false);
                       }
-                    } catch (error) {
-                      console.error("스케줄 처리 오류:", error);
-                      alert(t("schedule.scheduleAddError", locale));
-                    } finally {
-                      setIsModalLoading(false);
                     }
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      isModalLoading
-                        ? t("schedule.processing", locale)
-                        : t("schedule.selectWorkItemPlaceholder", locale)
-                    }
-                  />
-                  {isModalLoading && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  {workItems.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} ({formatTimeFromMinutes(item.start_min)} -{" "}
-                      {formatTimeFromMinutes(item.end_min)})
-                    </SelectItem>
-                  ))}
-                  {/* 기존 스케줄이 있는 경우에만 삭제 및 이전 옵션 표시 */}
-                  {modalCell &&
-                    assignments.some(
-                      (a) =>
-                        a.userId === modalCell.userId &&
-                        a.date === modalCell.date &&
-                        a.status === "ASSIGNED"
-                    ) && (
-                      <>
-                        <SelectItem value="TRANSFER_SCHEDULE">
-                          {t("schedule.transferSchedule", locale)}
-                        </SelectItem>
-                        <SelectItem value="DELETE_SCHEDULE">
-                          {t("schedule.deleteSchedule", locale)}
-                        </SelectItem>
-                      </>
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        isModalLoading
+                          ? t("schedule.processing", locale)
+                          : t("schedule.selectWorkItemPlaceholder", locale)
+                      }
+                    />
+                    {isModalLoading && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     )}
-                </SelectContent>
-              </Select>
-            </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workItems.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} ({formatTimeFromMinutes(item.start_min)} -{" "}
+                        {formatTimeFromMinutes(item.end_min)})
+                      </SelectItem>
+                    ))}
+                    {/* 기존 스케줄이 있는 경우에만 삭제 및 이전 옵션 표시 */}
+                    {modalCell &&
+                      assignments.some(
+                        (a) =>
+                          a.userId === modalCell.userId &&
+                          a.date === modalCell.date &&
+                          a.status === "ASSIGNED"
+                      ) && (
+                        <>
+                          <SelectItem value="TRANSFER_SCHEDULE">
+                            {t("schedule.transferSchedule", locale)}
+                          </SelectItem>
+                          <SelectItem value="DELETE_SCHEDULE">
+                            {t("schedule.deleteSchedule", locale)}
+                          </SelectItem>
+                        </>
+                      )}
+                  </SelectContent>
+                </Select>
+              </div>
             ) : (
               /* 스케줄 이전 모드 */
               <div className="space-y-4">
@@ -1350,19 +1513,30 @@ export function WeekGrid({
                           const targetUserResponse = await fetch(
                             `/api/stores/${storeId}/users/${value}`
                           );
-                          const targetUserResult = await targetUserResponse.json();
+                          const targetUserResult =
+                            await targetUserResponse.json();
 
-                          if (targetUserResult.success && targetUserResult.data) {
+                          if (
+                            targetUserResult.success &&
+                            targetUserResult.data
+                          ) {
                             const targetUserData = targetUserResult.data;
-                            const targetUserName = users.find(u => u.id === value)?.name || targetUserData.name;
+                            const targetUserName =
+                              users.find((u) => u.id === value)?.name ||
+                              targetUserData.name;
 
                             // 1. Difficult Work Days 확인
                             const scheduleDate = new Date(modalCell.date);
                             const scheduleWeekday = scheduleDate.getDay(); // 0=일요일, 6=토요일
-                            const preferredWeekdays = targetUserData.preferredWeekdays || [];
+                            const preferredWeekdays =
+                              targetUserData.preferredWeekdays || [];
                             const isDifficultDay = preferredWeekdays.some(
-                              (pw: { weekday: number; is_preferred: boolean }) =>
-                                pw.weekday === scheduleWeekday && pw.is_preferred === true
+                              (pw: {
+                                weekday: number;
+                                is_preferred: boolean;
+                              }) =>
+                                pw.weekday === scheduleWeekday &&
+                                pw.is_preferred === true
                             );
 
                             if (isDifficultDay) {
@@ -1376,7 +1550,7 @@ export function WeekGrid({
                                 t("user.weekdays.saturday", locale),
                               ];
                               setWarningData({
-                                type: 'TRANSFER_DIFFICULT_DAY',
+                                type: "TRANSFER_DIFFICULT_DAY",
                                 userName: targetUserName,
                                 difficultDayName: weekdayNames[scheduleWeekday],
                                 weekday: scheduleWeekday,
@@ -1394,24 +1568,39 @@ export function WeekGrid({
 
                             // 2. Desired Weekly Hours 초과 확인
                             if (targetUserData.desiredWeeklyHours) {
-                              const desiredHours = targetUserData.desiredWeeklyHours;
+                              const desiredHours =
+                                targetUserData.desiredWeeklyHours;
                               const currentHours = getUserTotalHours(value);
-                              
+
                               // 기존 스케줄 시간 계산
                               const startMin =
-                                parseInt(existingAssignment.startTime.split(":")[0]) * 60 +
-                                parseInt(existingAssignment.startTime.split(":")[1]);
+                                parseInt(
+                                  existingAssignment.startTime.split(":")[0]
+                                ) *
+                                  60 +
+                                parseInt(
+                                  existingAssignment.startTime.split(":")[1]
+                                );
                               let endMin =
-                                parseInt(existingAssignment.endTime.split(":")[0]) * 60 +
-                                parseInt(existingAssignment.endTime.split(":")[1]);
+                                parseInt(
+                                  existingAssignment.endTime.split(":")[0]
+                                ) *
+                                  60 +
+                                parseInt(
+                                  existingAssignment.endTime.split(":")[1]
+                                );
 
                               if (endMin <= startMin) {
                                 endMin += 24 * 60;
                               }
 
                               const workMinutes = endMin - startMin;
-                              const unpaidBreakMin = existingAssignment.unpaidBreakMin || 0;
-                              const newHours = Math.round(((workMinutes - unpaidBreakMin) / 60) * 10) / 10;
+                              const unpaidBreakMin =
+                                existingAssignment.unpaidBreakMin || 0;
+                              const newHours =
+                                Math.round(
+                                  ((workMinutes - unpaidBreakMin) / 60) * 10
+                                ) / 10;
                               const totalHours = getUserTotalHours(value, {
                                 startTime: existingAssignment.startTime,
                                 endTime: existingAssignment.endTime,
@@ -1420,7 +1609,7 @@ export function WeekGrid({
 
                               if (totalHours > desiredHours) {
                                 setWarningData({
-                                  type: 'TRANSFER_DESIRED_HOURS',
+                                  type: "TRANSFER_DESIRED_HOURS",
                                   userName: targetUserName,
                                   currentHours,
                                   desiredHours,
@@ -1440,7 +1629,10 @@ export function WeekGrid({
                             }
                           }
                         } catch (error) {
-                          console.error("이전 대상 사용자 정보 조회 오류:", error);
+                          console.error(
+                            "이전 대상 사용자 정보 조회 오류:",
+                            error
+                          );
                           // 에러가 발생해도 스케줄 이전은 계속 진행
                         }
 
@@ -1537,12 +1729,20 @@ export function WeekGrid({
               <AlertCircle className="h-5 w-5" />
               {warningData && (
                 <>
-                  {warningData.type === 'DESIRED_HOURS' && t("schedule.warning.exceedDesiredHours", locale)}
-                  {warningData.type === 'DIFFICULT_DAY' && t("schedule.warning.difficultDay", locale)}
-                  {warningData.type === 'MAX_STAFF' && t("schedule.warning.maxStaff", locale)}
-                  {warningData.type === 'TRANSFER_DESIRED_HOURS' && t("schedule.warning.transferDesiredHours", locale)}
-                  {warningData.type === 'TRANSFER_DIFFICULT_DAY' && t("schedule.warning.transferDifficultDay", locale)}
-                  {warningData.type === 'UNAVAILABLE' && t("schedule.warning.unavailable", locale)}
+                  {warningData.type === "DESIRED_HOURS" &&
+                    t("schedule.warning.exceedDesiredHours", locale)}
+                  {warningData.type === "DIFFICULT_DAY" &&
+                    t("schedule.warning.difficultDay", locale)}
+                  {warningData.type === "MAX_STAFF" &&
+                    t("schedule.warning.maxStaff", locale)}
+                  {warningData.type === "TRANSFER_DESIRED_HOURS" &&
+                    t("schedule.warning.transferDesiredHours", locale)}
+                  {warningData.type === "TRANSFER_DIFFICULT_DAY" &&
+                    t("schedule.warning.transferDifficultDay", locale)}
+                  {warningData.type === "UNAVAILABLE" &&
+                    t("schedule.warning.unavailable", locale)}
+                  {warningData.type === "MULTI_DAY" &&
+                    t("schedule.multiDaySchedule", locale)}
                 </>
               )}
             </DialogTitle>
@@ -1550,23 +1750,128 @@ export function WeekGrid({
           <div className="space-y-4 py-4">
             {warningData && (
               <>
+                {/* MULTI_DAY - 복수 요일 경고 */}
+                {warningData.type === "MULTI_DAY" &&
+                  warningData.multiDayWarnings && (
+                    <div className="space-y-2">
+                      <div className="text-sm text-muted-foreground mb-2">
+                        <p>
+                          <strong>{warningData.userName}</strong>{" "}
+                          {t("schedule.warning.multiDayMessage", locale)}
+                        </p>
+                      </div>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {warningData.multiDayWarnings.map(
+                          (dayWarning, index) => (
+                            <Alert key={index} variant="destructive">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertTitle>
+                                {format(
+                                  new Date(dayWarning.date),
+                                  "MM/dd (EEE)",
+                                  {
+                                    locale: dateLocales[locale],
+                                  }
+                                )}
+                              </AlertTitle>
+                              <AlertDescription className="space-y-1 mt-2">
+                                {dayWarning.warnings.map((warning, wIndex) => (
+                                  <div key={wIndex} className="text-sm">
+                                    {warning.type === "UNAVAILABLE" && (
+                                      <div>
+                                        {t(
+                                          "schedule.warning.unavailableMessage",
+                                          locale
+                                        )}
+                                        {warning.data.reason && (
+                                          <span className="ml-1">
+                                            ({warning.data.reason})
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {warning.type === "DIFFICULT_DAY" && (
+                                      <div>
+                                        {t(
+                                          "schedule.warning.difficultDayMessage",
+                                          locale
+                                        )}{" "}
+                                        ({warning.data.difficultDayName})
+                                      </div>
+                                    )}
+                                    {warning.type === "DESIRED_HOURS" && (
+                                      <div>
+                                        {t(
+                                          "schedule.warning.exceedDesiredHoursMessage",
+                                          locale
+                                        )}{" "}
+                                        {t(
+                                          "schedule.warning.totalHours",
+                                          locale
+                                        )}
+                                        : {warning.data.totalHours}h /{" "}
+                                        {t(
+                                          "schedule.warning.desiredHours",
+                                          locale
+                                        )}
+                                        : {warning.data.desiredHours}h
+                                      </div>
+                                    )}
+                                    {warning.type === "MAX_STAFF" && (
+                                      <div>
+                                        {t(
+                                          "schedule.warning.maxStaffMessage",
+                                          locale
+                                        )}{" "}
+                                        (
+                                        {warning.data.shiftType === "morning"
+                                          ? t("schedule.morningStaff", locale)
+                                          : t(
+                                              "schedule.afternoonStaff",
+                                              locale
+                                            )}
+                                        )
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </AlertDescription>
+                            </Alert>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
                 {/* DESIRED_HOURS 또는 TRANSFER_DESIRED_HOURS */}
-                {(warningData.type === 'DESIRED_HOURS' || warningData.type === 'TRANSFER_DESIRED_HOURS') && (
+                {(warningData.type === "DESIRED_HOURS" ||
+                  warningData.type === "TRANSFER_DESIRED_HOURS") && (
                   <div className="text-sm text-muted-foreground">
                     <p className="mb-2">
                       <strong>{warningData.userName}</strong>{" "}
-                      {warningData.type === 'DESIRED_HOURS' 
-                        ? t("schedule.warning.exceedDesiredHoursMessage", locale)
-                        : t("schedule.warning.transferDesiredHoursMessage", locale)}
+                      {warningData.type === "DESIRED_HOURS"
+                        ? t(
+                            "schedule.warning.exceedDesiredHoursMessage",
+                            locale
+                          )
+                        : t(
+                            "schedule.warning.transferDesiredHoursMessage",
+                            locale
+                          )}
                     </p>
                     <div className="space-y-1 mt-3">
                       <div className="flex justify-between">
-                        <span>{t("schedule.warning.currentHours", locale)}:</span>
-                        <span className="font-medium">{warningData.currentHours}h</span>
+                        <span>
+                          {t("schedule.warning.currentHours", locale)}:
+                        </span>
+                        <span className="font-medium">
+                          {warningData.currentHours}h
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span>{t("schedule.warning.newHours", locale)}:</span>
-                        <span className="font-medium">+{warningData.newHours}h</span>
+                        <span className="font-medium">
+                          +{warningData.newHours}h
+                        </span>
                       </div>
                       <div className="flex justify-between border-t pt-1">
                         <span>{t("schedule.warning.totalHours", locale)}:</span>
@@ -1575,13 +1880,22 @@ export function WeekGrid({
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>{t("schedule.warning.desiredHours", locale)}:</span>
-                        <span className="font-medium">{warningData.desiredHours}h</span>
+                        <span>
+                          {t("schedule.warning.desiredHours", locale)}:
+                        </span>
+                        <span className="font-medium">
+                          {warningData.desiredHours}h
+                        </span>
                       </div>
                       <div className="flex justify-between text-amber-600 font-semibold">
                         <span>{t("schedule.warning.exceedBy", locale)}:</span>
                         <span>
-                          +{((warningData.totalHours || 0) - (warningData.desiredHours || 0)).toFixed(1)}h
+                          +
+                          {(
+                            (warningData.totalHours || 0) -
+                            (warningData.desiredHours || 0)
+                          ).toFixed(1)}
+                          h
                         </span>
                       </div>
                     </div>
@@ -1589,17 +1903,23 @@ export function WeekGrid({
                 )}
 
                 {/* DIFFICULT_DAY 또는 TRANSFER_DIFFICULT_DAY */}
-                {(warningData.type === 'DIFFICULT_DAY' || warningData.type === 'TRANSFER_DIFFICULT_DAY') && (
+                {(warningData.type === "DIFFICULT_DAY" ||
+                  warningData.type === "TRANSFER_DIFFICULT_DAY") && (
                   <div className="text-sm text-muted-foreground">
                     <p className="mb-2">
                       <strong>{warningData.userName}</strong>{" "}
-                      {warningData.type === 'DIFFICULT_DAY'
+                      {warningData.type === "DIFFICULT_DAY"
                         ? t("schedule.warning.difficultDayMessage", locale)
-                        : t("schedule.warning.transferDifficultDayMessage", locale)}
+                        : t(
+                            "schedule.warning.transferDifficultDayMessage",
+                            locale
+                          )}
                     </p>
                     <div className="space-y-1 mt-3">
                       <div className="flex justify-between">
-                        <span>{t("schedule.warning.difficultDayName", locale)}:</span>
+                        <span>
+                          {t("schedule.warning.difficultDayName", locale)}:
+                        </span>
                         <span className="font-medium text-amber-600">
                           {warningData.difficultDayName}
                         </span>
@@ -1609,7 +1929,7 @@ export function WeekGrid({
                 )}
 
                 {/* MAX_STAFF */}
-                {warningData.type === 'MAX_STAFF' && (
+                {warningData.type === "MAX_STAFF" && (
                   <div className="text-sm text-muted-foreground">
                     <p className="mb-2">
                       {t("schedule.warning.maxStaffMessage", locale)}
@@ -1617,20 +1937,28 @@ export function WeekGrid({
                     <div className="space-y-1 mt-3">
                       <div className="flex justify-between">
                         <span>
-                          {warningData.shiftType === 'morning'
+                          {warningData.shiftType === "morning"
                             ? t("schedule.warning.maxMorningStaff", locale)
-                            : t("schedule.warning.maxAfternoonStaff", locale)}:
+                            : t("schedule.warning.maxAfternoonStaff", locale)}
+                          :
                         </span>
-                        <span className="font-medium">{warningData.maxStaff}</span>
+                        <span className="font-medium">
+                          {warningData.maxStaff}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span>
-                          {warningData.shiftType === 'morning'
+                          {warningData.shiftType === "morning"
                             ? t("schedule.warning.currentMorningStaff", locale)
-                            : t("schedule.warning.currentAfternoonStaff", locale)}:
+                            : t(
+                                "schedule.warning.currentAfternoonStaff",
+                                locale
+                              )}
+                          :
                         </span>
                         <span className="font-medium text-amber-600">
-                          {warningData.currentStaff} → {((warningData.currentStaff || 0) + 1)}
+                          {warningData.currentStaff} →{" "}
+                          {(warningData.currentStaff || 0) + 1}
                         </span>
                       </div>
                     </div>
@@ -1638,7 +1966,7 @@ export function WeekGrid({
                 )}
 
                 {/* UNAVAILABLE */}
-                {warningData.type === 'UNAVAILABLE' && (
+                {warningData.type === "UNAVAILABLE" && (
                   <div className="text-sm text-muted-foreground">
                     <p className="mb-2">
                       <strong>{warningData.userName}</strong>{" "}
@@ -1648,7 +1976,9 @@ export function WeekGrid({
                       <div className="flex justify-between">
                         <span>{t("availability.date", locale)}:</span>
                         <span className="font-medium">
-                          {warningData.date ? new Date(warningData.date).toLocaleDateString() : ""}
+                          {warningData.date
+                            ? new Date(warningData.date).toLocaleDateString()
+                            : ""}
                         </span>
                       </div>
                       {warningData.reason && (
@@ -1685,18 +2015,96 @@ export function WeekGrid({
                       try {
                         let response;
 
-                        if (pendingScheduleData.existingAssignment) {
+                        if (pendingScheduleData.requestData.multiDay) {
+                          // 복수 요일 일괄 등록
+                          const selectedDaysArray =
+                            pendingScheduleData.requestData.selectedDays || [];
+                          const promises = selectedDaysArray.map(
+                            (dateStr: string) => {
+                              const requestData = {
+                                store_id:
+                                  pendingScheduleData.requestData.store_id,
+                                user_id:
+                                  pendingScheduleData.requestData.user_id,
+                                work_item_id:
+                                  pendingScheduleData.requestData.work_item_id,
+                                date: dateStr,
+                                start_time:
+                                  pendingScheduleData.requestData.start_time,
+                                end_time:
+                                  pendingScheduleData.requestData.end_time,
+                              };
+
+                              return fetch("/api/schedule/assignments", {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify(requestData),
+                              });
+                            }
+                          );
+
+                          const results = await Promise.allSettled(promises);
+                          const failed = results.filter(
+                            (r) =>
+                              r.status === "rejected" ||
+                              (r.status === "fulfilled" && !r.value.ok)
+                          );
+
+                          if (failed.length > 0) {
+                            const errorMessages = await Promise.all(
+                              failed.map(async (r) => {
+                                if (r.status === "rejected") {
+                                  return r.reason?.message || "Unknown error";
+                                } else {
+                                  try {
+                                    const errorText = await r.value.text();
+                                    return errorText;
+                                  } catch {
+                                    return `HTTP ${r.value.status}`;
+                                  }
+                                }
+                              })
+                            );
+                            alert(
+                              `${t("schedule.scheduleAddError", locale)}: ${
+                                failed.length
+                              }개 실패\n${errorMessages.join("\n")}`
+                            );
+                            setIsModalLoading(false);
+                            setWarningData(null);
+                            setPendingScheduleData(null);
+                            return;
+                          }
+
+                          if (onScheduleChange) {
+                            onScheduleChange();
+                          }
+                          setIsMultiDayModalOpen(false);
+                          setSelectedDays(new Set());
+                          setMultiDayWarnings([]);
+                          setSelectedWorkItem("");
+                          setIsModalLoading(false);
+                          setWarningData(null);
+                          setPendingScheduleData(null);
+                          return;
+                        } else if (pendingScheduleData.existingAssignment) {
                           // 스케줄 수정 또는 이전
                           const patchData: any = {};
-                          
+
                           if (pendingScheduleData.requestData.user_id) {
                             // 스케줄 이전 (user_id 변경)
-                            patchData.user_id = pendingScheduleData.requestData.user_id;
+                            patchData.user_id =
+                              pendingScheduleData.requestData.user_id;
                           } else {
                             // 스케줄 수정 (work_item_id, start_time, end_time 변경)
-                            patchData.work_item_id = pendingScheduleData.requestData.work_item_id;
-                            patchData.start_time = pendingScheduleData.requestData.start_time;
-                            patchData.end_time = pendingScheduleData.requestData.end_time;
+                            patchData.work_item_id =
+                              pendingScheduleData.requestData.work_item_id;
+                            patchData.start_time =
+                              pendingScheduleData.requestData.start_time;
+                            patchData.end_time =
+                              pendingScheduleData.requestData.end_time;
                           }
 
                           response = await fetch(
@@ -1716,7 +2124,9 @@ export function WeekGrid({
                             headers: {
                               "Content-Type": "application/json",
                             },
-                            body: JSON.stringify(pendingScheduleData.requestData),
+                            body: JSON.stringify(
+                              pendingScheduleData.requestData
+                            ),
                           });
                         }
 
@@ -1737,7 +2147,11 @@ export function WeekGrid({
                           }
                         } else {
                           const errorText = await response.text();
-                          console.error("HTTP 오류:", response.status, errorText);
+                          console.error(
+                            "HTTP 오류:",
+                            response.status,
+                            errorText
+                          );
                           alert(
                             `${t("schedule.scheduleAddError", locale)}: ${
                               response.status
@@ -1759,6 +2173,471 @@ export function WeekGrid({
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 복수 요일 선택 모달 */}
+      <Dialog
+        open={isMultiDayModalOpen}
+        onOpenChange={(open) => {
+          setIsMultiDayModalOpen(open);
+          if (!open) {
+            setSelectedDays(new Set());
+            setMultiDayWarnings([]);
+            setSelectedWorkItem("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {multiDayModalUser && (
+                <>
+                  {multiDayModalUser.userName} -{" "}
+                  {t("schedule.multiDaySchedule", locale)}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* 근무 항목 선택 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {t("schedule.selectWorkItem", locale)}
+              </label>
+              <Select
+                value={selectedWorkItem}
+                disabled={isModalLoading}
+                onValueChange={(value) => {
+                  setSelectedWorkItem(value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={t(
+                      "schedule.selectWorkItemPlaceholder",
+                      locale
+                    )}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {workItems.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name} ({formatTimeFromMinutes(item.start_min)} -{" "}
+                      {formatTimeFromMinutes(item.end_min)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 요일 선택 */}
+            {selectedWorkItem && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  {t("schedule.selectDays", locale)}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {weekDays.map((day, index) => {
+                    const dayStr = day.toISOString().split("T")[0];
+                    const dayOfWeek = day.getDay();
+                    const dayBusinessHour = businessHours.find(
+                      (h) => h.weekday === dayOfWeek
+                    );
+                    const closeMin =
+                      dayBusinessHour?.close_min === 0
+                        ? 1440
+                        : dayBusinessHour?.close_min ?? 0;
+                    const isBusinessDay =
+                      dayBusinessHour && dayBusinessHour.open_min < closeMin;
+                    const isSelected = selectedDays.has(dayStr);
+                    const availability = getAvailabilityForUserDate(
+                      multiDayModalUser?.userId || "",
+                      dayStr
+                    );
+                    const isUnavailable = availability !== null;
+
+                    // 이미 스케줄이 등록되어 있는지 확인
+                    const hasExistingSchedule = assignments.some(
+                      (a) =>
+                        a.userId === multiDayModalUser?.userId &&
+                        a.date === dayStr &&
+                        a.status === "ASSIGNED"
+                    );
+
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center space-x-2 p-2 border rounded-md ${
+                          !isBusinessDay ? "opacity-50" : ""
+                        } ${isUnavailable ? "bg-red-50 border-red-200" : ""} ${
+                          hasExistingSchedule ? "bg-muted/30" : ""
+                        }`}
+                      >
+                        <Checkbox
+                          id={`day-${dayStr}`}
+                          checked={isSelected}
+                          disabled={
+                            !isBusinessDay ||
+                            isModalLoading ||
+                            hasExistingSchedule
+                          }
+                          onCheckedChange={(checked) => {
+                            const newSelected = new Set(selectedDays);
+                            if (checked) {
+                              newSelected.add(dayStr);
+                            } else {
+                              newSelected.delete(dayStr);
+                            }
+                            setSelectedDays(newSelected);
+                          }}
+                        />
+                        <label
+                          htmlFor={`day-${dayStr}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>
+                              {formatWeekday(day)} {formatDate(day)}
+                            </span>
+                            {isUnavailable && (
+                              <Badge variant="destructive" className="text-xs">
+                                {t("availability.unavailable", locale)}
+                              </Badge>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 버튼 */}
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsMultiDayModalOpen(false);
+                  setSelectedDays(new Set());
+                  setMultiDayWarnings([]);
+                  setSelectedWorkItem("");
+                }}
+                disabled={isModalLoading}
+              >
+                {t("common.cancel", locale)}
+              </Button>
+              <Button
+                variant="default"
+                onClick={async () => {
+                  if (
+                    !multiDayModalUser ||
+                    !selectedWorkItem ||
+                    selectedDays.size === 0
+                  ) {
+                    return;
+                  }
+
+                  setIsModalLoading(true);
+
+                  try {
+                    // 사용자 정보 조회
+                    const userResponse = await fetch(
+                      `/api/stores/${storeId}/users/${multiDayModalUser.userId}`
+                    );
+                    const userResult = await userResponse.json();
+
+                    if (!userResult.success || !userResult.data) {
+                      alert(t("schedule.scheduleAddError", locale));
+                      setIsModalLoading(false);
+                      return;
+                    }
+
+                    const userData = userResult.data;
+                    const selectedItem = workItems.find(
+                      (item) => item.id === selectedWorkItem
+                    );
+
+                    if (!selectedItem) {
+                      alert(t("schedule.scheduleAddError", locale));
+                      setIsModalLoading(false);
+                      return;
+                    }
+
+                    const startTime = selectedItem.start_min
+                      ? formatTimeFromMinutes(selectedItem.start_min)
+                      : "09:00";
+                    const endTime = selectedItem.end_min
+                      ? formatTimeFromMinutes(selectedItem.end_min)
+                      : "18:00";
+
+                    // 각 요일별 경고 수집
+                    const warnings: typeof multiDayWarnings = [];
+                    const selectedDaysArray = Array.from(selectedDays);
+
+                    for (const dateStr of selectedDaysArray) {
+                      const dayWarnings: Array<{
+                        type:
+                          | "DESIRED_HOURS"
+                          | "DIFFICULT_DAY"
+                          | "MAX_STAFF"
+                          | "UNAVAILABLE";
+                        data: any;
+                      }> = [];
+
+                      // UNAVAILABLE 체크
+                      const availability = getAvailabilityForUserDate(
+                        multiDayModalUser.userId,
+                        dateStr
+                      );
+                      if (availability) {
+                        dayWarnings.push({
+                          type: "UNAVAILABLE",
+                          data: {
+                            reason: availability.reason,
+                          },
+                        });
+                      }
+
+                      // DIFFICULT_DAY 체크
+                      const scheduleDate = new Date(dateStr);
+                      const scheduleWeekday = scheduleDate.getDay();
+                      const preferredWeekdays =
+                        userData.preferredWeekdays || [];
+                      const isDifficultDay = preferredWeekdays.some(
+                        (pw: { weekday: number; is_preferred: boolean }) =>
+                          pw.weekday === scheduleWeekday &&
+                          pw.is_preferred === true
+                      );
+
+                      if (isDifficultDay) {
+                        const weekdayNames = [
+                          t("user.weekdays.sunday", locale),
+                          t("user.weekdays.monday", locale),
+                          t("user.weekdays.tuesday", locale),
+                          t("user.weekdays.wednesday", locale),
+                          t("user.weekdays.thursday", locale),
+                          t("user.weekdays.friday", locale),
+                          t("user.weekdays.saturday", locale),
+                        ];
+                        dayWarnings.push({
+                          type: "DIFFICULT_DAY",
+                          data: {
+                            difficultDayName: weekdayNames[scheduleWeekday],
+                            weekday: scheduleWeekday,
+                          },
+                        });
+                      }
+
+                      // MAX_STAFF 체크
+                      const scheduleDay = weekDays.find(
+                        (day) => format(day, "yyyy-MM-dd") === dateStr
+                      );
+                      if (scheduleDay) {
+                        const {
+                          morning: currentMorning,
+                          afternoon: currentAfternoon,
+                        } = getShiftCounts(scheduleDay);
+
+                        const startMinForShift =
+                          parseInt(startTime.split(":")[0]) * 60 +
+                          parseInt(startTime.split(":")[1]);
+                        const isMorningShift =
+                          startMinForShift < shiftBoundaryTimeMin;
+
+                        const newMorningCount = isMorningShift
+                          ? currentMorning + 1
+                          : currentMorning;
+                        const newAfternoonCount = !isMorningShift
+                          ? currentAfternoon + 1
+                          : currentAfternoon;
+
+                        if (
+                          maxMorningStaff > 0 &&
+                          newMorningCount > maxMorningStaff
+                        ) {
+                          dayWarnings.push({
+                            type: "MAX_STAFF",
+                            data: {
+                              shiftType: "morning",
+                              currentStaff: currentMorning,
+                              maxStaff: maxMorningStaff,
+                            },
+                          });
+                        }
+
+                        if (
+                          maxAfternoonStaff > 0 &&
+                          newAfternoonCount > maxAfternoonStaff
+                        ) {
+                          dayWarnings.push({
+                            type: "MAX_STAFF",
+                            data: {
+                              shiftType: "afternoon",
+                              currentStaff: currentAfternoon,
+                              maxStaff: maxAfternoonStaff,
+                            },
+                          });
+                        }
+                      }
+
+                      if (dayWarnings.length > 0) {
+                        warnings.push({
+                          date: dateStr,
+                          warnings: dayWarnings,
+                        });
+                      }
+                    }
+
+                    // DESIRED_HOURS 체크 (모든 선택된 요일의 시간 합산)
+                    // desiredWeeklyHours가 없으면 기본값 40으로 설정
+                    const desiredHours = userData.desiredWeeklyHours || 40;
+
+                    if (selectedDaysArray.length > 0) {
+                      const startMin =
+                        parseInt(startTime.split(":")[0]) * 60 +
+                        parseInt(startTime.split(":")[1]);
+                      let endMin =
+                        parseInt(endTime.split(":")[0]) * 60 +
+                        parseInt(endTime.split(":")[1]);
+
+                      if (endMin <= startMin) {
+                        endMin += 24 * 60;
+                      }
+
+                      const workMinutes = endMin - startMin;
+                      const unpaidBreakMin =
+                        selectedItem?.unpaid_break_min || 0;
+                      const newHoursPerDay =
+                        Math.round(((workMinutes - unpaidBreakMin) / 60) * 10) /
+                        10;
+
+                      // 현재 등록되어 있는 스케줄 시간 포함
+                      const currentHours = getUserTotalHours(
+                        multiDayModalUser.userId
+                      );
+                      const totalNewHours =
+                        newHoursPerDay * selectedDaysArray.length;
+                      const totalHours = currentHours + totalNewHours;
+
+                      if (totalHours > desiredHours) {
+                        // 각 요일별로 DESIRED_HOURS 경고 추가
+                        selectedDaysArray.forEach((dateStr) => {
+                          const existingWarning = warnings.find(
+                            (w) => w.date === dateStr
+                          );
+                          if (existingWarning) {
+                            existingWarning.warnings.push({
+                              type: "DESIRED_HOURS",
+                              data: {
+                                currentHours,
+                                desiredHours,
+                                newHours: newHoursPerDay,
+                                totalHours,
+                              },
+                            });
+                          } else {
+                            warnings.push({
+                              date: dateStr,
+                              warnings: [
+                                {
+                                  type: "DESIRED_HOURS",
+                                  data: {
+                                    currentHours,
+                                    desiredHours,
+                                    newHours: newHoursPerDay,
+                                    totalHours,
+                                  },
+                                },
+                              ],
+                            });
+                          }
+                        });
+                      }
+                    }
+
+                    // 경고가 있으면 확인 모달 표시
+                    if (warnings.length > 0) {
+                      setWarningData({
+                        type: "MULTI_DAY",
+                        userName: multiDayModalUser.userName,
+                        multiDayWarnings: warnings,
+                      });
+                      setPendingScheduleData({
+                        requestData: {
+                          multiDay: true,
+                          store_id: storeId,
+                          user_id: multiDayModalUser.userId,
+                          work_item_id: selectedWorkItem,
+                          start_time: startTime,
+                          end_time: endTime,
+                          selectedDays: selectedDaysArray,
+                        },
+                        existingAssignment: undefined,
+                      });
+                      setShowWarningDialog(true);
+                      setIsModalLoading(false);
+                      return;
+                    }
+
+                    // 경고가 없으면 바로 일괄 등록
+                    const promises = selectedDaysArray.map((dateStr) => {
+                      const requestData = {
+                        store_id: storeId,
+                        user_id: multiDayModalUser.userId,
+                        work_item_id: selectedWorkItem,
+                        date: dateStr,
+                        start_time: startTime,
+                        end_time: endTime,
+                      };
+
+                      return fetch("/api/schedule/assignments", {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(requestData),
+                      });
+                    });
+
+                    const results = await Promise.allSettled(promises);
+                    const failed = results.filter(
+                      (r) => r.status === "rejected"
+                    );
+
+                    if (failed.length > 0) {
+                      alert(
+                        `${t("schedule.scheduleAddError", locale)}: ${
+                          failed.length
+                        }개 실패`
+                      );
+                    } else {
+                      if (onScheduleChange) {
+                        onScheduleChange();
+                      }
+                      setIsMultiDayModalOpen(false);
+                      setSelectedDays(new Set());
+                      setMultiDayWarnings([]);
+                      setSelectedWorkItem("");
+                    }
+                  } catch (error) {
+                    console.error("복수 요일 스케줄 등록 오류:", error);
+                    alert(t("schedule.scheduleAddError", locale));
+                  } finally {
+                    setIsModalLoading(false);
+                  }
+                }}
+                disabled={
+                  isModalLoading || !selectedWorkItem || selectedDays.size === 0
+                }
+              >
+                {isModalLoading
+                  ? t("schedule.processing", locale)
+                  : t("schedule.register", locale)}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
