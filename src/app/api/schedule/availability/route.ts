@@ -11,7 +11,21 @@ const CreateAvailabilitySchema = z.object({
   user_id: z.string(),
   date: z.string(), // ISO date
   reason: z.string().optional(),
-});
+  has_time_restriction: z.boolean().optional(),
+  start_time: z.string().optional(), // HH:mm 형식
+  end_time: z.string().optional(), // HH:mm 형식
+}).refine(
+  (data) => {
+    // has_time_restriction이 true인 경우 start_time과 end_time이 필수
+    if (data.has_time_restriction === true) {
+      return data.start_time !== undefined && data.end_time !== undefined;
+    }
+    return true;
+  },
+  {
+    message: "시간 제한이 활성화된 경우 시작 시간과 종료 시간이 필요합니다",
+  }
+);
 
 /**
  * 출근 불가 조회
@@ -143,6 +157,9 @@ export async function GET(request: NextRequest) {
           userName: userName,
           date: availability.date,
           reason: availability.reason,
+          hasTimeRestriction: availability.has_time_restriction || false,
+          startTime: availability.start_time || null,
+          endTime: availability.end_time || null,
           createdAt: availability.created_at,
           updatedAt: availability.updated_at,
         };
@@ -188,7 +205,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { store_id, user_id, date, reason } = parsed.data;
+  const { store_id, user_id, date, reason, has_time_restriction, start_time, end_time } = parsed.data;
 
   try {
     // user_id가 "current"인 경우 현재 사용자 ID로 대체
@@ -299,15 +316,27 @@ export async function POST(request: NextRequest) {
     }
 
     // 출근 불가 등록 (upsert 사용)
+    const upsertData: any = {
+      store_id,
+      user_id: finalUserId,
+      date,
+      reason,
+      created_by: user.user.id,
+    };
+
+    if (has_time_restriction === true) {
+      upsertData.has_time_restriction = true;
+      upsertData.start_time = start_time;
+      upsertData.end_time = end_time;
+    } else {
+      upsertData.has_time_restriction = false;
+      upsertData.start_time = null;
+      upsertData.end_time = null;
+    }
+
     const { data: newAvailability, error: insertError } = await supabase
       .from("user_availability")
-      .upsert({
-        store_id,
-        user_id: finalUserId,
-        date,
-        reason,
-        created_by: user.user.id,
-      })
+      .upsert(upsertData)
       .select()
       .single();
 
