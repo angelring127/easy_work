@@ -52,6 +52,14 @@ interface UserAvailability {
   reason?: string;
 }
 
+interface BusinessHour {
+  id: string;
+  store_id: string;
+  weekday: number;
+  open_min: number;
+  close_min: number;
+}
+
 export default function SchedulePage() {
   const { locale } = useParams();
   const router = useRouter();
@@ -73,6 +81,7 @@ export default function SchedulePage() {
       roles: string[];
     }>
   >([]);
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -101,30 +110,59 @@ export default function SchedulePage() {
 
     setLoading(true);
     try {
+      // 현재 주의 시작일과 종료일 계산 (매번 새로 계산, 로컬 시간대 기준)
+      const currentWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+      const currentWeekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
+      const fromDate = format(currentWeekStart, "yyyy-MM-dd");
+      const toDate = format(currentWeekEnd, "yyyy-MM-dd");
+
+      console.log("스케줄 데이터 로드:", {
+        currentWeek: format(currentWeek, "yyyy-MM-dd"),
+        fromDate,
+        toDate,
+      });
+
       // API 호출 구현
-      const [assignmentsRes, availabilitiesRes, storeUsersRes] =
+      const [assignmentsRes, availabilitiesRes, storeUsersRes, businessHoursRes] =
         await Promise.all([
           fetch(
-            `/api/schedule/assignments?store_id=${currentStore.id}&from=${
-              weekStart.toISOString().split("T")[0]
-            }&to=${weekEnd.toISOString().split("T")[0]}`
+            `/api/schedule/assignments?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
           ),
           fetch(
-            `/api/schedule/availability?store_id=${currentStore.id}&from=${
-              weekStart.toISOString().split("T")[0]
-            }&to=${weekEnd.toISOString().split("T")[0]}`
+            `/api/schedule/availability?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
           ),
           fetch(`/api/stores/${currentStore.id}/users`),
+          fetch(`/api/store-business-hours?store_id=${currentStore.id}`),
         ]);
 
       if (assignmentsRes.ok) {
         const assignmentsData = await assignmentsRes.json();
-        setAssignments(assignmentsData.data || []);
+        const loadedAssignments = assignmentsData.data || [];
+        
+        // 현재 주 범위 내의 스케줄만 필터링 (안전장치)
+        const filteredAssignments = loadedAssignments.filter((a: ScheduleAssignment) => {
+          return a.date >= fromDate && a.date <= toDate;
+        });
+        
+        console.log("로드된 스케줄:", {
+          total: loadedAssignments.length,
+          filtered: filteredAssignments.length,
+          dates: filteredAssignments.map((a: ScheduleAssignment) => a.date),
+        });
+        
+        setAssignments(filteredAssignments);
       }
 
       if (availabilitiesRes.ok) {
         const availabilitiesData = await availabilitiesRes.json();
         setUserAvailabilities(availabilitiesData.data || []);
+      }
+
+      if (businessHoursRes.ok) {
+        const businessHoursData = await businessHoursRes.json();
+        if (businessHoursData.success) {
+          setBusinessHours(businessHoursData.data || []);
+        }
       }
 
       // 매장 사용자 목록도 로드 (사용자 표시를 위해)
@@ -222,8 +260,8 @@ export default function SchedulePage() {
 
   const handleAutoAssign = async () => {
     if (!currentStore?.id) return;
-    const from = weekStart.toISOString().split("T")[0];
-    const to = weekEnd.toISOString().split("T")[0];
+    const from = format(weekStart, "yyyy-MM-dd");
+    const to = format(weekEnd, "yyyy-MM-dd");
     try {
       const res = await fetch(
         `/api/schedule/auto-assign?store_id=${currentStore.id}&from=${from}&to=${to}`,
@@ -284,10 +322,16 @@ export default function SchedulePage() {
           )}
           <ScheduleExporter
             storeId={currentStore.id}
-            from={weekStart.toISOString().split("T")[0]}
-            to={weekEnd.toISOString().split("T")[0]}
+            from={format(weekStart, "yyyy-MM-dd")}
+            to={format(weekEnd, "yyyy-MM-dd")}
             locale={currentLocale}
             canExportAll={canManage}
+            assignments={assignments}
+            userAvailabilities={userAvailabilities}
+            currentWeek={currentWeek}
+            storeUsers={storeUsers}
+            storeName={currentStore.name}
+            businessHours={businessHours}
           />
         </div>
       </div>

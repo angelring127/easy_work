@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Calendar,
   Clock,
@@ -8,6 +8,7 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
+  Copy,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { t, type Locale } from "@/lib/i18n";
 import {
   format,
@@ -46,6 +49,9 @@ import {
   addMinutes,
   setHours,
   setMinutes,
+  addWeeks,
+  subWeeks,
+  differenceInDays,
 } from "date-fns";
 import { ko, enUS, ja } from "date-fns/locale";
 
@@ -210,11 +216,61 @@ export function WeekGrid({
   const [userDifficultDays, setUserDifficultDays] = useState<
     Map<string, Set<number>>
   >(new Map());
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [copyWarningDialogOpen, setCopyWarningDialogOpen] = useState(false);
+  const [selectedSourceWeek, setSelectedSourceWeek] = useState<Date | null>(
+    null
+  );
+  const [isCopying, setIsCopying] = useState(false);
+  const { toast } = useToast();
+  const toMessage = (v: unknown) =>
+    typeof v === "string"
+      ? v
+      : (() => {
+          try {
+            return JSON.stringify(v);
+          } catch {
+            return String(v);
+          }
+        })();
 
   // 週の日付 범위 계산
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // 월요일 시작
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+  // 현재 주 범위의 날짜 문자열 (로컬 시간대 기준으로 계산)
+  const weekStartStr = useMemo(
+    () => format(weekStart, "yyyy-MM-dd"),
+    [weekStart]
+  );
+  const weekEndStr = useMemo(() => format(weekEnd, "yyyy-MM-dd"), [weekEnd]);
+
+  // 현재 주 범위 내의 스케줄만 필터링 (핵심 수정)
+  const filteredAssignments = useMemo(() => {
+    const filtered = assignments.filter((a) => {
+      const isInCurrentWeek = a.date >= weekStartStr && a.date <= weekEndStr;
+      return isInCurrentWeek;
+    });
+
+    // 디버깅 로그 (개발 모드에서만)
+    if (
+      process.env.NODE_ENV === "development" &&
+      filtered.length !== assignments.length
+    ) {
+      console.log("스케줄 필터링:", {
+        원본개수: assignments.length,
+        필터링개수: filtered.length,
+        weekStartStr,
+        weekEndStr,
+        제외된날짜들: assignments
+          .filter((a) => a.date < weekStartStr || a.date > weekEndStr)
+          .map((a) => a.date),
+      });
+    }
+
+    return filtered;
+  }, [assignments, weekStartStr, weekEndStr]);
 
   // 매장 정보 및 영업 시간 조회
   useEffect(() => {
@@ -328,7 +384,7 @@ export function WeekGrid({
   // 사용자 목록 추출 (매장 사용자 우선, 배정/출근불가 사용자 추가)
   const allUserIds = new Set([
     ...storeUsers.map((u) => u.id),
-    ...assignments.map((a) => a.userId),
+    ...filteredAssignments.map((a) => a.userId),
     ...userAvailabilities.map((a) => a.userId),
   ]);
 
@@ -350,7 +406,7 @@ export function WeekGrid({
       }
 
       // 배정/출근불가에서 사용자 정보 추출
-      const assignment = assignments.find((a) => a.userId === userId);
+      const assignment = filteredAssignments.find((a) => a.userId === userId);
       const availability = userAvailabilities.find((a) => a.userId === userId);
       const userName = assignment?.userName || availability?.userName || "";
 
@@ -455,7 +511,7 @@ export function WeekGrid({
     date: Date
   ): { morning: number; afternoon: number } => {
     const dayStr = date.toISOString().split("T")[0];
-    const dayAssignments = assignments.filter(
+    const dayAssignments = filteredAssignments.filter(
       (a) => a.date === dayStr && a.status === "ASSIGNED"
     );
 
@@ -486,6 +542,7 @@ export function WeekGrid({
   };
 
   // 사용자의 총 스케줄 시간 계산 (Unpaid Break 제외)
+  // 현재 주의 스케줄만 계산 (filteredAssignments 사용)
   const getUserTotalHours = (
     userId: string,
     includeNewAssignment?: {
@@ -494,7 +551,8 @@ export function WeekGrid({
       unpaidBreakMin?: number;
     }
   ): number => {
-    const userAssignments = assignments.filter(
+    // filteredAssignments는 이미 현재 주 범위로 필터링됨
+    const userAssignments = filteredAssignments.filter(
       (a) => a.userId === userId && a.status === "ASSIGNED"
     );
 
@@ -610,10 +668,23 @@ export function WeekGrid({
     <TooltipProvider>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            {t("schedule.weekGrid", locale)}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              {t("schedule.weekGrid", locale)}
+            </CardTitle>
+            {canManage && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCopyDialogOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Copy className="h-4 w-4" />
+                {t("schedule.copyWeek", locale)}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -720,7 +791,7 @@ export function WeekGrid({
                     const dayOfWeek = day.getDay();
 
                     // 해당 사용자의 해당 날짜 모든 배정 조회
-                    const dayAssignments = assignments.filter(
+                    const dayAssignments = filteredAssignments.filter(
                       (a) =>
                         a.userId === user.id &&
                         isSameDay(new Date(a.date), new Date(dayStr))
@@ -950,7 +1021,7 @@ export function WeekGrid({
             {/* 기존 스케줄 정보 표시 */}
             {modalCell &&
               (() => {
-                const existingAssignment = assignments.find(
+                const existingAssignment = filteredAssignments.find(
                   (a) =>
                     a.userId === modalCell.userId &&
                     a.date === modalCell.date &&
@@ -999,7 +1070,7 @@ export function WeekGrid({
 
                       setIsModalLoading(true);
                       try {
-                        const existingAssignment = assignments.find(
+                        const existingAssignment = filteredAssignments.find(
                           (a) =>
                             a.userId === modalCell.userId &&
                             a.date === modalCell.date
@@ -1050,7 +1121,7 @@ export function WeekGrid({
                       setIsModalLoading(true);
 
                       // 기존 스케줄이 있는지 확인
-                      const existingAssignment = assignments.find(
+                      const existingAssignment = filteredAssignments.find(
                         (a) =>
                           a.userId === modalCell.userId &&
                           a.date === modalCell.date &&
@@ -1459,7 +1530,7 @@ export function WeekGrid({
                     ))}
                     {/* 기존 스케줄이 있는 경우에만 삭제 및 이전 옵션 표시 */}
                     {modalCell &&
-                      assignments.some(
+                      filteredAssignments.some(
                         (a) =>
                           a.userId === modalCell.userId &&
                           a.date === modalCell.date &&
@@ -1495,7 +1566,7 @@ export function WeekGrid({
 
                       try {
                         // 기존 스케줄 찾기
-                        const existingAssignment = assignments.find(
+                        const existingAssignment = filteredAssignments.find(
                           (a) =>
                             a.userId === modalCell.userId &&
                             a.date === modalCell.date &&
@@ -2259,7 +2330,7 @@ export function WeekGrid({
                     const isUnavailable = availability !== null;
 
                     // 이미 스케줄이 등록되어 있는지 확인
-                    const hasExistingSchedule = assignments.some(
+                    const hasExistingSchedule = filteredAssignments.some(
                       (a) =>
                         a.userId === multiDayModalUser?.userId &&
                         a.date === dayStr &&
@@ -2636,6 +2707,225 @@ export function WeekGrid({
                 {isModalLoading
                   ? t("schedule.processing", locale)
                   : t("schedule.register", locale)}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Copy Week Dialog */}
+      <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("schedule.copyWeek", locale)}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>{t("schedule.selectWeekToCopy", locale)}</Label>
+              <div className="flex items-center gap-2 mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const prevWeek = subWeeks(currentWeek, 1);
+                    setSelectedSourceWeek(prevWeek);
+                  }}
+                >
+                  ←
+                </Button>
+                <Select
+                  value={
+                    selectedSourceWeek
+                      ? startOfWeek(selectedSourceWeek, { weekStartsOn: 1 })
+                          .toISOString()
+                          .split("T")[0]
+                      : ""
+                  }
+                  onValueChange={(value) => {
+                    setSelectedSourceWeek(new Date(value));
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue
+                      placeholder={t("schedule.selectWeekToCopy", locale)}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* 최근 8주 표시 */}
+                    {Array.from({ length: 8 }, (_, i) => {
+                      const weekDate = subWeeks(currentWeek, i);
+                      const weekStart = startOfWeek(weekDate, {
+                        weekStartsOn: 1,
+                      });
+                      const weekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
+                      const dateLocale = dateLocales[locale];
+                      return (
+                        <SelectItem
+                          key={weekStart.toISOString()}
+                          value={weekStart.toISOString().split("T")[0]}
+                        >
+                          {format(weekStart, "MM/dd", { locale: dateLocale })} -{" "}
+                          {format(weekEnd, "MM/dd", { locale: dateLocale })}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const nextWeek = addWeeks(currentWeek, 1);
+                    setSelectedSourceWeek(nextWeek);
+                  }}
+                >
+                  →
+                </Button>
+              </div>
+            </div>
+
+            {/* 전주 스케줄 복사 버튼 */}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                const prevWeek = subWeeks(currentWeek, 1);
+                setSelectedSourceWeek(prevWeek);
+              }}
+            >
+              {t("schedule.copyPreviousWeek", locale)}
+            </Button>
+
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{t("schedule.copyWarning", locale)}</AlertTitle>
+              <AlertDescription>
+                {t("schedule.copyConfirmDescription", locale)}
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCopyDialogOpen(false);
+                  setSelectedSourceWeek(null);
+                }}
+              >
+                {t("common.cancel", locale)}
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!selectedSourceWeek) {
+                    toast({
+                      title: t("common.error", locale),
+                      description: t("schedule.selectWeekToCopy", locale),
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  setCopyWarningDialogOpen(true);
+                }}
+                disabled={!selectedSourceWeek || isCopying}
+              >
+                {t("schedule.copyWeek", locale)}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Copy Warning Dialog */}
+      <Dialog
+        open={copyWarningDialogOpen}
+        onOpenChange={setCopyWarningDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("schedule.copyConfirm", locale)}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{t("schedule.copyWarning", locale)}</AlertTitle>
+              <AlertDescription>
+                {t("schedule.copyConfirmDescription", locale)}
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCopyWarningDialogOpen(false);
+                }}
+              >
+                {t("common.cancel", locale)}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!selectedSourceWeek) return;
+
+                  setIsCopying(true);
+                  try {
+                    const sourceWeekStart = startOfWeek(selectedSourceWeek, {
+                      weekStartsOn: 1,
+                    });
+                    const targetWeekStart = startOfWeek(currentWeek, {
+                      weekStartsOn: 1,
+                    });
+
+                    const response = await fetch("/api/schedule/copy-week", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        store_id: storeId,
+                        source_week_start: sourceWeekStart
+                          .toISOString()
+                          .split("T")[0],
+                        target_week_start: targetWeekStart
+                          .toISOString()
+                          .split("T")[0],
+                      }),
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                      toast({
+                        title: t("schedule.copySuccess", locale),
+                        description: t("availability.success", locale),
+                      });
+                      if (onScheduleChange) {
+                        onScheduleChange();
+                      }
+                      setCopyDialogOpen(false);
+                      setCopyWarningDialogOpen(false);
+                      setSelectedSourceWeek(null);
+                    } else {
+                      toast({
+                        title: t("common.error", locale),
+                        description:
+                          result.error || t("schedule.copyError", locale),
+                        variant: "destructive",
+                      });
+                    }
+                  } catch (error) {
+                    console.error("스케줄 복사 오류:", error);
+                    toast({
+                      title: t("common.error", locale),
+                      description: t("schedule.copyError", locale),
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setIsCopying(false);
+                  }
+                }}
+                disabled={isCopying}
+              >
+                {isCopying
+                  ? t("schedule.processing", locale)
+                  : t("schedule.copyWeek", locale)}
               </Button>
             </div>
           </div>
