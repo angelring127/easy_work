@@ -171,34 +171,41 @@ export default function SchedulePage() {
       });
 
       // API 호출 구현
-      const [assignmentsRes, availabilitiesRes, storeUsersRes, businessHoursRes, workItemsRes] =
-        await Promise.all([
-          fetch(
-            `/api/schedule/assignments?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
-          ),
-          fetch(
-            `/api/schedule/availability?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
-          ),
-          fetch(`/api/stores/${currentStore.id}/users`),
-          fetch(`/api/store-business-hours?store_id=${currentStore.id}`),
-          fetch(`/api/work-items?store_id=${currentStore.id}`),
-        ]);
+      const [
+        assignmentsRes,
+        availabilitiesRes,
+        storeUsersRes,
+        businessHoursRes,
+        workItemsRes,
+      ] = await Promise.all([
+        fetch(
+          `/api/schedule/assignments?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
+        ),
+        fetch(
+          `/api/schedule/availability?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
+        ),
+        fetch(`/api/stores/${currentStore.id}/users`),
+        fetch(`/api/store-business-hours?store_id=${currentStore.id}`),
+        fetch(`/api/work-items?store_id=${currentStore.id}`),
+      ]);
 
       if (assignmentsRes.ok) {
         const assignmentsData = await assignmentsRes.json();
         const loadedAssignments = assignmentsData.data || [];
-        
+
         // 현재 주 범위 내의 스케줄만 필터링 (안전장치)
-        const filteredAssignments = loadedAssignments.filter((a: ScheduleAssignment) => {
-          return a.date >= fromDate && a.date <= toDate;
-        });
-        
+        const filteredAssignments = loadedAssignments.filter(
+          (a: ScheduleAssignment) => {
+            return a.date >= fromDate && a.date <= toDate;
+          }
+        );
+
         console.log("로드된 스케줄:", {
           total: loadedAssignments.length,
           filtered: filteredAssignments.length,
           dates: filteredAssignments.map((a: ScheduleAssignment) => a.date),
         });
-        
+
         setAssignments(filteredAssignments);
       }
 

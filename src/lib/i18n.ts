@@ -67,19 +67,22 @@ const translations = {
     "auth.signup.errorDescription": "회원가입에 실패했습니다",
     "auth.signup.validation.invalidData": "입력 데이터가 유효하지 않습니다",
     "auth.signup.validation.invalidEmail": "유효한 이메일 주소를 입력하세요",
-    "auth.signup.validation.passwordMinLength": "비밀번호는 최소 8자 이상이어야 합니다",
+    "auth.signup.validation.passwordMinLength":
+      "비밀번호는 최소 8자 이상이어야 합니다",
     "auth.signup.validation.passwordMismatch": "비밀번호가 일치하지 않습니다",
     "auth.signup.error.general": "회원가입 중 오류가 발생했습니다",
     "auth.signup.error.alreadyRegistered": "이미 등록된 이메일 주소입니다",
     "auth.signup.error.passwordInvalid": "비밀번호 조건을 확인해주세요",
-    "auth.signup.error.invalidEmail": "유효하지 않은 이메일 주소입니다. 실제 이메일 주소를 사용해주세요",
+    "auth.signup.error.invalidEmail":
+      "유효하지 않은 이메일 주소입니다. 실제 이메일 주소를 사용해주세요",
     "auth.signup.error.emailCheck": "이메일 주소를 확인해주세요",
     "auth.signup.error.signupDisabled": "현재 회원가입이 비활성화되어 있습니다",
     "auth.signup.success.message": "회원가입이 완료되었습니다",
     "auth.signup.error.serverError": "서버 오류가 발생했습니다",
     "auth.signupComplete.title": "회원가입 완료",
     "auth.signupComplete.message": "회원가입이 완료되었습니다",
-    "auth.signupComplete.description": "이메일 확인이 완료되었습니다. 로그인하여 서비스를 이용해주세요",
+    "auth.signupComplete.description":
+      "이메일 확인이 완료되었습니다. 로그인하여 서비스를 이용해주세요",
     "auth.signupComplete.goToLogin": "로그인 페이지로 이동",
     "auth.verify.title": "이메일 확인",
     "auth.verify.description":
@@ -98,8 +101,10 @@ const translations = {
     "dashboard.noStoresDescription":
       "매장에 초대받거나 매장을 생성해야 합니다.",
     "dashboard.noStoresModal.title": "매장 등록 필요",
-    "dashboard.noStoresModal.message": "등록된 매장이 없습니다. 매장을 등록하시겠습니까?",
-    "dashboard.noStoresModal.description": "매장을 등록하면 스케줄 관리 및 팀원 초대 등의 기능을 사용할 수 있습니다.",
+    "dashboard.noStoresModal.message":
+      "등록된 매장이 없습니다. 매장을 등록하시겠습니까?",
+    "dashboard.noStoresModal.description":
+      "매장을 등록하면 스케줄 관리 및 팀원 초대 등의 기능을 사용할 수 있습니다.",
     "dashboard.noStoresModal.goToCreate": "매장 등록 페이지로 이동",
     "dashboard.schedule": "스케줄 관리",
     "dashboard.scheduleDescription": "근무표 생성 및 관리",
@@ -522,16 +527,21 @@ const translations = {
     "settings.store.close": "종료 시간",
     "settings.store.holidays": "휴무일",
     "settings.store.date": "날짜",
-    "settings.store.policiesDescription": "운영에 필요한 핵심 규정만 설정합니다. 복잡한 규칙은 제거하여 사용하기 쉽게 만들었습니다.",
-    "settings.store.currencyUnitDesc": "인건비 예산 및 급여 계산에 사용되는 통화 단위",
+    "settings.store.policiesDescription":
+      "운영에 필요한 핵심 규정만 설정합니다. 복잡한 규칙은 제거하여 사용하기 쉽게 만들었습니다.",
+    "settings.store.currencyUnitDesc":
+      "인건비 예산 및 급여 계산에 사용되는 통화 단위",
     "settings.store.publishCutoffDesc": "스케줄 게시 전 최소 시간 (시간 단위)",
     "settings.store.swapLeadTimeDesc": "교대 요청 최소 리드타임 (시간 단위)",
     "settings.store.minRestDesc": "연속 근무 간 최소 휴식 시간",
     "settings.store.maxHoursPerDayDesc": "하루 최대 근무 시간 (0 = 제한 없음)",
     "settings.store.maxHoursPerWeekDesc": "주 최대 근무 시간 (0 = 제한 없음)",
-    "settings.store.maxHoursPerMonthDesc": "월 최대 근무 시간 (기본값: 160시간)",
-    "settings.store.maxConsecutiveDaysDesc": "연속 근무 최대 일수 (0 = 제한 없음)",
-    "settings.store.weeklyBudgetDesc": "주간 인건비 예산 ({currency} 단위, 0 = 제한 없음)",
+    "settings.store.maxHoursPerMonthDesc":
+      "월 최대 근무 시간 (기본값: 160시간)",
+    "settings.store.maxConsecutiveDaysDesc":
+      "연속 근무 최대 일수 (0 = 제한 없음)",
+    "settings.store.weeklyBudgetDesc":
+      "주간 인건비 예산 ({currency} 단위, 0 = 제한 없음)",
     // workItems 탭
     "workItems.title": "근무 항목",
     "workItems.name": "이름",
@@ -747,7 +757,8 @@ const translations = {
     "schedule.selectDays": "요일 선택",
     "schedule.warnings": "경고",
     "schedule.register": "등록",
-    "schedule.warning.multiDayMessage": "님의 복수 요일 스케줄 등록 시 다음 경고가 있습니다.",
+    "schedule.warning.multiDayMessage":
+      "님의 복수 요일 스케줄 등록 시 다음 경고가 있습니다.",
     "availability.unavailable": "출근 불가",
     "availability.currentMonth": "이번 달",
     "availability.date": "날짜",
@@ -755,26 +766,6 @@ const translations = {
     "availability.pastDate": "과거 날짜",
     "availability.pastDateDescription": "과거 날짜는 수정할 수 없습니다",
     "availability.success": "상태가 성공적으로 변경되었습니다",
-    "availability.multiDateMode": "다른 날짜도 같이 등록",
-    "availability.selectAdditionalDates": "추가 날짜 선택",
-    "availability.selectedDates": "선택된 날짜",
-    "availability.dateAlreadyUnavailable": "이미 출근 불가로 등록된 날짜입니다",
-    "availability.hasTimeRestriction": "시간 제한",
-    "availability.timePeriod": "시간대",
-    "availability.startTime": "시작 시간",
-    "availability.endTime": "종료 시간",
-    "schedule.copyWeek": "주 복사",
-    "schedule.selectWeekToCopy": "복사할 주 선택",
-    "schedule.copyPreviousWeek": "전주 스케줄 복사",
-    "schedule.copyWarning": "현재 주의 모든 스케줄이 삭제됩니다",
-    "schedule.copySuccess": "스케줄이 복사되었습니다",
-    "schedule.copyError": "스케줄 복사 중 오류가 발생했습니다",
-    "schedule.copyConfirm": "스케줄을 복사하시겠습니까?",
-    "schedule.copyConfirmDescription": "현재 주의 모든 스케줄이 삭제되고 선택한 주의 스케줄이 복사됩니다.",
-    "schedule.noWorkItemsTitle": "근무 항목이 필요합니다",
-    "schedule.noWorkItemsDescription": "스케줄을 등록하려면 먼저 근무 항목을 설정해야 합니다",
-    "schedule.noWorkItemsMessage": "매장 설정에서 근무 항목을 등록한 후 스케줄을 등록할 수 있습니다.",
-    "schedule.goToWorkItems": "근무 항목 설정으로 이동",
   },
   en: {
     "schedule.autoAssign": "Auto Assign",
@@ -828,19 +819,23 @@ const translations = {
     "auth.signup.errorDescription": "Failed to create account",
     "auth.signup.validation.invalidData": "Invalid input data",
     "auth.signup.validation.invalidEmail": "Please enter a valid email address",
-    "auth.signup.validation.passwordMinLength": "Password must be at least 8 characters",
+    "auth.signup.validation.passwordMinLength":
+      "Password must be at least 8 characters",
     "auth.signup.validation.passwordMismatch": "Passwords do not match",
     "auth.signup.error.general": "An error occurred during sign up",
-    "auth.signup.error.alreadyRegistered": "This email address is already registered",
+    "auth.signup.error.alreadyRegistered":
+      "This email address is already registered",
     "auth.signup.error.passwordInvalid": "Please check password requirements",
-    "auth.signup.error.invalidEmail": "Invalid email address. Please use a real email address",
+    "auth.signup.error.invalidEmail":
+      "Invalid email address. Please use a real email address",
     "auth.signup.error.emailCheck": "Please check your email address",
     "auth.signup.error.signupDisabled": "Sign up is currently disabled",
     "auth.signup.success.message": "Sign up completed successfully",
     "auth.signup.error.serverError": "A server error occurred",
     "auth.signupComplete.title": "Sign Up Complete",
     "auth.signupComplete.message": "Your account has been created successfully",
-    "auth.signupComplete.description": "Email verification is complete. Please sign in to use the service",
+    "auth.signupComplete.description":
+      "Email verification is complete. Please sign in to use the service",
     "auth.signupComplete.goToLogin": "Go to Sign In Page",
     "auth.verify.title": "Verify Email",
     "auth.verify.description":
@@ -859,8 +854,10 @@ const translations = {
     "dashboard.noStoresDescription":
       "You need to be invited to a store or create one.",
     "dashboard.noStoresModal.title": "Store Registration Required",
-    "dashboard.noStoresModal.message": "You don't have any registered stores. Would you like to register a store?",
-    "dashboard.noStoresModal.description": "By registering a store, you can use features such as schedule management and team member invitations.",
+    "dashboard.noStoresModal.message":
+      "You don't have any registered stores. Would you like to register a store?",
+    "dashboard.noStoresModal.description":
+      "By registering a store, you can use features such as schedule management and team member invitations.",
     "dashboard.noStoresModal.goToCreate": "Go to Store Registration Page",
     "dashboard.schedule": "Schedule Management",
     "dashboard.scheduleDescription": "Create and manage work schedules",
@@ -1099,7 +1096,8 @@ const translations = {
     "user.alreadyDeleted": "Already Deleted User",
     "user.alreadyDeletedDescription": "This user has already been deleted.",
     "user.promoteToSubManager": "Promote",
-    "user.confirmPromoteMessage": "Are you sure you want to promote this user to sub manager?",
+    "user.confirmPromoteMessage":
+      "Are you sure you want to promote this user to sub manager?",
     "user.adminActions": "Admin Actions",
     "user.guestUser": "Guest User",
     // 초대 수락 페이지
@@ -1196,16 +1194,26 @@ const translations = {
     "settings.store.close": "Close",
     "settings.store.holidays": "Holidays",
     "settings.store.date": "Date",
-    "settings.store.policiesDescription": "Set only essential operational rules. Complex rules have been removed for ease of use.",
-    "settings.store.currencyUnitDesc": "Currency unit used for labor budget and salary calculations",
-    "settings.store.publishCutoffDesc": "Minimum time before schedule publication (in hours)",
-    "settings.store.swapLeadTimeDesc": "Minimum lead time for shift swap requests (in hours)",
-    "settings.store.minRestDesc": "Minimum rest time between consecutive shifts",
-    "settings.store.maxHoursPerDayDesc": "Maximum work hours per day (0 = no limit)",
-    "settings.store.maxHoursPerWeekDesc": "Maximum work hours per week (0 = no limit)",
-    "settings.store.maxHoursPerMonthDesc": "Maximum work hours per month (default: 160 hours)",
-    "settings.store.maxConsecutiveDaysDesc": "Maximum consecutive work days (0 = no limit)",
-    "settings.store.weeklyBudgetDesc": "Weekly labor budget ({currency} unit, 0 = no limit)",
+    "settings.store.policiesDescription":
+      "Set only essential operational rules. Complex rules have been removed for ease of use.",
+    "settings.store.currencyUnitDesc":
+      "Currency unit used for labor budget and salary calculations",
+    "settings.store.publishCutoffDesc":
+      "Minimum time before schedule publication (in hours)",
+    "settings.store.swapLeadTimeDesc":
+      "Minimum lead time for shift swap requests (in hours)",
+    "settings.store.minRestDesc":
+      "Minimum rest time between consecutive shifts",
+    "settings.store.maxHoursPerDayDesc":
+      "Maximum work hours per day (0 = no limit)",
+    "settings.store.maxHoursPerWeekDesc":
+      "Maximum work hours per week (0 = no limit)",
+    "settings.store.maxHoursPerMonthDesc":
+      "Maximum work hours per month (default: 160 hours)",
+    "settings.store.maxConsecutiveDaysDesc":
+      "Maximum consecutive work days (0 = no limit)",
+    "settings.store.weeklyBudgetDesc":
+      "Weekly labor budget ({currency} unit, 0 = no limit)",
     // workItems tab
     "workItems.title": "Work Items",
     "workItems.name": "Name",
@@ -1424,7 +1432,8 @@ const translations = {
     "schedule.selectDays": "Select Days",
     "schedule.warnings": "Warnings",
     "schedule.register": "Register",
-    "schedule.warning.multiDayMessage": " has the following warnings for multi-day schedule registration:",
+    "schedule.warning.multiDayMessage":
+      " has the following warnings for multi-day schedule registration:",
     "availability.unavailable": "Unavailable",
     "availability.currentMonth": "Current Month",
     "availability.date": "Date",
@@ -1432,26 +1441,6 @@ const translations = {
     "availability.pastDate": "Past Date",
     "availability.pastDateDescription": "Cannot modify past dates",
     "availability.success": "Status updated successfully",
-    "availability.multiDateMode": "Register other dates as well",
-    "availability.selectAdditionalDates": "Select Additional Dates",
-    "availability.selectedDates": "Selected Dates",
-    "availability.dateAlreadyUnavailable": "This date is already marked as unavailable",
-    "availability.hasTimeRestriction": "Time Restriction",
-    "availability.timePeriod": "Time Period",
-    "availability.startTime": "Start Time",
-    "availability.endTime": "End Time",
-    "schedule.copyWeek": "Copy Week",
-    "schedule.selectWeekToCopy": "Select Week to Copy",
-    "schedule.copyPreviousWeek": "Copy Previous Week Schedule",
-    "schedule.copyWarning": "All schedules in the current week will be deleted",
-    "schedule.copySuccess": "Schedule copied successfully",
-    "schedule.copyError": "Error occurred while copying schedule",
-    "schedule.copyConfirm": "Copy schedule?",
-    "schedule.copyConfirmDescription": "All schedules in the current week will be deleted and schedules from the selected week will be copied.",
-    "schedule.noWorkItemsTitle": "Work Items Required",
-    "schedule.noWorkItemsDescription": "You need to set up work items before registering schedules",
-    "schedule.noWorkItemsMessage": "You can register schedules after adding work items in Store Settings.",
-    "schedule.goToWorkItems": "Go to Work Items Settings",
     // work item roles
     "workItemRoles.title": "Work Item Role Requirements",
     "workItemRoles.description": "Set required roles for this work item",
@@ -1596,20 +1585,25 @@ const translations = {
     "auth.signup.error": "サインアップ失敗",
     "auth.signup.errorDescription": "アカウントの作成に失敗しました",
     "auth.signup.validation.invalidData": "入力データが無効です",
-    "auth.signup.validation.invalidEmail": "有効なメールアドレスを入力してください",
-    "auth.signup.validation.passwordMinLength": "パスワードは最低8文字以上である必要があります",
+    "auth.signup.validation.invalidEmail":
+      "有効なメールアドレスを入力してください",
+    "auth.signup.validation.passwordMinLength":
+      "パスワードは最低8文字以上である必要があります",
     "auth.signup.validation.passwordMismatch": "パスワードが一致しません",
     "auth.signup.error.general": "サインアップ中にエラーが発生しました",
-    "auth.signup.error.alreadyRegistered": "このメールアドレスは既に登録されています",
+    "auth.signup.error.alreadyRegistered":
+      "このメールアドレスは既に登録されています",
     "auth.signup.error.passwordInvalid": "パスワードの要件を確認してください",
-    "auth.signup.error.invalidEmail": "無効なメールアドレスです。実際のメールアドレスを使用してください",
+    "auth.signup.error.invalidEmail":
+      "無効なメールアドレスです。実際のメールアドレスを使用してください",
     "auth.signup.error.emailCheck": "メールアドレスを確認してください",
     "auth.signup.error.signupDisabled": "現在サインアップが無効になっています",
     "auth.signup.success.message": "サインアップが正常に完了しました",
     "auth.signup.error.serverError": "サーバーエラーが発生しました",
     "auth.signupComplete.title": "サインアップ完了",
     "auth.signupComplete.message": "アカウントが正常に作成されました",
-    "auth.signupComplete.description": "メール確認が完了しました。ログインしてサービスをご利用ください",
+    "auth.signupComplete.description":
+      "メール確認が完了しました。ログインしてサービスをご利用ください",
     "auth.signupComplete.goToLogin": "ログインページへ移動",
     "auth.verify.title": "メール確認",
     "auth.verify.description":
@@ -1629,8 +1623,10 @@ const translations = {
     "dashboard.noStoresDescription":
       "店舗に招待されるか、店舗を作成する必要があります。",
     "dashboard.noStoresModal.title": "店舗登録が必要です",
-    "dashboard.noStoresModal.message": "登録された店舗がありません。店舗を登録しますか？",
-    "dashboard.noStoresModal.description": "店舗を登録すると、スケジュール管理やチームメンバー招待などの機能を使用できます。",
+    "dashboard.noStoresModal.message":
+      "登録された店舗がありません。店舗を登録しますか？",
+    "dashboard.noStoresModal.description":
+      "店舗を登録すると、スケジュール管理やチームメンバー招待などの機能を使用できます。",
     "dashboard.noStoresModal.goToCreate": "店舗登録ページへ移動",
     "dashboard.schedule": "スケジュール管理",
     "dashboard.scheduleDescription": "勤務表の作成と管理",
@@ -1910,7 +1906,8 @@ const translations = {
     "user.alreadyDeleted": "既に削除されたユーザー",
     "user.alreadyDeletedDescription": "このユーザーは既に削除されています。",
     "user.promoteToSubManager": "昇格",
-    "user.confirmPromoteMessage": "このユーザーをサブマネージャーに昇格させますか？",
+    "user.confirmPromoteMessage":
+      "このユーザーをサブマネージャーに昇格させますか？",
     "user.adminActions": "管理者アクション",
     "user.guestUser": "ゲストユーザー",
     // 초대 수락 페이지
@@ -1982,16 +1979,22 @@ const translations = {
     "settings.store.close": "終了時間",
     "settings.store.holidays": "休業日",
     "settings.store.date": "日付",
-    "settings.store.policiesDescription": "運営に必要な核心的な規則のみ設定します。複雑な規則は削除して使いやすくしました。",
-    "settings.store.currencyUnitDesc": "人件費予算および給与計算に使用される通貨単位",
-    "settings.store.publishCutoffDesc": "スケジュール公開前の最小時間（時間単位）",
-    "settings.store.swapLeadTimeDesc": "シフト交換リクエストの最小リードタイム（時間単位）",
+    "settings.store.policiesDescription":
+      "運営に必要な核心的な規則のみ設定します。複雑な規則は削除して使いやすくしました。",
+    "settings.store.currencyUnitDesc":
+      "人件費予算および給与計算に使用される通貨単位",
+    "settings.store.publishCutoffDesc":
+      "スケジュール公開前の最小時間（時間単位）",
+    "settings.store.swapLeadTimeDesc":
+      "シフト交換リクエストの最小リードタイム（時間単位）",
     "settings.store.minRestDesc": "連続勤務間の最小休息時間",
     "settings.store.maxHoursPerDayDesc": "1日の最大勤務時間（0 = 制限なし）",
     "settings.store.maxHoursPerWeekDesc": "週の最大勤務時間（0 = 制限なし）",
-    "settings.store.maxHoursPerMonthDesc": "月の最大勤務時間（デフォルト: 160時間）",
+    "settings.store.maxHoursPerMonthDesc":
+      "月の最大勤務時間（デフォルト: 160時間）",
     "settings.store.maxConsecutiveDaysDesc": "連続勤務最大日数（0 = 制限なし）",
-    "settings.store.weeklyBudgetDesc": "週間人件費予算（{currency}単位、0 = 制限なし）",
+    "settings.store.weeklyBudgetDesc":
+      "週間人件費予算（{currency}単位、0 = 制限なし）",
     // workItems
     "workItems.title": "勤務項目",
     "workItems.name": "名称",
@@ -2207,7 +2210,8 @@ const translations = {
     "schedule.selectDays": "日付選択",
     "schedule.warnings": "警告",
     "schedule.register": "登録",
-    "schedule.warning.multiDayMessage": "さんの複数日スケジュール登録時に以下の警告があります。",
+    "schedule.warning.multiDayMessage":
+      "さんの複数日スケジュール登録時に以下の警告があります。",
     "availability.unavailable": "出勤不可",
     "availability.currentMonth": "今月",
     "availability.date": "日付",
@@ -2218,7 +2222,8 @@ const translations = {
     "availability.multiDateMode": "他の日付も一緒に登録",
     "availability.selectAdditionalDates": "追加日付選択",
     "availability.selectedDates": "選択された日付",
-    "availability.dateAlreadyUnavailable": "この日付は既に出勤不可として登録されています",
+    "availability.dateAlreadyUnavailable":
+      "この日付は既に出勤不可として登録されています",
     "availability.hasTimeRestriction": "時間制限",
     "availability.timePeriod": "時間帯",
     "availability.startTime": "開始時間",
@@ -2230,10 +2235,32 @@ const translations = {
     "schedule.copySuccess": "スケジュールがコピーされました",
     "schedule.copyError": "スケジュールコピー中にエラーが発生しました",
     "schedule.copyConfirm": "スケジュールをコピーしますか？",
-    "schedule.copyConfirmDescription": "現在の週のすべてのスケジュールが削除され、選択した週のスケジュールがコピーされます。",
+    "schedule.copyConfirmDescription":
+      "現在の週のすべてのスケジュールが削除され、選択した週のスケジュールがコピーされます。",
+    "availability.success": "状態が正常に更新されました",
+    "availability.multiDateMode": "他の日付も一緒に登録",
+    "availability.selectAdditionalDates": "追加日付選択",
+    "availability.selectedDates": "選択された日付",
+    "availability.dateAlreadyUnavailable":
+      "この日付は既に出勤不可として登録されています",
+    "availability.hasTimeRestriction": "時間制限",
+    "availability.timePeriod": "時間帯",
+    "availability.startTime": "開始時間",
+    "availability.endTime": "終了時間",
+    "schedule.copyWeek": "週コピー",
+    "schedule.selectWeekToCopy": "コピーする週を選択",
+    "schedule.copyPreviousWeek": "前週スケジュールコピー",
+    "schedule.copyWarning": "現在の週のすべてのスケジュールが削除されます",
+    "schedule.copySuccess": "スケジュールがコピーされました",
+    "schedule.copyError": "スケジュールコピー中にエラーが発生しました",
+    "schedule.copyConfirm": "スケジュールをコピーしますか？",
+    "schedule.copyConfirmDescription":
+      "現在の週のすべてのスケジュールが削除され、選択した週のスケジュールがコピーされます。",
     "schedule.noWorkItemsTitle": "勤務項目が必要です",
-    "schedule.noWorkItemsDescription": "スケジュールを登録するには、まず勤務項目を設定する必要があります",
-    "schedule.noWorkItemsMessage": "店舗設定で勤務項目を登録した後、スケジュールを登録できます。",
+    "schedule.noWorkItemsDescription":
+      "スケジュールを登録するには、まず勤務項目を設定する必要があります",
+    "schedule.noWorkItemsMessage":
+      "店舗設定で勤務項目を登録した後、スケジュールを登録できます。",
     "schedule.goToWorkItems": "勤務項目設定へ移動",
     // work item roles
     "workItemRoles.title": "勤務項目役割要件",
