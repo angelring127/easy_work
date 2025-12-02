@@ -2237,25 +2237,6 @@ const translations = {
     "schedule.copyConfirm": "スケジュールをコピーしますか？",
     "schedule.copyConfirmDescription":
       "現在の週のすべてのスケジュールが削除され、選択した週のスケジュールがコピーされます。",
-    "availability.success": "状態が正常に更新されました",
-    "availability.multiDateMode": "他の日付も一緒に登録",
-    "availability.selectAdditionalDates": "追加日付選択",
-    "availability.selectedDates": "選択された日付",
-    "availability.dateAlreadyUnavailable":
-      "この日付は既に出勤不可として登録されています",
-    "availability.hasTimeRestriction": "時間制限",
-    "availability.timePeriod": "時間帯",
-    "availability.startTime": "開始時間",
-    "availability.endTime": "終了時間",
-    "schedule.copyWeek": "週コピー",
-    "schedule.selectWeekToCopy": "コピーする週を選択",
-    "schedule.copyPreviousWeek": "前週スケジュールコピー",
-    "schedule.copyWarning": "現在の週のすべてのスケジュールが削除されます",
-    "schedule.copySuccess": "スケジュールがコピーされました",
-    "schedule.copyError": "スケジュールコピー中にエラーが発生しました",
-    "schedule.copyConfirm": "スケジュールをコピーしますか？",
-    "schedule.copyConfirmDescription":
-      "現在の週のすべてのスケジュールが削除され、選択した週のスケジュールがコピーされます。",
     "schedule.noWorkItemsTitle": "勤務項目が必要です",
     "schedule.noWorkItemsDescription":
       "スケジュールを登録するには、まず勤務項目を設定する必要があります",
