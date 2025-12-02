@@ -391,17 +391,49 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     }
   };
 
+  // 시간 표시를 로케일에 맞게 포맷
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     const isNextDay = hours >= 24;
     const displayHours = isNextDay ? hours - 24 : hours;
     const { hour, amPm } = convertFrom24Hour(displayHours);
-    const ampmText = amPm === "am" ? "오전" : "오후";
 
-    return `${isNextDay ? "다음날 " : ""}${ampmText} ${hour}시 ${mins
-      .toString()
-      .padStart(2, "0")}분`;
+    const labels: Record<
+      Locale,
+      { am: string; pm: string; nextDay: string; hourSuffix: string; minuteSuffix: string }
+    > = {
+      ko: {
+        am: "오전",
+        pm: "오후",
+        nextDay: "다음날 ",
+        hourSuffix: "시",
+        minuteSuffix: "분",
+      },
+      en: {
+        am: "AM",
+        pm: "PM",
+        nextDay: "Next day ",
+        hourSuffix: "",
+        minuteSuffix: "",
+      },
+      ja: {
+        am: "午前",
+        pm: "午後",
+        nextDay: "翌日 ",
+        hourSuffix: "時",
+        minuteSuffix: "分",
+      },
+    };
+
+    const currentLabels = labels[locale] ?? labels.ko;
+    const ampmText = amPm === "am" ? currentLabels.am : currentLabels.pm;
+    const hourText = `${hour}${currentLabels.hourSuffix}`;
+    const minuteText = mins.toString().padStart(2, "0") + currentLabels.minuteSuffix;
+
+    return `${isNextDay ? currentLabels.nextDay : ""}${ampmText} ${hourText}${
+      currentLabels.hourSuffix ? " " : ""
+    }${minuteText}`.trim();
   };
 
   const handleDeleteClick = (itemId: string) => {
