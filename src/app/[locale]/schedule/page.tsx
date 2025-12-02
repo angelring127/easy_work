@@ -14,6 +14,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { AlertCircle } from "lucide-react";
 import { StoreSwitcher } from "@/components/ui/store-switcher";
 import { WeekGrid } from "@/components/schedule/week-grid";
 import { UserAvailabilityCalendar } from "@/components/schedule/user-availability-calendar";
@@ -87,6 +96,8 @@ export default function SchedulePage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
   const [canManage, setCanManage] = useState(false);
+  const [workItems, setWorkItems] = useState<any[]>([]);
+  const [showWorkItemsModal, setShowWorkItemsModal] = useState(false);
 
   // 週の開始日と終了日を計算
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // 月曜日開始
@@ -104,6 +115,43 @@ export default function SchedulePage() {
       checkPermissions();
     }
   }, [currentStore?.id, currentWeek]);
+
+  // Work Items가 없고 관리자 권한이 있으면 모달 표시
+  // Work Items가 있으면 모달 닫기
+  useEffect(() => {
+    if (workItems.length === 0 && canManage && currentStore?.id && !loading) {
+      setShowWorkItemsModal(true);
+    } else if (workItems.length > 0) {
+      // Work Items가 있으면 모달 닫기
+      setShowWorkItemsModal(false);
+    }
+  }, [workItems.length, canManage, currentStore?.id, loading]);
+
+  // 페이지 포커스 시 work items 다시 확인
+  useEffect(() => {
+    const handleFocus = () => {
+      if (currentStore?.id && canManage) {
+        // work items 다시 확인
+        fetch(`/api/work-items?store_id=${currentStore.id}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              const items = data.data || [];
+              setWorkItems(items);
+              if (items.length > 0) {
+                setShowWorkItemsModal(false);
+              }
+            }
+          })
+          .catch((error) => {
+            console.error("Work items 확인 오류:", error);
+          });
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [currentStore?.id, canManage]);
 
   const loadScheduleData = async () => {
     if (!currentStore?.id) return;
@@ -123,7 +171,7 @@ export default function SchedulePage() {
       });
 
       // API 호출 구현
-      const [assignmentsRes, availabilitiesRes, storeUsersRes, businessHoursRes] =
+      const [assignmentsRes, availabilitiesRes, storeUsersRes, businessHoursRes, workItemsRes] =
         await Promise.all([
           fetch(
             `/api/schedule/assignments?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
@@ -133,6 +181,7 @@ export default function SchedulePage() {
           ),
           fetch(`/api/stores/${currentStore.id}/users`),
           fetch(`/api/store-business-hours?store_id=${currentStore.id}`),
+          fetch(`/api/work-items?store_id=${currentStore.id}`),
         ]);
 
       if (assignmentsRes.ok) {
@@ -162,6 +211,19 @@ export default function SchedulePage() {
         const businessHoursData = await businessHoursRes.json();
         if (businessHoursData.success) {
           setBusinessHours(businessHoursData.data || []);
+        }
+      }
+
+      // Work Items 확인
+      if (workItemsRes.ok) {
+        const workItemsData = await workItemsRes.json();
+        if (workItemsData.success) {
+          const items = workItemsData.data || [];
+          setWorkItems(items);
+          // Work Items가 있으면 모달 닫기
+          if (items.length > 0) {
+            setShowWorkItemsModal(false);
+          }
         }
       }
 
@@ -414,6 +476,46 @@ export default function SchedulePage() {
           </TabsContent>
         }
       </Tabs>
+
+      {/* Work Items 없음 모달 */}
+      <Dialog open={showWorkItemsModal} onOpenChange={setShowWorkItemsModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              {t("schedule.noWorkItemsTitle", currentLocale)}
+            </DialogTitle>
+            <DialogDescription>
+              {t("schedule.noWorkItemsDescription", currentLocale)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              {t("schedule.noWorkItemsMessage", currentLocale)}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowWorkItemsModal(false)}
+            >
+              {t("common.cancel", currentLocale)}
+            </Button>
+            <Button
+              onClick={() => {
+                if (currentStore?.id) {
+                  router.push(
+                    `/${locale}/stores/${currentStore.id}/edit?tab=workItems`
+                  );
+                  setShowWorkItemsModal(false);
+                }
+              }}
+            >
+              {t("schedule.goToWorkItems", currentLocale)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -56,6 +56,7 @@ export default function EditStorePage() {
   // URL 쿼리 파라미터에서 from 값 확인
   const searchParams = new URLSearchParams(window.location.search);
   const fromDashboard = searchParams.get("from") === "dashboard";
+  const tabParam = searchParams.get("tab");
 
   const [store, setStore] = useState<StoreData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -188,7 +189,7 @@ export default function EditStorePage() {
       <main className="max-w-5xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <Tabs defaultValue="basic">
+            <Tabs defaultValue={tabParam || "basic"}>
               <TabsList className="flex flex-wrap gap-2">
                 <TabsTrigger value="basic">
                   {t("settings.store.basic", currentLocale)}
@@ -367,7 +368,7 @@ function HoursEditor({ storeId, locale }: { storeId: string; locale: Locale }) {
           )
           .join(", ");
         if (fieldErrors) {
-          errorMessage = `검증 오류: ${fieldErrors}`;
+          errorMessage = `${t("settings.store.validationError", locale)}: ${fieldErrors}`;
         }
       }
 
@@ -392,7 +393,7 @@ function HoursEditor({ storeId, locale }: { storeId: string; locale: Locale }) {
               {getWeekdayName(r.weekday, locale)}
             </div>
             <div className="space-y-1">
-              <Label htmlFor={`open-${idx}`}>Open</Label>
+              <Label htmlFor={`open-${idx}`}>{t("settings.store.open", locale)}</Label>
               <Input
                 id={`open-${idx}`}
                 type="time"
@@ -418,7 +419,7 @@ function HoursEditor({ storeId, locale }: { storeId: string; locale: Locale }) {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor={`close-${idx}`}>Close</Label>
+              <Label htmlFor={`close-${idx}`}>{t("settings.store.close", locale)}</Label>
               <Input
                 id={`close-${idx}`}
                 type="time"
@@ -533,10 +534,10 @@ function HolidaysEditor({
 
   return (
     <section>
-      <h3 className="text-lg font-semibold mb-4">Holidays</h3>
+      <h3 className="text-lg font-semibold mb-4">{t("settings.store.holidays", locale)}</h3>
       <div className="flex items-end gap-2 mb-3">
         <div className="space-y-1">
-          <Label htmlFor="holiday-date">Date</Label>
+          <Label htmlFor="holiday-date">{t("settings.store.date", locale)}</Label>
           <Input
             id="holiday-date"
             type="date"
@@ -634,8 +635,7 @@ function PoliciesEditor({
           {t("settings.store.policies", locale)}
         </h3>
         <p className="text-sm text-gray-600 mb-6">
-          운영에 필요한 핵심 규정만 설정합니다. 복잡한 규칙은 제거하여 사용하기
-          쉽게 만들었습니다.
+          {t("settings.store.policiesDescription", locale)}
         </p>
       </div>
 
@@ -681,27 +681,27 @@ function PoliciesEditor({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="KRW">
-                {t("policies.currency_krw", locale)} (원)
+                {t("policies.currency_krw", locale)} ({getCurrencySymbol("KRW")})
               </SelectItem>
               <SelectItem value="USD">
-                {t("policies.currency_usd", locale)} ($)
+                {t("policies.currency_usd", locale)} ({getCurrencySymbol("USD")})
               </SelectItem>
               <SelectItem value="JPY">
-                {t("policies.currency_jpy", locale)} (¥)
+                {t("policies.currency_jpy", locale)} ({getCurrencySymbol("JPY")})
               </SelectItem>
               <SelectItem value="EUR">
-                {t("policies.currency_eur", locale)} (€)
+                {t("policies.currency_eur", locale)} ({getCurrencySymbol("EUR")})
               </SelectItem>
               <SelectItem value="CAD">
-                {t("policies.currency_cad", locale)} (C$)
+                {t("policies.currency_cad", locale)} ({getCurrencySymbol("CAD")})
               </SelectItem>
               <SelectItem value="AUD">
-                {t("policies.currency_aud", locale)} (A$)
+                {t("policies.currency_aud", locale)} ({getCurrencySymbol("AUD")})
               </SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-500">
-            인건비 예산 및 급여 계산에 사용되는 통화 단위
+            {t("settings.store.currencyUnitDesc", locale)}
           </p>
         </div>
 
@@ -776,7 +776,7 @@ function PoliciesEditor({
             }
           />
           <p className="text-xs text-gray-500">
-            스케줄 게시 전 최소 시간 (시간 단위)
+            {t("settings.store.publishCutoffDesc", locale)}
           </p>
         </div>
 
@@ -798,7 +798,7 @@ function PoliciesEditor({
             }
           />
           <p className="text-xs text-gray-500">
-            교대 요청 최소 리드타임 (시간 단위)
+            {t("settings.store.swapLeadTimeDesc", locale)}
           </p>
         </div>
 
@@ -819,7 +819,7 @@ function PoliciesEditor({
               }))
             }
           />
-          <p className="text-xs text-gray-500">연속 근무 간 최소 휴식 시간</p>
+          <p className="text-xs text-gray-500">{t("settings.store.minRestDesc", locale)}</p>
         </div>
 
         {/* 일 최대 근무 시간 */}
@@ -840,7 +840,7 @@ function PoliciesEditor({
             }
           />
           <p className="text-xs text-gray-500">
-            하루 최대 근무 시간 (0 = 제한 없음)
+            {t("settings.store.maxHoursPerDayDesc", locale)}
           </p>
         </div>
 
@@ -862,7 +862,7 @@ function PoliciesEditor({
             }
           />
           <p className="text-xs text-gray-500">
-            주 최대 근무 시간 (0 = 제한 없음)
+            {t("settings.store.maxHoursPerWeekDesc", locale)}
           </p>
         </div>
 
@@ -886,7 +886,7 @@ function PoliciesEditor({
             }
           />
           <p className="text-xs text-gray-500">
-            월 최대 근무 시간 (기본값: 160시간)
+            {t("settings.store.maxHoursPerMonthDesc", locale)}
           </p>
         </div>
 
@@ -908,7 +908,7 @@ function PoliciesEditor({
             }
           />
           <p className="text-xs text-gray-500">
-            연속 근무 최대 일수 (0 = 제한 없음)
+            {t("settings.store.maxConsecutiveDaysDesc", locale)}
           </p>
         </div>
 
@@ -936,8 +936,10 @@ function PoliciesEditor({
             </div>
           </div>
           <p className="text-xs text-gray-500">
-            주간 인건비 예산 ({getCurrencyName(form.currency_unit)} 단위, 0 =
-            제한 없음)
+            {t("settings.store.weeklyBudgetDesc", locale).replace(
+              "{currency}",
+              getCurrencyName(form.currency_unit)
+            )}
           </p>
         </div>
 
