@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { useParams } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,8 @@ import {
   type SignUpFormData,
   type AuthApiResponse,
 } from "@/lib/validations/auth";
-import { t, getCurrentLocale } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 
 interface SignUpFormProps {
   onSuccess?: (data: AuthApiResponse) => void;
@@ -40,7 +42,10 @@ async function signUpUser(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      locale, // locale을 body에 포함
+    }),
   });
 
   const result = await response.json();
@@ -58,7 +63,8 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
-  const locale = getCurrentLocale();
+  const params = useParams();
+  const locale = (params?.locale as Locale) || defaultLocale;
 
   const form = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),

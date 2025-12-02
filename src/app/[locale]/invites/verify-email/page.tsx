@@ -166,9 +166,8 @@ export default function VerifyEmailPage() {
                 return;
               } else {
                 console.log("일반 사용자:", data.user.user_metadata);
-                // 일반 사용자면 대시보드로 이동
-                await refreshStores();
-                router.push(`/${currentLocale}/dashboard`);
+                // 일반 사용자면 회원가입 완료 페이지로 이동
+                router.push(`/${currentLocale}/auth/signup-complete`);
                 return;
               }
             } else {
@@ -289,9 +288,8 @@ export default function VerifyEmailPage() {
           setIsVerified(true);
         } else {
           console.log("일반 사용자:", user.user_metadata);
-          // 일반 사용자면 대시보드로 이동
-          await refreshStores();
-          router.push(`/${currentLocale}/dashboard`);
+          // 일반 사용자면 회원가입 완료 페이지로 이동
+          router.push(`/${currentLocale}/auth/signup-complete`);
         }
       } catch (error) {
         console.error("인증 확인 실패:", error);

@@ -425,8 +425,8 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   const handlePromoteToSubManager = () => {
     setConfirmDialog({
       isOpen: true,
-      title: t("store.role.sub_manager", locale) + " 승격",
-      message: "이 사용자를 서브 매니저로 승격하시겠습니까?",
+      title: t("store.role.sub_manager", locale) + " " + t("user.promoteToSubManager", locale),
+      message: t("user.confirmPromoteMessage", locale),
       onConfirm: () => {
         promoteToSubManagerMutation.mutate();
         setConfirmDialog({
@@ -690,7 +690,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                         )}
                         {userDetail?.isGuest ? (
                           <Badge variant="secondary" className="mt-1">
-                            게스트 사용자
+                            {t("user.guestUser", locale)}
                           </Badge>
                         ) : (
                           <p className="text-sm text-muted-foreground">
@@ -931,7 +931,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                 {/* 관리자 액션 */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>관리자 액션</CardTitle>
+                    <CardTitle>{t("user.adminActions", locale)}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
@@ -942,7 +942,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                           className="flex items-center gap-2"
                         >
                           <UserPlus className="h-4 w-4" />
-                          {t("store.role.sub_manager", locale)} 승격
+                          {t("store.role.sub_manager", locale)} {t("user.promoteToSubManager", locale)}
                         </Button>
                       )}
 
@@ -964,7 +964,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                           className="flex items-center gap-2"
                         >
                           <Trash2 className="h-4 w-4" />
-                          삭제
+                          {t("common.delete", locale)}
                         </Button>
                       )}
                     </div>

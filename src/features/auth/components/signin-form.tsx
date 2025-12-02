@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { useParams } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
+import { t, type Locale } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
 
 import {
   signInSchema,
@@ -31,7 +34,10 @@ interface SignInFormProps {
 }
 
 // 로그인 API 호출 함수
-async function signInUser(data: SignInFormData): Promise<AuthApiResponse> {
+async function signInUser(
+  data: SignInFormData,
+  locale: string
+): Promise<AuthApiResponse> {
   const response = await fetch("/api/auth/signin", {
     method: "POST",
     headers: {
@@ -43,7 +49,9 @@ async function signInUser(data: SignInFormData): Promise<AuthApiResponse> {
   const result = await response.json();
 
   if (!response.ok) {
-    throw new Error(result.error || "로그인에 실패했습니다");
+    throw new Error(
+      result.error || t("auth.login.errorDescription", locale as any)
+    );
   }
 
   return result;
@@ -53,6 +61,8 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const { refreshSession } = useAuth();
+  const params = useParams();
+  const locale = (params?.locale as Locale) || defaultLocale;
 
   const form = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -63,11 +73,11 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
   });
 
   const signInMutation = useMutation({
-    mutationFn: signInUser,
+    mutationFn: (data: SignInFormData) => signInUser(data, locale),
     onSuccess: async (data) => {
       toast({
-        title: "로그인 성공",
-        description: data.message || "로그인이 완료되었습니다",
+        title: t("auth.login.success", locale),
+        description: data.message || t("auth.login.successDescription", locale),
       });
 
       // AuthContext 상태 새로고침
@@ -77,9 +87,10 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
       onSuccess?.(data);
     },
     onError: (error: Error) => {
-      const errorMessage = error.message || "로그인에 실패했습니다";
+      const errorMessage =
+        error.message || t("auth.login.errorDescription", locale);
       toast({
-        title: "로그인 실패",
+        title: t("auth.login.error", locale),
         description: errorMessage,
         variant: "destructive",
       });
@@ -100,10 +111,10 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>이메일</FormLabel>
+              <FormLabel>{t("auth.login.email", locale)}</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="이메일을 입력하세요"
+                  placeholder={t("auth.login.emailPlaceholder", locale)}
                   type="email"
                   autoComplete="email"
                   {...field}
@@ -120,11 +131,11 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>비밀번호</FormLabel>
+              <FormLabel>{t("auth.login.password", locale)}</FormLabel>
               <FormControl>
                 <div className="relative">
                   <Input
-                    placeholder="비밀번호를 입력하세요"
+                    placeholder={t("auth.login.passwordPlaceholder", locale)}
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     {...field}
@@ -136,7 +147,9 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={
-                      showPassword ? "비밀번호 숨기기" : "비밀번호 보기"
+                      showPassword
+                        ? t("auth.login.passwordHide", locale)
+                        : t("auth.login.passwordShow", locale)
                     }
                   >
                     {showPassword ? (
@@ -161,10 +174,10 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
           {signInMutation.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              로그인 중...
+              {t("auth.login.submitting", locale)}
             </>
           ) : (
-            "로그인"
+            t("auth.login.submit", locale)
           )}
         </Button>
       </form>

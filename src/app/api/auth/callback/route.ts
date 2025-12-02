@@ -55,6 +55,37 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // 일반 회원가입 사용자 (초대되지 않은 사용자)는 회원가입 완료 페이지로 리다이렉트
+      // emailRedirectTo에서 locale 추출 시도
+      const emailRedirectTo = redirectTo || next;
+      const localeMatch = emailRedirectTo?.match(/\/(ko|en|ja)\//);
+      const locale = localeMatch ? localeMatch[1] : "en";
+
+      // 일반 사용자인 경우 회원가입 완료 페이지로 리다이렉트
+      if (
+        !data.user.user_metadata?.is_invited_user &&
+        data.user.user_metadata?.type !== "store_invitation"
+      ) {
+        const signupCompletePath = `/${locale}/auth/signup-complete`;
+        console.log(
+          "일반 회원가입 사용자, 회원가입 완료 페이지로 리다이렉트:",
+          signupCompletePath
+        );
+
+        const forwardedHost = request.headers.get("x-forwarded-host");
+        const isLocalEnv = process.env.NODE_ENV === "development";
+
+        if (isLocalEnv) {
+          return NextResponse.redirect(`${origin}${signupCompletePath}`);
+        } else if (forwardedHost) {
+          return NextResponse.redirect(
+            `https://${forwardedHost}${signupCompletePath}`
+          );
+        } else {
+          return NextResponse.redirect(`${origin}${signupCompletePath}`);
+        }
+      }
+
       const forwardedHost = request.headers.get("x-forwarded-host"); // 배포 환경에서 원본 호스트
       const isLocalEnv = process.env.NODE_ENV === "development";
 

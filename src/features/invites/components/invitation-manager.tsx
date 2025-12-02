@@ -307,7 +307,7 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                   htmlFor="isGuest"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  이메일 없이 등록 (게스트 사용자)
+                  {t("invite.registerWithoutEmail", locale)}
                 </Label>
               </div>
               <div>
@@ -439,7 +439,7 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                 refetch();
               }}
             >
-              새로고침
+              {t("invite.refresh", locale)}
             </Button>
           </div>
         </CardHeader>

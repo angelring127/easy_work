@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
@@ -19,6 +19,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Loader2,
   LogOut,
@@ -42,6 +50,7 @@ export default function DashboardPage() {
   } = useStore();
   const router = useRouter();
   const currentLocale = (locale as Locale) || defaultLocale;
+  const [showNoStoreModal, setShowNoStoreModal] = useState(false);
 
   // 권한 관련 훅
   const { userRole, roleDisplayName } = usePermissions();
@@ -94,6 +103,27 @@ export default function DashboardPage() {
       });
     }
   }, [loading, user, currentStore, accessibleStores]);
+
+  // 마스터 사용자이고 스토어가 없으면 모달 표시
+  useEffect(() => {
+    if (
+      !loading &&
+      !storesLoading &&
+      user &&
+      userRole === "MASTER" &&
+      accessibleStores.length === 0
+    ) {
+      console.log("Dashboard: 마스터 사용자 스토어 없음, 모달 표시");
+      setShowNoStoreModal(true);
+    } else {
+      setShowNoStoreModal(false);
+    }
+  }, [loading, storesLoading, user, userRole, accessibleStores.length]);
+
+  const handleGoToStoreCreate = () => {
+    setShowNoStoreModal(false);
+    router.push(`/${locale}/stores/create`);
+  };
 
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트 (useEffect 사용)
   useEffect(() => {
@@ -494,6 +524,37 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* 스토어 없음 확인 모달 */}
+      <Dialog open={showNoStoreModal} onOpenChange={setShowNoStoreModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t("dashboard.noStoresModal.title", currentLocale)}
+            </DialogTitle>
+            <DialogDescription>
+              {t("dashboard.noStoresModal.description", currentLocale)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              {t("dashboard.noStoresModal.message", currentLocale)}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowNoStoreModal(false)}
+            >
+              {t("common.cancel", currentLocale)}
+            </Button>
+            <Button onClick={handleGoToStoreCreate}>
+              <Store className="h-4 w-4 mr-2" />
+              {t("dashboard.noStoresModal.goToCreate", currentLocale)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
