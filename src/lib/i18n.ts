@@ -586,9 +586,15 @@ const translations = {
     "policies.max_morning_staff": "오전 최대 근무 인원",
     "policies.max_morning_staff_desc":
       "오전 시간대 최대 근무 인원 수 (0 = 제한 없음)",
+    "policies.min_morning_staff": "오전 최소 근무 인원",
+    "policies.min_morning_staff_desc":
+      "오전 시간대 최소 근무 인원 수 (0 = 제한 없음)",
     "policies.max_afternoon_staff": "오후 최대 근무 인원",
     "policies.max_afternoon_staff_desc":
       "오후 시간대 최대 근무 인원 수 (0 = 제한 없음)",
+    "policies.min_afternoon_staff": "오후 최소 근무 인원",
+    "policies.min_afternoon_staff_desc":
+      "오후 시간대 최소 근무 인원 수 (0 = 제한 없음)",
     "policies.weekly_labor_budget_cents": "주간 인건비 예산 (원)",
     "policies.schedule_unit": "스케줄 단위",
     "policies.schedule_unit_week": "주 단위",
@@ -603,6 +609,16 @@ const translations = {
     "policies.shift_boundary_time": "오전/오후 구분 시간",
     "policies.shift_boundary_time_desc":
       "스케줄 그리드에서 오전/오후를 구분하는 기준 시간입니다. 이 시간을 기준으로 오전/오후 인원수가 계산됩니다.",
+    "policies.group.basicSettings": "기본 설정",
+    "policies.group.basicSettingsDesc": "스케줄 단위, 통화 단위, 시간 구분 등 기본 설정",
+    "policies.group.schedulePublishing": "스케줄 게시",
+    "policies.group.schedulePublishingDesc": "스케줄 게시 관련 설정",
+    "policies.group.workHoursLimits": "근무 시간 제한",
+    "policies.group.workHoursLimitsDesc": "주간, 월간 근무 시간 및 연속 근무 일수 제한",
+    "policies.group.staffManagement": "인원 관리",
+    "policies.group.staffManagementDesc": "오전/오후 시간대별 최소/최대 근무 인원 설정",
+    "policies.group.unusedSettings": "미사용 항목",
+    "policies.group.unusedSettingsDesc": "현재 사용하지 않는 설정 항목들",
     "workItems.nameRequired": "근무 항목명을 입력해주세요",
     "workItems.endAfterStart": "종료 시간은 시작 시간보다 늦어야 합니다",
     "workItems.breakTooLong": "휴식 시간은 근무 시간보다 길 수 없습니다",
@@ -685,6 +701,15 @@ const translations = {
     "schedule.createFirst": "스케줄 생성하기",
     "schedule.monthViewComingSoon": "월간 보기 준비 중",
     "schedule.monthViewDescription": "월간 캘린더 뷰는 곧 제공될 예정입니다.",
+    "schedule.copyWeek": "주 복사",
+    "schedule.selectWeekToCopy": "복사할 주 선택",
+    "schedule.copyPreviousWeek": "이전 주 스케줄 복사",
+    "schedule.copyWarning": "현재 주의 모든 스케줄이 삭제됩니다",
+    "schedule.copySuccess": "스케줄이 복사되었습니다",
+    "schedule.copyError": "스케줄 복사 중 오류가 발생했습니다",
+    "schedule.copyConfirm": "스케줄을 복사하시겠습니까?",
+    "schedule.copyConfirmDescription":
+      "현재 주의 모든 스케줄이 삭제되고, 선택한 주의 스케줄이 복사됩니다.",
     // availability calendar
     "availability.title": "출근 불가 캘린더",
     "availability.markUnavailable": "출근 불가로 표시",
@@ -1260,9 +1285,15 @@ const translations = {
     "policies.max_morning_staff": "Max Morning Staff",
     "policies.max_morning_staff_desc":
       "Maximum number of staff working in the morning shift (0 = no limit)",
+    "policies.min_morning_staff": "Min Morning Staff",
+    "policies.min_morning_staff_desc":
+      "Minimum number of staff working in the morning shift (0 = no limit)",
     "policies.max_afternoon_staff": "Max Afternoon Staff",
     "policies.max_afternoon_staff_desc":
       "Maximum number of staff working in the afternoon shift (0 = no limit)",
+    "policies.min_afternoon_staff": "Min Afternoon Staff",
+    "policies.min_afternoon_staff_desc":
+      "Minimum number of staff working in the afternoon shift (0 = no limit)",
     "policies.weekly_labor_budget_cents": "Weekly Labor Budget (Cents)",
     "policies.schedule_unit": "Schedule Unit",
     "policies.schedule_unit_week": "Weekly",
@@ -1277,6 +1308,16 @@ const translations = {
     "policies.shift_boundary_time": "Morning/Afternoon Boundary Time",
     "policies.shift_boundary_time_desc":
       "The time that divides morning and afternoon shifts in the schedule grid. Staff counts are calculated based on this time.",
+    "policies.group.basicSettings": "Basic Settings",
+    "policies.group.basicSettingsDesc": "Basic settings such as schedule unit, currency unit, and time boundaries",
+    "policies.group.schedulePublishing": "Schedule Publishing",
+    "policies.group.schedulePublishingDesc": "Settings related to schedule publishing",
+    "policies.group.workHoursLimits": "Work Hours Limits",
+    "policies.group.workHoursLimitsDesc": "Weekly, monthly work hours and consecutive work days limits",
+    "policies.group.staffManagement": "Staff Management",
+    "policies.group.staffManagementDesc": "Minimum and maximum staff settings for morning and afternoon shifts",
+    "policies.group.unusedSettings": "Unused Settings",
+    "policies.group.unusedSettingsDesc": "Settings that are currently not in use",
     "workItems.nameRequired": "Work item name is required",
     "workItems.endAfterStart": "End time must be after start time",
     "workItems.breakTooLong": "Break time cannot be longer than work time",
@@ -1362,6 +1403,15 @@ const translations = {
     "schedule.monthViewComingSoon": "Month View Coming Soon",
     "schedule.monthViewDescription":
       "Monthly calendar view will be available soon.",
+    "schedule.copyWeek": "Copy Week",
+    "schedule.selectWeekToCopy": "Select Week to Copy",
+    "schedule.copyPreviousWeek": "Copy Previous Week Schedule",
+    "schedule.copyWarning": "All schedules in the current week will be deleted",
+    "schedule.copySuccess": "Schedule copied successfully",
+    "schedule.copyError": "An error occurred while copying the schedule",
+    "schedule.copyConfirm": "Do you want to copy the schedule?",
+    "schedule.copyConfirmDescription":
+      "All schedules in the current week will be deleted and the selected week's schedules will be copied.",
     // availability calendar
     "availability.title": "Availability Calendar",
     "availability.markUnavailable": "Mark as Unavailable",
@@ -2039,9 +2089,15 @@ const translations = {
     "policies.max_morning_staff": "午前最大勤務人数",
     "policies.max_morning_staff_desc":
       "午前時間帯の最大勤務人数 (0 = 制限なし)",
+    "policies.min_morning_staff": "午前最小勤務人数",
+    "policies.min_morning_staff_desc":
+      "午前時間帯の最小勤務人数 (0 = 制限なし)",
     "policies.max_afternoon_staff": "午後最大勤務人数",
     "policies.max_afternoon_staff_desc":
       "午後時間帯の最大勤務人数 (0 = 制限なし)",
+    "policies.min_afternoon_staff": "午後最小勤務人数",
+    "policies.min_afternoon_staff_desc":
+      "午後時間帯の最小勤務人数 (0 = 制限なし)",
     "policies.weekly_labor_budget_cents": "週間人件費予算（円）",
     "policies.schedule_unit": "スケジュール単位",
     "policies.schedule_unit_week": "週単位",
@@ -2056,6 +2112,16 @@ const translations = {
     "policies.shift_boundary_time": "午前/午後区分時間",
     "policies.shift_boundary_time_desc":
       "スケジュールグリッドで午前と午後を区別する基準時間です。この時間を基準に午前/午後の人員数が計算されます。",
+    "policies.group.basicSettings": "基本設定",
+    "policies.group.basicSettingsDesc": "スケジュール単位、通貨単位、時間区分などの基本設定",
+    "policies.group.schedulePublishing": "スケジュール発行",
+    "policies.group.schedulePublishingDesc": "スケジュール発行に関する設定",
+    "policies.group.workHoursLimits": "勤務時間制限",
+    "policies.group.workHoursLimitsDesc": "週間、月間勤務時間および連続勤務日数の制限",
+    "policies.group.staffManagement": "人員管理",
+    "policies.group.staffManagementDesc": "午前/午後時間帯別の最小/最大勤務人員設定",
+    "policies.group.unusedSettings": "未使用項目",
+    "policies.group.unusedSettingsDesc": "現在使用していない設定項目",
     "workItems.nameRequired": "勤務項目名が必要です",
     "workItems.endAfterStart": "終了時間は開始時間より遅くする必要があります",
     "workItems.breakTooLong": "休憩時間は勤務時間より長くすることはできません",

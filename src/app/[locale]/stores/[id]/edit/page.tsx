@@ -15,6 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -586,6 +593,8 @@ function PoliciesEditor({
     shift_boundary_time_min: 720, // 12:00 기본값
     max_morning_staff: 0,
     max_afternoon_staff: 0,
+    min_morning_staff: 0,
+    min_afternoon_staff: 0,
   });
 
   useEffect(() => {
@@ -609,6 +618,8 @@ function PoliciesEditor({
           shift_boundary_time_min: s.shift_boundary_time_min ?? 720,
           max_morning_staff: s.max_morning_staff ?? 0,
           max_afternoon_staff: s.max_afternoon_staff ?? 0,
+          min_morning_staff: s.min_morning_staff ?? 0,
+          min_afternoon_staff: s.min_afternoon_staff ?? 0,
         }));
       }
     })();
@@ -639,10 +650,22 @@ function PoliciesEditor({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-6">
+        {/* 기본 설정 그룹 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("policies.group.basicSettings", locale)}
+            </CardTitle>
+            <CardDescription>
+              {t("policies.group.basicSettingsDesc", locale)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 스케줄 단위 설정 */}
         <div className="space-y-2">
-          <Label htmlFor="schedule_unit">
+          <Label htmlFor="schedule_unit" className="text-gray-400">
             {t("policies.schedule_unit", locale)}
           </Label>
           <Select
@@ -650,8 +673,9 @@ function PoliciesEditor({
             onValueChange={(value: "week" | "month") =>
               setForm((prev) => ({ ...prev, schedule_unit: value }))
             }
+            disabled
           >
-            <SelectTrigger>
+            <SelectTrigger className="bg-gray-50">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -667,7 +691,7 @@ function PoliciesEditor({
 
         {/* 통화 단위 설정 */}
         <div className="space-y-2">
-          <Label htmlFor="currency_unit">
+          <Label htmlFor="currency_unit" className="text-gray-400">
             {t("policies.currency_unit", locale)}
           </Label>
           <Select
@@ -675,8 +699,9 @@ function PoliciesEditor({
             onValueChange={(value: CurrencyUnit) =>
               setForm((prev) => ({ ...prev, currency_unit: value }))
             }
+            disabled
           >
-            <SelectTrigger>
+            <SelectTrigger className="bg-gray-50">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -700,7 +725,7 @@ function PoliciesEditor({
               </SelectItem>
             </SelectContent>
           </Select>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             {t("settings.store.currencyUnitDesc", locale)}
           </p>
         </div>
@@ -757,10 +782,25 @@ function PoliciesEditor({
             {t("policies.shift_boundary_time_desc", locale)}
           </p>
         </div>
+            </div>
+          </CardContent>
+        </Card>
 
+        {/* 스케줄 게시 그룹 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("policies.group.schedulePublishing", locale)}
+            </CardTitle>
+            <CardDescription>
+              {t("policies.group.schedulePublishingDesc", locale)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 게시 마감 시간 */}
         <div className="space-y-2">
-          <Label htmlFor="publish_cutoff_hours">
+          <Label htmlFor="publish_cutoff_hours" className="text-gray-400">
             {t("policies.publish_cutoff_hours", locale)}
           </Label>
           <Input
@@ -774,76 +814,29 @@ function PoliciesEditor({
                 publish_cutoff_hours: Number(e.target.value || 0),
               }))
             }
+            disabled
+            className="bg-gray-50"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             {t("settings.store.publishCutoffDesc", locale)}
           </p>
         </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* 교대 요청 리드타임 */}
-        <div className="space-y-2">
-          <Label htmlFor="swap_lead_time_hours">
-            {t("policies.swap_lead_time_hours", locale)}
-          </Label>
-          <Input
-            id="swap_lead_time_hours"
-            type="number"
-            min="0"
-            value={form.swap_lead_time_hours}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                swap_lead_time_hours: Number(e.target.value || 0),
-              }))
-            }
-          />
-          <p className="text-xs text-gray-500">
-            {t("settings.store.swapLeadTimeDesc", locale)}
-          </p>
-        </div>
-
-        {/* 근무 간 최소 휴식 */}
-        <div className="space-y-2">
-          <Label htmlFor="min_rest_hours_between_shifts">
-            {t("policies.min_rest_hours_between_shifts", locale)}
-          </Label>
-          <Input
-            id="min_rest_hours_between_shifts"
-            type="number"
-            min="0"
-            value={form.min_rest_hours_between_shifts}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                min_rest_hours_between_shifts: Number(e.target.value || 0),
-              }))
-            }
-          />
-          <p className="text-xs text-gray-500">{t("settings.store.minRestDesc", locale)}</p>
-        </div>
-
-        {/* 일 최대 근무 시간 */}
-        <div className="space-y-2">
-          <Label htmlFor="max_hours_per_day">
-            {t("policies.max_hours_per_day", locale)}
-          </Label>
-          <Input
-            id="max_hours_per_day"
-            type="number"
-            min="0"
-            value={form.max_hours_per_day}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                max_hours_per_day: Number(e.target.value || 0),
-              }))
-            }
-          />
-          <p className="text-xs text-gray-500">
-            {t("settings.store.maxHoursPerDayDesc", locale)}
-          </p>
-        </div>
-
+        {/* 근무 시간 제한 그룹 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("policies.group.workHoursLimits", locale)}
+            </CardTitle>
+            <CardDescription>
+              {t("policies.group.workHoursLimitsDesc", locale)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 주 최대 근무 시간 */}
         <div className="space-y-2">
           <Label htmlFor="max_hours_per_week">
@@ -892,7 +885,7 @@ function PoliciesEditor({
 
         {/* 연속 근무 최대 일수 */}
         <div className="space-y-2">
-          <Label htmlFor="max_consecutive_days">
+          <Label htmlFor="max_consecutive_days" className="text-gray-400">
             {t("policies.max_consecutive_days", locale)}
           </Label>
           <Input
@@ -906,43 +899,29 @@ function PoliciesEditor({
                 max_consecutive_days: Number(e.target.value || 0),
               }))
             }
+            disabled
+            className="bg-gray-50"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             {t("settings.store.maxConsecutiveDaysDesc", locale)}
           </p>
         </div>
-
-        {/* 주간 인건비 예산 */}
-        <div className="space-y-2">
-          <Label htmlFor="weekly_labor_budget_cents">
-            {t("policies.weekly_labor_budget_cents", locale)}
-          </Label>
-          <div className="relative">
-            <Input
-              id="weekly_labor_budget_cents"
-              type="number"
-              min="0"
-              value={form.weekly_labor_budget_cents}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  weekly_labor_budget_cents: Number(e.target.value || 0),
-                }))
-              }
-              className="pr-16"
-            />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
-              {getCurrencySymbol(form.currency_unit)}
             </div>
-          </div>
-          <p className="text-xs text-gray-500">
-            {t("settings.store.weeklyBudgetDesc", locale).replace(
-              "{currency}",
-              getCurrencyName(form.currency_unit)
-            )}
-          </p>
-        </div>
+          </CardContent>
+        </Card>
 
+        {/* 인원 관리 그룹 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("policies.group.staffManagement", locale)}
+            </CardTitle>
+            <CardDescription>
+              {t("policies.group.staffManagementDesc", locale)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 오전 최대 근무 인원 */}
         <div className="space-y-2">
           <Label htmlFor="max_morning_staff">
@@ -963,6 +942,29 @@ function PoliciesEditor({
           />
           <p className="text-xs text-gray-500">
             {t("policies.max_morning_staff_desc", locale)}
+          </p>
+        </div>
+
+        {/* 오전 최소 근무 인원 */}
+        <div className="space-y-2">
+          <Label htmlFor="min_morning_staff">
+            {t("policies.min_morning_staff", locale)}
+          </Label>
+          <Input
+            id="min_morning_staff"
+            type="number"
+            min="0"
+            max="999"
+            value={form.min_morning_staff}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                min_morning_staff: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            {t("policies.min_morning_staff_desc", locale)}
           </p>
         </div>
 
@@ -988,6 +990,149 @@ function PoliciesEditor({
             {t("policies.max_afternoon_staff_desc", locale)}
           </p>
         </div>
+
+        {/* 오후 최소 근무 인원 */}
+        <div className="space-y-2">
+          <Label htmlFor="min_afternoon_staff">
+            {t("policies.min_afternoon_staff", locale)}
+          </Label>
+          <Input
+            id="min_afternoon_staff"
+            type="number"
+            min="0"
+            max="999"
+            value={form.min_afternoon_staff}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                min_afternoon_staff: Number(e.target.value || 0),
+              }))
+            }
+          />
+          <p className="text-xs text-gray-500">
+            {t("policies.min_afternoon_staff_desc", locale)}
+          </p>
+        </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 미사용 항목 그룹 */}
+        <Card className="opacity-60">
+          <CardHeader>
+            <CardTitle className="text-base text-gray-400">
+              {t("policies.group.unusedSettings", locale)}
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              {t("policies.group.unusedSettingsDesc", locale)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 교대 요청 리드타임 */}
+        <div className="space-y-2">
+          <Label htmlFor="swap_lead_time_hours" className="text-gray-400">
+            {t("policies.swap_lead_time_hours", locale)}
+          </Label>
+          <Input
+            id="swap_lead_time_hours"
+            type="number"
+            min="0"
+            value={form.swap_lead_time_hours}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                swap_lead_time_hours: Number(e.target.value || 0),
+              }))
+            }
+            disabled
+            className="bg-gray-50"
+          />
+          <p className="text-xs text-gray-400">
+            {t("settings.store.swapLeadTimeDesc", locale)}
+          </p>
+        </div>
+
+        {/* 근무 간 최소 휴식 */}
+        <div className="space-y-2">
+          <Label htmlFor="min_rest_hours_between_shifts" className="text-gray-400">
+            {t("policies.min_rest_hours_between_shifts", locale)}
+          </Label>
+          <Input
+            id="min_rest_hours_between_shifts"
+            type="number"
+            min="0"
+            value={form.min_rest_hours_between_shifts}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                min_rest_hours_between_shifts: Number(e.target.value || 0),
+              }))
+            }
+            disabled
+            className="bg-gray-50"
+          />
+          <p className="text-xs text-gray-400">{t("settings.store.minRestDesc", locale)}</p>
+        </div>
+
+        {/* 일 최대 근무 시간 */}
+        <div className="space-y-2">
+          <Label htmlFor="max_hours_per_day" className="text-gray-400">
+            {t("policies.max_hours_per_day", locale)}
+          </Label>
+          <Input
+            id="max_hours_per_day"
+            type="number"
+            min="0"
+            value={form.max_hours_per_day}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                max_hours_per_day: Number(e.target.value || 0),
+              }))
+            }
+            disabled
+            className="bg-gray-50"
+          />
+          <p className="text-xs text-gray-400">
+            {t("settings.store.maxHoursPerDayDesc", locale)}
+          </p>
+        </div>
+
+        {/* 주간 인건비 예산 */}
+        <div className="space-y-2">
+          <Label htmlFor="weekly_labor_budget_cents" className="text-gray-400">
+            {t("policies.weekly_labor_budget_cents", locale)}
+          </Label>
+          <div className="relative">
+            <Input
+              id="weekly_labor_budget_cents"
+              type="number"
+              min="0"
+              value={form.weekly_labor_budget_cents}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  weekly_labor_budget_cents: Number(e.target.value || 0),
+                }))
+              }
+              className="pr-16 bg-gray-50"
+              disabled
+            />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-400">
+              {getCurrencySymbol(form.currency_unit)}
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">
+            {t("settings.store.weeklyBudgetDesc", locale).replace(
+              "{currency}",
+              getCurrencyName(form.currency_unit)
+            )}
+          </p>
+        </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex justify-end">

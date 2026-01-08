@@ -57,7 +57,6 @@ export default function DashboardPage() {
   const {
     canManageStore,
     canManageUsers,
-    canCreateSchedule,
     canApproveShifts,
     canViewAnalytics,
     isManager,
@@ -300,15 +299,6 @@ export default function DashboardPage() {
                 >
                   {t("dashboard.viewSchedule", currentLocale)}
                 </Button>
-                {canCreateSchedule && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => router.push(`/${locale}/schedule/create`)}
-                  >
-                    {t("dashboard.createSchedule", currentLocale)}
-                  </Button>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -330,6 +320,7 @@ export default function DashboardPage() {
                   variant="outline"
                   className="w-full justify-start"
                   onClick={() => router.push(`/${locale}/shifts`)}
+                  disabled
                 >
                   {t("dashboard.viewRequests", currentLocale)}
                 </Button>
@@ -338,6 +329,7 @@ export default function DashboardPage() {
                     variant="outline"
                     className="w-full justify-start"
                     onClick={() => router.push(`/${locale}/shifts/approve`)}
+                    disabled
                   >
                     {t("dashboard.approveRequests", currentLocale)}
                   </Button>
@@ -477,6 +469,7 @@ export default function DashboardPage() {
                     variant="outline"
                     className="w-full justify-start"
                     onClick={() => router.push(`/${locale}/analytics`)}
+                    disabled
                   >
                     {t("dashboard.viewAnalytics", currentLocale)}
                   </Button>
@@ -485,44 +478,6 @@ export default function DashboardPage() {
             </Card>
           )}
         </div>
-
-        {/* 빠른 액션 */}
-        {isManager && (
-          <div className="mt-8">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              {t("dashboard.quickActions", currentLocale)}
-            </h3>
-            <div className="flex flex-wrap gap-4">
-              {canCreateSchedule && (
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/${locale}/schedule/create`)}
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  {t("dashboard.quickCreateSchedule", currentLocale)}
-                </Button>
-              )}
-              {canManageUsers && (
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/${locale}/users/invite`)}
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  {t("dashboard.quickInviteUser", currentLocale)}
-                </Button>
-              )}
-              {canApproveShifts && (
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/${locale}/shifts/approve`)}
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  {t("dashboard.quickApproveShifts", currentLocale)}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
       </main>
 
       {/* 스토어 없음 확인 모달 */}
