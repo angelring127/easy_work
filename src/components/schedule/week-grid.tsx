@@ -13,7 +13,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RoleBadge } from "@/components/auth/role-badge";
 import { AssignmentSheet } from "@/components/schedule/assignment-sheet";
 import {
@@ -157,6 +156,7 @@ export function WeekGrid({
   >([]);
   const [selectedWorkItem, setSelectedWorkItem] = useState<string>("");
   const [isModalLoading, setIsModalLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [showTransferMode, setShowTransferMode] = useState(false);
   const [selectedTransferUserId, setSelectedTransferUserId] =
     useState<string>("");
@@ -492,6 +492,10 @@ export function WeekGrid({
     return time.substring(0, 5); // HH:mm 형식으로 변환
   };
 
+  const formatMobileUserName = (name: string): string => {
+    return name.length > 8 ? `${name.slice(0, 8)}…` : name;
+  };
+
   // 역할 이니셜 변환
   const getRoleInitial = (role: string): string => {
     const roleMap: Record<string, string> = {
@@ -626,6 +630,9 @@ export function WeekGrid({
     if (user) {
       setModalCell({ userId, date, userName: user.name });
       setSelectedWorkItem(""); // 항상 선택 초기화
+      setModalError(null);
+      setShowTransferMode(false);
+      setSelectedTransferUserId("");
       setIsModalOpen(true);
     }
     setSelectedCell({ userId, date });
@@ -698,18 +705,18 @@ export function WeekGrid({
             ) : null}
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto -mx-2 md:mx-0">
-            <div className="min-w-max px-2 md:px-0">
+        <CardContent className="px-1.5 py-3 md:p-6">
+          <div className="overflow-x-auto -mx-1 md:mx-0">
+            <div className="min-w-full px-1 md:px-0">
               {/* 헤더 행 - 날짜 */}
-              <div className="grid grid-cols-8 gap-px md:gap-1 mb-0.5 md:mb-2 min-w-max">
-                <div className="min-w-[50px] md:min-w-0 md:w-auto p-0.5 md:p-3 font-semibold text-[9px] md:text-sm text-muted-foreground bg-muted/50 border rounded-sm md:rounded-md">
+              <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] md:grid-cols-8 gap-px md:gap-1 mb-0.5 md:mb-2">
+                <div className="min-w-0 md:w-auto p-px md:p-3 font-semibold text-[9px] md:text-sm text-muted-foreground bg-muted/50 border rounded-sm md:rounded-md">
                   {t("schedule.user", locale)}
                 </div>
                 {weekDays.map((day, index) => (
                   <div
                     key={index}
-                    className="min-w-[32px] md:min-w-0 md:w-auto p-0.5 md:p-3 text-center border rounded-sm md:rounded-md bg-muted/50"
+                    className="min-w-0 md:w-auto p-px md:p-3 text-center border rounded-sm md:rounded-md bg-muted/50"
                   >
                     <div className="text-[9px] md:text-sm font-semibold">
                       {formatWeekday(day)}
@@ -722,23 +729,33 @@ export function WeekGrid({
               </div>
 
               {/* 오전/오후 라벨 행 */}
-              <div className="grid grid-cols-8 gap-px md:gap-1 mb-0.5 md:mb-2 min-w-max">
-                <div className="min-w-[50px] md:min-w-0 md:w-auto p-0.5 md:p-2 text-center border rounded-sm md:rounded-md bg-muted/30">
-                  <div className="flex flex-col gap-px">
-                    <div className="text-[8px] md:text-xs text-blue-600 font-medium">
-                      {t("schedule.morningStaff", locale)}
-                    </div>
-                    <div className="text-[8px] md:text-xs text-orange-600 font-medium">
-                      {t("schedule.afternoonStaff", locale)}
+              <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] md:grid-cols-8 gap-px md:gap-1 mb-0.5 md:mb-2">
+                <div className="min-w-0 md:w-auto p-px md:p-2 text-center border rounded-sm md:rounded-md bg-muted/30">
+                    <div className="flex flex-col gap-px">
+                      <div className="text-[8px] md:text-xs text-blue-600 font-medium">
+                        <span className="md:hidden">
+                          {t("schedule.morningStaffShort", locale)}
+                        </span>
+                        <span className="hidden md:inline">
+                          {t("schedule.morningStaff", locale)}
+                        </span>
+                      </div>
+                      <div className="text-[8px] md:text-xs text-orange-600 font-medium">
+                        <span className="md:hidden">
+                          {t("schedule.afternoonStaffShort", locale)}
+                        </span>
+                        <span className="hidden md:inline">
+                          {t("schedule.afternoonStaff", locale)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
                 {weekDays.map((day, index) => {
                   const { morning, afternoon } = getShiftCounts(day);
                   return (
                     <div
                       key={index}
-                      className="min-w-[32px] md:min-w-0 md:w-auto p-0.5 md:p-2 text-center border rounded-sm md:rounded-md bg-muted/30"
+                      className="min-w-0 md:w-auto p-px md:p-2 text-center border rounded-sm md:rounded-md bg-muted/30"
                     >
                       <div className="flex flex-col gap-px">
                         <div className="text-[9px] md:text-xs text-blue-600 font-medium">
@@ -755,10 +772,13 @@ export function WeekGrid({
 
               {/* 사용자별 행 */}
               {users.map((user) => (
-                <div key={user.id} className="grid grid-cols-8 gap-px md:gap-1 mb-px md:mb-1 min-w-max">
+                <div
+                  key={user.id}
+                  className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] md:grid-cols-8 gap-px md:gap-1 mb-px md:mb-1"
+                >
                   {/* 사용자 정보 */}
                   <div
-                    className={`min-w-[50px] md:min-w-0 md:w-auto p-0.5 md:p-2 border rounded-sm md:rounded-md bg-muted/50 ${
+                    className={`min-w-0 md:w-auto p-px md:p-2 border rounded-sm md:rounded-md bg-muted/50 ${
                       canManage
                         ? "cursor-pointer hover:bg-muted/70 transition-colors touch-manipulation"
                         : ""
@@ -766,14 +786,12 @@ export function WeekGrid({
                     onClick={() => handleUserNameClick(user.id)}
                   >
                     <div className="flex items-center gap-0.5 md:gap-2">
-                      <Avatar className="h-3 w-3 md:h-6 md:w-6">
-                        <AvatarFallback className="text-[8px] md:text-xs">
-                          {user.name.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[9px] md:text-sm font-medium truncate">
-                          {user.name}
+                        <div className="text-[9px] md:text-sm font-medium leading-tight md:truncate">
+                          <span className="md:hidden">
+                            {formatMobileUserName(user.name)}
+                          </span>
+                          <span className="hidden md:inline">{user.name}</span>
                         </div>
                         <div className="text-[8px] md:text-xs text-blue-600 font-medium">
                           {getUserTotalHours(user.id)}h
@@ -831,7 +849,7 @@ export function WeekGrid({
                       <div
                         key={dayIndex}
                         className={`
-                          min-w-[32px] md:min-w-0 md:w-auto p-px md:p-2 border rounded-sm md:rounded-md min-h-[48px] md:min-h-[100px] cursor-pointer transition-colors touch-manipulation
+                          min-w-0 md:w-auto p-px md:p-2 border rounded-sm md:rounded-md min-h-[48px] md:min-h-[100px] cursor-pointer transition-colors touch-manipulation
                           ${
                             isSelected
                               ? "bg-primary/10 border-primary"
@@ -1003,16 +1021,33 @@ export function WeekGrid({
       <Dialog
         open={isModalOpen}
         onOpenChange={(open) => {
+          if (!open && isModalLoading) {
+            return;
+          }
+
           setIsModalOpen(open);
           if (!open) {
             // 모달이 닫힐 때 선택된 근무 항목 및 이전 모드 초기화
             setSelectedWorkItem("");
             setShowTransferMode(false);
             setSelectedTransferUserId("");
+            setModalError(null);
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent
+          className="sm:max-w-md"
+          onInteractOutside={(e) => {
+            if (isModalLoading) {
+              e.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(e) => {
+            if (isModalLoading) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {modalCell && (
@@ -1029,6 +1064,12 @@ export function WeekGrid({
             <div className="text-sm text-muted-foreground">
               {t("schedule.selectAction", locale)}
             </div>
+            {modalError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{modalError}</AlertDescription>
+              </Alert>
+            )}
 
             {/* 기존 스케줄 정보 표시 */}
             {modalCell &&
@@ -1067,6 +1108,7 @@ export function WeekGrid({
                   value={selectedWorkItem}
                   disabled={isModalLoading}
                   onValueChange={async (value) => {
+                    setModalError(null);
                     setSelectedWorkItem(value);
 
                     if (value === "TRANSFER_SCHEDULE") {
@@ -1573,6 +1615,7 @@ export function WeekGrid({
                     onValueChange={async (value) => {
                       if (!value || !modalCell) return;
 
+                      setModalError(null);
                       setSelectedTransferUserId(value);
                       setIsModalLoading(true);
 
@@ -1586,7 +1629,7 @@ export function WeekGrid({
                         );
 
                         if (!existingAssignment) {
-                          alert(t("schedule.noScheduleToDelete", locale));
+                          setModalError(t("schedule.noScheduleToDelete", locale));
                           setIsModalLoading(false);
                           return;
                         }
@@ -1741,7 +1784,7 @@ export function WeekGrid({
                             }
                             setIsModalOpen(false);
                           } else {
-                            alert(
+                            setModalError(
                               `${t("schedule.transferError", locale)}: ${
                                 result.error || "Unknown error"
                               }`
@@ -1751,7 +1794,7 @@ export function WeekGrid({
                           const errorData = await response.json().catch(() => ({
                             error: `HTTP ${response.status}`,
                           }));
-                          alert(
+                          setModalError(
                             `${t("schedule.transferError", locale)}: ${
                               errorData.error || response.status
                             }`
@@ -1759,7 +1802,7 @@ export function WeekGrid({
                         }
                       } catch (error) {
                         console.error("스케줄 이전 오류:", error);
-                        alert(t("schedule.transferError", locale));
+                        setModalError(t("schedule.transferError", locale));
                       } finally {
                         setIsModalLoading(false);
                       }
@@ -1793,6 +1836,7 @@ export function WeekGrid({
                   onClick={() => {
                     setShowTransferMode(false);
                     setSelectedTransferUserId("");
+                    setModalError(null);
                   }}
                   disabled={isModalLoading}
                 >

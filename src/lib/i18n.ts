@@ -20,6 +20,8 @@ const translations = {
     "schedule.autoAssign": "자동 배정",
     "schedule.morningStaff": "오전 인원",
     "schedule.afternoonStaff": "오후 인원",
+    "schedule.morningStaffShort": "오전",
+    "schedule.afternoonStaffShort": "오후",
     "home.title": "스마트 스케줄 관리",
     "home.description":
       "소규모 카페와 음식점을 위한 스마트 교대 근무표 자동 생성 및 팀 커뮤니케이션 솔루션",
@@ -941,6 +943,8 @@ const translations = {
     "schedule.autoAssign": "Auto Assign",
     "schedule.morningStaff": "Morning Staff",
     "schedule.afternoonStaff": "Afternoon Staff",
+    "schedule.morningStaffShort": "AM",
+    "schedule.afternoonStaffShort": "PM",
     "home.title": "Smart Schedule Management",
     "home.description":
       "Smart shift schedule automation and team communication solution for small cafes and restaurants",
@@ -1907,6 +1911,8 @@ const translations = {
     "schedule.autoAssign": "自動割当",
     "schedule.morningStaff": "午前人員",
     "schedule.afternoonStaff": "午後人員",
+    "schedule.morningStaffShort": "午前",
+    "schedule.afternoonStaffShort": "午後",
     "home.title": "スマートスケジュール管理",
     "home.description":
       "小規模カフェ・レストラン向けのスマートシフトスケジュール自動生成・チームコミュニケーションソリューション",
