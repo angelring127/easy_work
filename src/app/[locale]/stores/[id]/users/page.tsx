@@ -6,9 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { useStore } from "@/contexts/store-context";
 import { usePermissions, useAdminAccess } from "@/hooks/use-permissions";
-import { LanguageSwitcher } from "@/components/ui/language-switcher";
-import { StoreSwitcher } from "@/components/ui/store-switcher";
-import { RoleBadge } from "@/components/auth/role-badge";
+import { ResponsiveHeader } from "@/components/layout/responsive-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,7 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { t } from "@/lib/i18n";
 import { Locale } from "@/lib/i18n-config";
 import { InvitationManager } from "@/features/invites/components/invitation-manager";
-import { User, LogOut, Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 
 interface UserManagementPageProps {
   params: Promise<{
@@ -417,35 +415,12 @@ export default function UserManagementPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <h1 className="text-3xl font-bold text-gray-900">Workeasy</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <LanguageSwitcher />
-              <StoreSwitcher />
-              <div className="flex items-center space-x-2">
-                <User className="h-5 w-5" />
-                <span className="text-sm font-medium">
-                  {user?.email || "Unknown"}
-                </span>
-                {userRole && <RoleBadge role={userRole} className="text-xs" />}
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleSignOut}
-                className="flex items-center space-x-2"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>{t("dashboard.logout", locale)}</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <ResponsiveHeader
+        userEmail={user?.email}
+        currentStoreRole={userRole}
+        locale={locale as string}
+        onLogout={handleSignOut}
+      />
 
       {/* 메인 콘텐츠 */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
