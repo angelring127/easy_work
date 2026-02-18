@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/middleware";
 import { locales, defaultLocale, isValidLocale, type Locale } from "@/lib/i18n-config";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // 정적 파일과 API 루트는 스킵

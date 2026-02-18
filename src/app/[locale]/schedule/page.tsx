@@ -27,11 +27,13 @@ import { StoreSwitcher } from "@/components/ui/store-switcher";
 import { WeekGrid } from "@/components/schedule/week-grid";
 import { UserAvailabilityCalendar } from "@/components/schedule/user-availability-calendar";
 import { ScheduleExporter } from "@/components/schedule/schedule-exporter";
+import { ResponsiveHeader } from "@/components/layout/responsive-header";
 import { useAuth } from "@/contexts/auth-context";
 import { useStore } from "@/contexts/store-context";
 import { t, type Locale } from "@/lib/i18n";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { ko, enUS, ja } from "date-fns/locale";
+import { UserRole } from "@/types/auth";
 
 // 日付フォーマット용 로케일 매핑
 const dateLocales = { ko, en: enUS, ja };
@@ -98,6 +100,18 @@ export default function SchedulePage() {
   const [canManage, setCanManage] = useState(false);
   const [workItems, setWorkItems] = useState<any[]>([]);
   const [showWorkItemsModal, setShowWorkItemsModal] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push(`/${locale}/login`);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   // 週の開始日と終了日を計算
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // 月曜日開始
@@ -239,7 +253,15 @@ export default function SchedulePage() {
         const storeUsersData = await storeUsersRes.json();
         console.log("매장 사용자 API 응답:", storeUsersData);
         if (storeUsersData.success) {
-          const members = storeUsersData.data?.members || [];
+          let members = storeUsersData.data?.members || [];
+
+          // Part Timer는 본인만 표시
+          if (currentUserRole === "PART_TIMER" && currentUserId) {
+            members = members.filter(
+              (m: any) => m.id === currentUserId || m.user_id === currentUserId
+            );
+          }
+
           const transformedUsers = members.map((member: any) => ({
             // Guest 사용자의 경우 user_id가 null이므로 id(store_users.id)를 사용
             id: member.id || member.user_id,
@@ -270,12 +292,26 @@ export default function SchedulePage() {
     if (!currentStore?.id || !user) return;
 
     try {
-      // 사용자 권한 확인 (간단한 구현)
-      // 실제로는 API에서 권한 정보를 가져와야 함
-      setCanManage(true); // 임시로 true 설정
+      const response = await fetch(`/api/stores/${currentStore.id}/users/me`);
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        const userRole = data.data.role;
+        const userId = data.data.id;
+
+        setCanManage(userRole === "MASTER" || userRole === "SUB_MANAGER");
+        setCurrentUserRole(userRole);
+        setCurrentUserId(userId);
+      } else {
+        setCanManage(false);
+        setCurrentUserRole(null);
+        setCurrentUserId(null);
+      }
     } catch (error) {
       console.error("권한 확인 실패:", error);
       setCanManage(false);
+      setCurrentUserRole(null);
+      setCurrentUserId(null);
     }
   };
 
@@ -359,93 +395,136 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* ヘッダー */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push(`/${locale}/dashboard`)}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {t("common.back", currentLocale)}
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">
-              {t("schedule.title", currentLocale)}
-            </h1>
-            <p className="text-muted-foreground">
-              {currentStore.name} • {formatWeekRange()}
-            </p>
-          </div>
-        </div>
+    <>
+      {/* Responsive Header */}
+      <ResponsiveHeader
+        userEmail={user?.email}
+        currentStoreRole={currentUserRole as UserRole}
+        locale={locale as string}
+        onLogout={handleLogout}
+      />
 
-        <div className="flex items-center gap-2">
-          <StoreSwitcher />
-          {canManage && (
-            <Button variant="default" size="sm" onClick={handleAutoAssign}>
-              {t("schedule.autoAssign", currentLocale)}
+      <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
+        {/* Page Title & Actions */}
+        <div className="flex flex-col gap-3 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/${locale}/dashboard`)}
+              className="flex items-center gap-2 min-h-[44px] touch-manipulation"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">{t("common.back", currentLocale)}</span>
             </Button>
-          )}
-          <ScheduleExporter
-            storeId={currentStore.id}
-            from={format(weekStart, "yyyy-MM-dd")}
-            to={format(weekEnd, "yyyy-MM-dd")}
-            locale={currentLocale}
-            canExportAll={canManage}
-            assignments={assignments}
-            userAvailabilities={userAvailabilities}
-            currentWeek={currentWeek}
-            storeUsers={storeUsers}
-            storeName={currentStore.name}
-            businessHours={businessHours}
-          />
-        </div>
-      </div>
-
-      {/* 週ナビゲーション */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
-                ←
-              </Button>
-              <Button variant="outline" size="sm" onClick={goToCurrentWeek}>
-                {t("schedule.currentWeek", currentLocale)}
-              </Button>
-              <Button variant="outline" size="sm" onClick={goToNextWeek}>
-                →
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">{formatWeekRange()}</Badge>
+            <div className="flex-1">
+              <h1 className="text-xl md:text-3xl font-bold">
+                {t("schedule.title", currentLocale)}
+              </h1>
+              <p className="text-xs md:text-sm text-muted-foreground">
+                {currentStore.name} • {formatWeekRange()}
+              </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* メインコンテンツ */}
-      <Tabs
-        value={viewMode}
-        onValueChange={(value) => setViewMode(value as "week" | "month")}
-      >
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="week" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            {t("schedule.weekView", currentLocale)}
-          </TabsTrigger>
-          <TabsTrigger value="month" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            {t("schedule.monthView", currentLocale)}
-          </TabsTrigger>
-        </TabsList>
+          {/* Action Buttons - Mobile optimized */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="md:hidden flex-1">
+              <StoreSwitcher />
+            </div>
+            {canManage && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleAutoAssign}
+                className="min-h-[44px] touch-manipulation flex-1 md:flex-none"
+              >
+                {t("schedule.autoAssign", currentLocale)}
+              </Button>
+            )}
+            <div className="flex-1 md:flex-none">
+              <ScheduleExporter
+                storeId={currentStore.id}
+                from={format(weekStart, "yyyy-MM-dd")}
+                to={format(weekEnd, "yyyy-MM-dd")}
+                locale={currentLocale}
+                canExportAll={canManage}
+                assignments={assignments}
+                userAvailabilities={userAvailabilities}
+                currentWeek={currentWeek}
+                storeUsers={storeUsers}
+                storeName={currentStore.name}
+                businessHours={businessHours}
+              />
+            </div>
+          </div>
+        </div>
 
-        {
-          <TabsContent value="week" className="space-y-4">
+        {/* Week Navigation */}
+        <Card>
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1 md:gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousWeek}
+                  className="min-h-[44px] min-w-[44px] touch-manipulation"
+                >
+                  ←
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToCurrentWeek}
+                  className="min-h-[44px] touch-manipulation text-xs md:text-sm"
+                >
+                  {t("schedule.currentWeek", currentLocale)}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextWeek}
+                  className="min-h-[44px] min-w-[44px] touch-manipulation"
+                >
+                  →
+                </Button>
+              </div>
+
+              <Badge variant="secondary" className="hidden sm:inline-flex">
+                {formatWeekRange()}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Main Content - Tabs */}
+        <Tabs
+          value={viewMode}
+          onValueChange={(value) => setViewMode(value as "week" | "month")}
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger
+              value="week"
+              className="flex items-center gap-2 min-h-[44px] touch-manipulation"
+            >
+              <Calendar className="h-4 w-4" />
+              <span className="text-xs md:text-sm">
+                {t("schedule.weekView", currentLocale)}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="month"
+              className="flex items-center gap-2 min-h-[44px] touch-manipulation"
+            >
+              <Calendar className="h-4 w-4" />
+              <span className="text-xs md:text-sm">
+                {t("schedule.monthView", currentLocale)}
+              </span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="week" className="space-y-2 md:space-y-4 mt-4">
             <WeekGrid
               storeId={currentStore.id}
               currentWeek={currentWeek}
@@ -460,10 +539,8 @@ export default function SchedulePage() {
               canManage={canManage}
             />
           </TabsContent>
-        }
 
-        {
-          <TabsContent value="month" className="space-y-4">
+          <TabsContent value="month" className="space-y-2 md:space-y-4 mt-4">
             <UserAvailabilityCalendar
               storeId={currentStore.id}
               locale={currentLocale}
@@ -481,11 +558,10 @@ export default function SchedulePage() {
               }}
             />
           </TabsContent>
-        }
-      </Tabs>
+        </Tabs>
 
-      {/* Work Items 없음 모달 */}
-      <Dialog open={showWorkItemsModal} onOpenChange={setShowWorkItemsModal}>
+        {/* Work Items Warning Modal */}
+        <Dialog open={showWorkItemsModal} onOpenChange={setShowWorkItemsModal}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -501,10 +577,11 @@ export default function SchedulePage() {
               {t("schedule.noWorkItemsMessage", currentLocale)}
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => setShowWorkItemsModal(false)}
+              className="w-full sm:w-auto min-h-[44px] touch-manipulation"
             >
               {t("common.cancel", currentLocale)}
             </Button>
@@ -517,12 +594,14 @@ export default function SchedulePage() {
                   setShowWorkItemsModal(false);
                 }
               }}
+              className="w-full sm:w-auto min-h-[44px] touch-manipulation"
             >
               {t("schedule.goToWorkItems", currentLocale)}
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-    </div>
+        </Dialog>
+      </div>
+    </>
   );
 }

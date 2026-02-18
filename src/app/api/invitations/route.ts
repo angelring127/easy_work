@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 
 /**
  * 초대 생성 API
@@ -199,8 +199,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 기존 사용자인지 먼저 확인
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    // 기존 사용자인지 먼저 확인 - Admin API 사용을 위해 Service Role Key 클라이언트 사용
+    const adminClient = await createPureClient();
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(
       (u) => u.email?.toLowerCase() === email.toLowerCase()
     );
@@ -350,7 +351,7 @@ export async function POST(request: NextRequest) {
         const userName = name?.trim() || email.split("@")[0] || "";
 
         const { error: emailError } =
-          await supabase.auth.admin.inviteUserByEmail(email, {
+          await adminClient.auth.admin.inviteUserByEmail(email, {
             data: {
               store_id: storeId,
               store_name: store.name,

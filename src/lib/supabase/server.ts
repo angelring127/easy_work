@@ -11,10 +11,10 @@ export async function createClient() {
   // 환경변수 검증 (빌드 시점에서는 기본값 사용)
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key";
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
 
-  return createServerClient<Database>(url, serviceKey, {
+  return createServerClient<Database>(url, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

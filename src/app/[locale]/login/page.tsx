@@ -74,9 +74,8 @@ function SignInContent() {
           if (error) {
             console.error("LoginPage: 세션 설정 실패:", error);
             toast({
-              title: "초대 링크 오류",
-              description:
-                "초대 링크 처리 중 오류가 발생했습니다. 다시 시도해주세요.",
+              title: t("invite.error.title", currentLocale),
+              description: t("invite.error.processing", currentLocale),
               variant: "destructive",
             });
             setProcessingInvite(false);
@@ -184,7 +183,9 @@ function SignInContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-lg font-medium text-gray-700">
-            {isProcessingInvite ? "초대 링크 처리 중..." : "로딩 중..."}
+            {isProcessingInvite
+              ? t("invite.accept.loading", currentLocale)
+              : t("auth.login.loading", currentLocale)}
           </p>
         </div>
       </div>

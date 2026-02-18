@@ -11,6 +11,7 @@ export interface SessionState {
 export class SessionManager {
   private static instance: SessionManager;
   private checkInterval: NodeJS.Timeout | null = null;
+  private hasSeenAuthenticatedSession = false;
   private readonly CHECK_INTERVAL = 60000; // 1분마다 체크
   private readonly REFRESH_THRESHOLD = 300000; // 5분 전에 갱신
 
@@ -30,15 +31,27 @@ export class SessionManager {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (error || !session) {
+      if (error) {
         return {
           user: null,
           session: null,
-          isExpired: true,
+          isExpired: this.hasSeenAuthenticatedSession,
           expiresAt: null
         };
       }
 
+      // 로그인하지 않은 상태는 "만료"가 아니라 정상 상태로 취급한다.
+      // 그래야 로그인/회원가입 페이지에서 불필요한 리다이렉트가 발생하지 않는다.
+      if (!session) {
+        return {
+          user: null,
+          session: null,
+          isExpired: false,
+          expiresAt: null
+        };
+      }
+
+      this.hasSeenAuthenticatedSession = true;
       const expiresAt = session.expires_at ? session.expires_at * 1000 : null;
       const now = Date.now();
       const isExpired = expiresAt ? now >= expiresAt : false;
@@ -149,6 +162,7 @@ export class SessionManager {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
+      this.hasSeenAuthenticatedSession = false;
       
       if (process.env.NODE_ENV === 'development') {
         console.log('주기적 세션 체크 중지');

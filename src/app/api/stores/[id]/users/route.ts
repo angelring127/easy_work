@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 
 /**
  * 매장 구성원 목록 조회 API
@@ -117,10 +117,11 @@ async function getStoreUsers(
       );
     }
 
-    // 사용자 정보 조회 (이메일, 이름 등)
+    // 사용자 정보 조회 (이메일, 이름 등) - Admin API 사용을 위해 Service Role Key 클라이언트 사용
     const userIds = (userRoles || []).map((ur) => ur.user_id);
+    const adminClient = await createPureClient();
     const { data: users, error: usersError } =
-      await supabase.auth.admin.listUsers();
+      await adminClient.auth.admin.listUsers();
 
     if (usersError) {
       console.error("사용자 정보 조회 오류:", usersError);

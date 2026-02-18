@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -23,7 +23,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { defaultLocale } from "@/lib/i18n-config";
 
 import {
-  signInSchema,
+  createSignInSchema,
   type SignInFormData,
   type AuthApiResponse,
 } from "@/lib/validations/auth";
@@ -43,7 +43,10 @@ async function signInUser(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      locale,
+    }),
   });
 
   const result = await response.json();
@@ -63,6 +66,7 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
   const { refreshSession } = useAuth();
   const params = useParams();
   const locale = (params?.locale as Locale) || defaultLocale;
+  const signInSchema = useMemo(() => createSignInSchema(locale), [locale]);
 
   const form = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),

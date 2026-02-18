@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 // 요청 데이터 검증 스키마
@@ -69,9 +69,10 @@ async function assignTemporaryWork(
       );
     }
 
-    // 대상 사용자 존재 확인
+    // 대상 사용자 존재 확인 - Admin API 사용을 위해 Service Role Key 클라이언트 사용
+    const adminClient = await createPureClient();
     const { data: targetUser, error: userError } =
-      await supabase.auth.admin.getUserById(userId);
+      await adminClient.auth.admin.getUserById(userId);
     if (userError || !targetUser.user) {
       return NextResponse.json(
         {

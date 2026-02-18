@@ -57,35 +57,35 @@ export default function InviteErrorPage() {
   }, []);
 
   const getErrorMessage = () => {
-    if (!errorInfo) return "알 수 없는 오류가 발생했습니다.";
+    if (!errorInfo) return t("common.unknownError", currentLocale);
 
     switch (errorInfo.errorCode) {
       case "otp_expired":
-        return "이메일 링크가 만료되었습니다.";
+        return t("invite.error.message.otpExpired", currentLocale);
       case "access_denied":
-        return "접근이 거부되었습니다.";
+        return t("invite.error.message.accessDenied", currentLocale);
       default:
-        return "초대 링크에 문제가 있습니다.";
+        return t("invite.error.message.invalidInvite", currentLocale);
     }
   };
 
   const getErrorDescription = () => {
-    if (!errorInfo) return "초대 링크를 다시 확인해주세요.";
+    if (!errorInfo) return t("invite.error.description.default", currentLocale);
 
     switch (errorInfo.errorCode) {
       case "otp_expired":
-        return "초대 링크의 유효기간이 만료되었습니다. 새로운 초대를 요청해주세요.";
+        return t("invite.error.description.otpExpired", currentLocale);
       case "access_denied":
-        return "이 초대 링크에 대한 접근 권한이 없습니다. 관리자에게 문의해주세요.";
+        return t("invite.error.description.accessDenied", currentLocale);
       default:
-        return "초대 링크가 유효하지 않거나 손상되었습니다.";
+        return t("invite.error.description.invalidInvite", currentLocale);
     }
   };
 
   const handleRequestNewInvite = () => {
     toast({
-      title: "새로운 초대 요청",
-      description: "관리자에게 새로운 초대를 요청해주세요.",
+      title: t("invite.error.requestNew", currentLocale),
+      description: t("invite.error.requestNewDescription", currentLocale),
     });
     // 대시보드로 이동 (로그인된 경우)
     router.push(`/${currentLocale}/dashboard`);
@@ -119,14 +119,14 @@ export default function InviteErrorPage() {
             {errorInfo && (
               <div className="bg-gray-50 p-3 rounded-lg text-xs text-gray-500">
                 <div>
-                  <strong>오류 코드:</strong> {errorInfo.errorCode}
+                  <strong>{t("invite.error.code", currentLocale)}:</strong> {errorInfo.errorCode}
                 </div>
                 <div>
-                  <strong>오류 타입:</strong> {errorInfo.error}
+                  <strong>{t("invite.error.type", currentLocale)}:</strong> {errorInfo.error}
                 </div>
                 {errorInfo.errorDescription && (
                   <div>
-                    <strong>상세:</strong> {errorInfo.errorDescription}
+                    <strong>{t("invite.error.detail", currentLocale)}:</strong> {errorInfo.errorDescription}
                   </div>
                 )}
               </div>

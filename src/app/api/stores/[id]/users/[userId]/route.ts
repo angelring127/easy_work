@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAuth, createAuthErrorResponse } from "@/lib/auth/middleware";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 // 사용자 프로필 수정 스키마
@@ -163,9 +163,10 @@ async function getUserDetail(
       }
     }
     
-    // 사용자 기본 정보 조회
+    // 사용자 기본 정보 조회 - Admin API 사용을 위해 Service Role Key 클라이언트 사용
+    const adminClient = await createPureClient();
     const { data: userInfo, error: userError } =
-      await supabase.auth.admin.getUserById(authUserId);
+      await adminClient.auth.admin.getUserById(authUserId);
 
     if (userError || !userInfo.user) {
       return NextResponse.json(
@@ -509,9 +510,10 @@ async function updateUserProfile(
       }
     }
 
-    // 사용자 존재 확인
+    // 사용자 존재 확인 - Admin API 사용을 위해 Service Role Key 클라이언트 사용
+    const adminClient = await createPureClient();
     const { data: targetUser, error: targetUserError } =
-      await supabase.auth.admin.getUserById(authUserId);
+      await adminClient.auth.admin.getUserById(authUserId);
 
     if (targetUserError || !targetUser.user) {
       return NextResponse.json(
@@ -559,7 +561,7 @@ async function updateUserProfile(
 
       // auth.users의 user_metadata.name 업데이트
       const currentMetadata = targetUser.user.user_metadata || {};
-      const { error: authNameError } = await supabase.auth.admin.updateUserById(
+      const { error: authNameError } = await adminClient.auth.admin.updateUserById(
         authUserId,
         {
           user_metadata: {
@@ -688,7 +690,7 @@ async function updateUserProfile(
       }),
     };
 
-    const { error: updateError } = await supabase.auth.admin.updateUserById(
+    const { error: updateError } = await adminClient.auth.admin.updateUserById(
       userId,
       {
         user_metadata: updatedMetadata,

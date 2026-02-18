@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { DateActionSheet } from "@/components/schedule/date-action-sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -735,14 +736,14 @@ export function UserAvailabilityCalendar({
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2 md:space-y-4">
             {/* 요일 헤더 */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-1 md:gap-2">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
                 (day, index) => (
                   <div
                     key={index}
-                    className="p-2 text-center text-sm font-medium text-muted-foreground"
+                    className="p-1 md:p-2 text-center text-xs md:text-sm font-medium text-muted-foreground"
                   >
                     {day}
                   </div>
@@ -751,7 +752,7 @@ export function UserAvailabilityCalendar({
             </div>
 
             {/* 캘린더 그리드 */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-1 md:gap-2">
               {monthDays.map((date, index) => {
                 // 현재 월에 속하는 날짜인지 확인
                 const isCurrentMonth =
@@ -770,7 +771,7 @@ export function UserAvailabilityCalendar({
                   <div
                     key={index}
                     className={`
-                      aspect-square p-2 border rounded-md transition-colors
+                      aspect-square p-1 md:p-2 border rounded-md transition-colors touch-manipulation
                       ${!isCurrentMonth ? "opacity-30" : ""}
                       ${isCurrentDay ? "bg-primary/10 border-primary" : ""}
                       ${
@@ -791,7 +792,7 @@ export function UserAvailabilityCalendar({
                     <div className="flex flex-col items-center justify-center h-full">
                       <div
                         className={`
-                        text-sm font-medium
+                        text-xs md:text-sm font-medium
                         ${isCurrentDay ? "text-primary" : ""}
                         ${isUnavailable ? "text-red-600" : ""}
                       `}
@@ -800,12 +801,12 @@ export function UserAvailabilityCalendar({
                       </div>
 
                       {isUnavailable && (
-                        <div className="mt-1 flex flex-col items-center gap-0.5">
-                          <AlertCircle className="h-3 w-3 text-red-500" />
+                        <div className="mt-0.5 md:mt-1 flex flex-col items-center gap-0.5">
+                          <AlertCircle className="h-2.5 w-2.5 md:h-3 md:w-3 text-red-500" />
                           {canManage && unavailableCount > 1 && (
                             <Badge
                               variant="destructive"
-                              className="h-4 px-1 text-xs"
+                              className="h-3 md:h-4 px-0.5 md:px-1 text-[10px] md:text-xs"
                             >
                               {unavailableCount}
                             </Badge>

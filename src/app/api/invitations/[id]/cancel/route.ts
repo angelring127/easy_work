@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { createClient } from "@/lib/supabase/server";
+import { defaultLocale, isValidLocale, t, type Locale } from "@/lib/i18n";
+
+function resolveLocale(request: NextRequest): Locale {
+  const localeParam = request.nextUrl.searchParams.get("locale");
+  if (localeParam && isValidLocale(localeParam)) {
+    return localeParam;
+  }
+
+  const acceptLanguage = request.headers.get("accept-language");
+  const preferredLocale = acceptLanguage?.split(",")[0]?.split("-")[0];
+  if (preferredLocale && isValidLocale(preferredLocale)) {
+    return preferredLocale;
+  }
+
+  return defaultLocale;
+}
 
 /**
  * 초대 취소 API
@@ -12,6 +28,7 @@ async function cancelInvitation(
 ): Promise<NextResponse> {
   try {
     const { user } = context;
+    const locale = resolveLocale(request);
     const params = await context.params;
     const { id: invitationId } = params;
     const supabase = await createClient();
@@ -27,7 +44,7 @@ async function cancelInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "초대를 찾을 수 없습니다",
+          error: t("invite.accept.notFound", locale),
         },
         { status: 404 }
       );
@@ -55,7 +72,7 @@ async function cancelInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "초대 취소 권한이 없습니다",
+          error: t("invite.cancelPermissionDenied", locale),
         },
         { status: 403 }
       );
@@ -66,7 +83,7 @@ async function cancelInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "대기 중인 초대만 취소할 수 있습니다",
+          error: t("invite.onlyPendingCancel", locale),
         },
         { status: 400 }
       );
@@ -87,7 +104,7 @@ async function cancelInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "초대 취소에 실패했습니다",
+          error: t("invite.cancelError", locale),
         },
         { status: 500 }
       );
@@ -118,14 +135,15 @@ async function cancelInvitation(
 
     return NextResponse.json({
       success: true,
-      message: "초대가 성공적으로 취소되었습니다",
+      message: t("invite.cancelSuccess", locale),
     });
   } catch (error) {
     console.error("초대 취소 API 오류:", error);
+    const locale: Locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", locale),
       },
       { status: 500 }
     );

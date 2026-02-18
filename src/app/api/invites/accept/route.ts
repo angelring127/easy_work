@@ -2,15 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { defaultLocale, isValidLocale, t, type Locale } from "@/lib/i18n";
 
 /**
  * 초대 수락 요청 스키마
  */
 const acceptInviteSchema = z.object({
-  token: z.string().min(1, "초대 토큰이 필요합니다"),
+  token: z.string().min(1),
 });
 
 type AcceptInviteRequest = z.infer<typeof acceptInviteSchema>;
+
+function resolveLocale(request: NextRequest, localeParam?: string): Locale {
+  if (localeParam && isValidLocale(localeParam)) {
+    return localeParam;
+  }
+
+  const acceptLanguage = request.headers.get("accept-language");
+  const preferredLocale = acceptLanguage?.split(",")[0]?.split("-")[0];
+  if (preferredLocale && isValidLocale(preferredLocale)) {
+    return preferredLocale;
+  }
+
+  return defaultLocale;
+}
 
 /**
  * 초대 수락 API
@@ -26,6 +41,8 @@ async function acceptInvite(
 
     // 요청 데이터 검증
     const body = await request.json();
+    const localeParam = typeof body?.locale === "string" ? body.locale : undefined;
+    const locale = resolveLocale(request, localeParam);
     const validatedData = acceptInviteSchema.parse(body);
     const { token } = validatedData;
 
@@ -48,7 +65,7 @@ async function acceptInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "유효하지 않거나 만료된 초대입니다",
+          error: t("invite.accept.invalidToken", locale),
         },
         { status: 404 }
       );
@@ -59,7 +76,7 @@ async function acceptInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "초대된 이메일과 현재 로그인한 이메일이 일치하지 않습니다",
+          error: t("invite.accept.emailMismatch", locale),
         },
         { status: 403 }
       );
@@ -88,7 +105,7 @@ async function acceptInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "이미 해당 매장의 구성원입니다",
+          error: t("invite.accept.alreadyMember", locale),
         },
         { status: 409 }
       );
@@ -128,7 +145,7 @@ async function acceptInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "초대 수락 처리 중 오류가 발생했습니다",
+          error: t("invite.accept.processingError", locale),
         },
         { status: 500 }
       );
@@ -150,6 +167,11 @@ async function acceptInvite(
       });
     }
 
+    const roleName =
+      invite.role === "SUB_MANAGER"
+        ? t("invite.subManager", locale)
+        : t("invite.partTimer", locale);
+
     // 성공 응답
     return NextResponse.json({
       success: true,
@@ -158,28 +180,31 @@ async function acceptInvite(
         role: invite.role,
         membership_id: null, // Supabase insert는 기본적으로 데이터를 반환하지 않음
       },
-      message: `${invite.store.name}에 ${
-        invite.role === "SUB_MANAGER" ? "서브 관리자" : "파트타이머"
-      }로 성공적으로 합류했습니다`,
+      message: t("invite.accept.joinedRoleMessage", locale, {
+        storeName: invite.store.name,
+        roleName,
+      }),
     });
   } catch (error) {
     console.error("초대 수락 API 오류:", error);
 
     if (error instanceof z.ZodError) {
+      const locale = defaultLocale;
       return NextResponse.json(
         {
           success: false,
-          error: "입력 데이터가 유효하지 않습니다",
+          error: t("auth.login.validation.invalidData", locale),
           details: error.errors,
         },
         { status: 400 }
       );
     }
 
+    const locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", locale),
       },
       { status: 500 }
     );
@@ -192,6 +217,8 @@ async function acceptInvite(
  */
 async function getInviteInfo(request: NextRequest): Promise<NextResponse> {
   try {
+    const localeParam = request.nextUrl.searchParams.get("locale") || undefined;
+    const locale = resolveLocale(request, localeParam);
     const { searchParams } = new URL(request.url);
     const token = searchParams.get("token");
 
@@ -199,7 +226,7 @@ async function getInviteInfo(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: false,
-          error: "초대 토큰이 필요합니다",
+          error: t("invite.accept.tokenRequired", locale),
         },
         { status: 400 }
       );
@@ -229,7 +256,7 @@ async function getInviteInfo(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: false,
-          error: "초대를 찾을 수 없습니다",
+          error: t("invite.accept.notFound", locale),
         },
         { status: 404 }
       );
@@ -241,17 +268,17 @@ async function getInviteInfo(request: NextRequest): Promise<NextResponse> {
     const isExpired = now > expiresAt;
 
     let status = "valid";
-    let statusMessage = "유효한 초대입니다";
+    let statusMessage = t("invite.accept.status.valid", locale);
 
     if (invite.is_cancelled) {
       status = "cancelled";
-      statusMessage = "취소된 초대입니다";
+      statusMessage = t("invite.accept.status.cancelled", locale);
     } else if (invite.is_used) {
       status = "used";
-      statusMessage = "이미 사용된 초대입니다";
+      statusMessage = t("invite.accept.status.used", locale);
     } else if (isExpired) {
       status = "expired";
-      statusMessage = "만료된 초대입니다";
+      statusMessage = t("invite.accept.status.expired", locale);
     }
 
     return NextResponse.json({
@@ -265,10 +292,11 @@ async function getInviteInfo(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     console.error("초대 정보 조회 API 오류:", error);
+    const locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", locale),
       },
       { status: 500 }
     );

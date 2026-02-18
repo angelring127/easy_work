@@ -3,9 +3,8 @@
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { t } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
-import { Locale } from "@/lib/i18n-config";
 
 interface AcceptInvitationPageProps {
   params: Promise<{
@@ -58,9 +57,8 @@ export default function AcceptInvitationPage({
             if (error) {
               console.error("세션 설정 실패:", error);
               toast({
-                title: "초대 링크 오류",
-                description:
-                  "초대 링크 처리 중 오류가 발생했습니다. 다시 시도해주세요.",
+                title: t("invite.error.title", locale),
+                description: t("invite.error.processing", locale),
                 variant: "destructive",
               });
               router.push(`/${locale}/invites/error`);
@@ -79,8 +77,8 @@ export default function AcceptInvitationPage({
       } catch (error) {
         console.error("초대 링크 처리 실패:", error);
         toast({
-          title: "초대 링크 오류",
-          description: "초대 링크 처리 중 오류가 발생했습니다.",
+          title: t("invite.error.title", locale),
+          description: t("invite.error.processing", locale),
           variant: "destructive",
         });
         router.push(`/${locale}/invites/error`);
@@ -97,7 +95,7 @@ export default function AcceptInvitationPage({
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-        <p>초대 링크를 처리하는 중...</p>
+        <p>{t("invite.accept.loading", locale)}</p>
       </div>
     </div>
   );

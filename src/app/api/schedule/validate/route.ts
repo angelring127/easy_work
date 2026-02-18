@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { validateScheduleRoleRequirements } from "@/lib/schedule/role-coverage";
+import { defaultLocale, isValidLocale, type Locale } from "@/lib/i18n";
 
 // 입력 검증 스키마 (제출 전의 간단한 체크)
 const AssignmentSchema = z.object({
@@ -10,9 +11,25 @@ const AssignmentSchema = z.object({
   startMin: z.number().int().min(0).max(1440),
   endMin: z.number().int().min(0).max(1440),
   roleHint: z.string().optional(),
+  locale: z.string().optional(),
   workItemIds: z.array(z.string().uuid()).optional(), // 근무 항목 ID 배열
   assignedUsers: z.array(z.string().uuid()).optional(), // 배정된 유저 ID 배열
 });
+
+function resolveLocale(request: NextRequest, localeParam?: string): Locale {
+  if (localeParam && isValidLocale(localeParam)) {
+    return localeParam;
+  }
+
+  const acceptLanguage = request.headers.get("accept-language");
+  const preferredLocale = acceptLanguage?.split(",")[0]?.split("-")[0];
+
+  if (preferredLocale && isValidLocale(preferredLocale)) {
+    return preferredLocale;
+  }
+
+  return defaultLocale;
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -33,8 +50,16 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     );
 
-  const { storeId, startMin, endMin, roleHint, workItemIds, assignedUsers } =
-    parsed.data;
+  const {
+    storeId,
+    startMin,
+    endMin,
+    roleHint,
+    locale: localeParam,
+    workItemIds,
+    assignedUsers,
+  } = parsed.data;
+  const locale = resolveLocale(request, localeParam);
 
   // 1) end > start
   if (endMin <= startMin) {
@@ -105,7 +130,8 @@ export async function POST(request: NextRequest) {
       roleValidation = await validateScheduleRoleRequirements(
         storeId,
         workItemIds,
-        assignedUsers
+        assignedUsers,
+        locale
       );
 
       if (!roleValidation.isValid) {
@@ -128,7 +154,12 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           code: "schedule.errors.roleValidationError",
-          error: "역할 검증 중 오류가 발생했습니다.",
+          error:
+            locale === "ko"
+              ? "역할 검증 중 오류가 발생했습니다."
+              : locale === "ja"
+                ? "役割検証中にエラーが発生しました。"
+                : "An error occurred during role validation.",
         },
         { status: 500 }
       );

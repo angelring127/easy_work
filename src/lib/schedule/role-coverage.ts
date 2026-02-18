@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { defaultLocale, isValidLocale, type Locale } from "@/lib/i18n";
 
 // 역할 커버리지 정보 타입
 export interface RoleCoverage {
@@ -173,24 +174,38 @@ export function validateRoleCoverage(roleCoverage: RoleCoverage[]): {
  */
 export function formatRoleCoverageMessage(
   insufficientRoles: RoleCoverage[],
-  locale: string
+  locale: Locale
 ): string {
+  const safeLocale: Locale = isValidLocale(locale) ? locale : defaultLocale;
+
   if (insufficientRoles.length === 0) {
-    return locale === "ko"
-      ? "모든 역할 요구 사항이 충족되었습니다."
-      : "All role requirements are satisfied.";
+    if (safeLocale === "ko") {
+      return "모든 역할 요구 사항이 충족되었습니다.";
+    }
+    if (safeLocale === "ja") {
+      return "すべての役割要件が満たされています。";
+    }
+    return "All role requirements are satisfied.";
   }
 
   const roleMessages = insufficientRoles.map((role) => {
     const roleName = role.jobRoleCode || role.jobRoleName;
-    return locale === "ko"
-      ? `${roleName}: ${role.currentCount}/${role.requiredCount}명`
-      : `${roleName}: ${role.currentCount}/${role.requiredCount} people`;
+    if (safeLocale === "ko") {
+      return `${roleName}: ${role.currentCount}/${role.requiredCount}명`;
+    }
+    if (safeLocale === "ja") {
+      return `${roleName}: ${role.currentCount}/${role.requiredCount}人`;
+    }
+    return `${roleName}: ${role.currentCount}/${role.requiredCount} people`;
   });
 
-  return locale === "ko"
-    ? `역할 인원 부족: ${roleMessages.join(", ")}`
-    : `Insufficient role coverage: ${roleMessages.join(", ")}`;
+  if (safeLocale === "ko") {
+    return `역할 인원 부족: ${roleMessages.join(", ")}`;
+  }
+  if (safeLocale === "ja") {
+    return `役割人員不足: ${roleMessages.join(", ")}`;
+  }
+  return `Insufficient role coverage: ${roleMessages.join(", ")}`;
 }
 
 /**
@@ -199,7 +214,8 @@ export function formatRoleCoverageMessage(
 export async function validateScheduleRoleRequirements(
   storeId: string,
   workItemIds: string[],
-  assignedUsers: string[]
+  assignedUsers: string[],
+  locale: Locale = defaultLocale
 ): Promise<{
   isValid: boolean;
   roleCoverage: RoleCoverage[];
@@ -215,7 +231,12 @@ export async function validateScheduleRoleRequirements(
         isValid: true,
         roleCoverage: [],
         insufficientRoles: [],
-        message: "역할 요구 사항이 없습니다.",
+        message:
+          locale === "ko"
+            ? "역할 요구 사항이 없습니다."
+            : locale === "ja"
+              ? "役割要件がありません。"
+              : "No role requirements found.",
       };
     }
 
@@ -236,7 +257,7 @@ export async function validateScheduleRoleRequirements(
       isValid: validation.isValid,
       roleCoverage,
       insufficientRoles: validation.insufficientRoles,
-      message: formatRoleCoverageMessage(validation.insufficientRoles, "ko"),
+      message: formatRoleCoverageMessage(validation.insufficientRoles, locale),
     };
   } catch (error) {
     console.error("스케줄 역할 검증 오류:", error);
@@ -244,7 +265,12 @@ export async function validateScheduleRoleRequirements(
       isValid: false,
       roleCoverage: [],
       insufficientRoles: [],
-      message: "역할 검증 중 오류가 발생했습니다.",
+      message:
+        locale === "ko"
+          ? "역할 검증 중 오류가 발생했습니다."
+          : locale === "ja"
+            ? "役割検証中にエラーが発生しました。"
+            : "An error occurred during role validation.",
     };
   }
 }

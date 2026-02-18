@@ -193,7 +193,7 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
     if (createForm.isGuest) {
       if (!createForm.name) {
         toast({
-          title: "이름을 입력해주세요",
+          title: t("invite.setupPassword.nameRequiredTitle", locale),
           variant: "destructive",
         });
         return;

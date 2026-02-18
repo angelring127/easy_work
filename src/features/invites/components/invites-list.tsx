@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { t } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
+import { t, type Locale } from "@/lib/i18n";
 import {
   Mail,
   Calendar,
@@ -26,7 +28,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+import { enUS, ja, ko } from "date-fns/locale";
 
 interface Invite {
   id: string;
@@ -68,6 +70,8 @@ export function InvitesList({
   const [isLoading, setIsLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const { toast } = useToast();
+  const params = useParams();
+  const locale = (params?.locale as Locale) || defaultLocale;
 
   /**
    * 초대 목록 로드
@@ -80,18 +84,18 @@ export function InvitesList({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "초대 목록 로드에 실패했습니다");
+        throw new Error(result.error || t("invite.loadError", locale));
       }
 
       setInvites(result.data || []);
     } catch (error) {
       console.error("초대 목록 로드 오류:", error);
       toast({
-        title: "로드 실패",
+        title: t("invite.loadError", locale),
         description:
           error instanceof Error
             ? error.message
-            : "알 수 없는 오류가 발생했습니다",
+            : t("common.unknownError", locale),
         variant: "destructive",
       });
     } finally {
@@ -113,12 +117,12 @@ export function InvitesList({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "초대 취소에 실패했습니다");
+        throw new Error(result.error || t("invite.cancelError", locale));
       }
 
       toast({
-        title: "초대 취소 완료",
-        description: "초대가 성공적으로 취소되었습니다",
+        title: t("invite.cancelSuccess", locale),
+        description: t("invite.cancelSuccess", locale),
       });
 
       // 목록 새로고침
@@ -127,11 +131,11 @@ export function InvitesList({
     } catch (error) {
       console.error("초대 취소 오류:", error);
       toast({
-        title: "취소 실패",
+        title: t("invite.cancelError", locale),
         description:
           error instanceof Error
             ? error.message
-            : "알 수 없는 오류가 발생했습니다",
+            : t("common.unknownError", locale),
         variant: "destructive",
       });
     } finally {
@@ -143,19 +147,19 @@ export function InvitesList({
    * 초대 링크 복사
    */
   const handleCopyInviteLink = async (token: string) => {
-    const inviteUrl = `${window.location.origin}/ko/invites/accept/${token}`;
+    const inviteUrl = `${window.location.origin}/${locale}/invites/accept/${token}`;
 
     try {
       await navigator.clipboard.writeText(inviteUrl);
       toast({
-        title: "링크 복사됨",
-        description: "초대 링크가 클립보드에 복사되었습니다",
+        title: t("invite.linkCopied", locale),
+        description: t("invite.linkCopiedDescription", locale),
       });
     } catch (error) {
       console.error("링크 복사 오류:", error);
       toast({
-        title: "복사 실패",
-        description: "링크 복사에 실패했습니다",
+        title: t("invite.copyError", locale),
+        description: t("invite.copyError", locale),
         variant: "destructive",
       });
     }
@@ -172,7 +176,7 @@ export function InvitesList({
     if (invite.is_cancelled) {
       return {
         status: "cancelled",
-        label: "취소됨",
+        label: t("invite.cancelled", locale),
         variant: "secondary" as const,
       };
     }
@@ -180,7 +184,7 @@ export function InvitesList({
     if (invite.is_used && invite.accepted_at) {
       return {
         status: "accepted",
-        label: "수락됨",
+        label: t("invite.accepted", locale),
         variant: "default" as const,
       };
     }
@@ -188,12 +192,16 @@ export function InvitesList({
     if (isExpired) {
       return {
         status: "expired",
-        label: "만료됨",
+        label: t("invite.expired", locale),
         variant: "destructive" as const,
       };
     }
 
-    return { status: "pending", label: "대기중", variant: "outline" as const };
+    return {
+      status: "pending",
+      label: t("invite.pending", locale),
+      variant: "outline" as const,
+    };
   };
 
   /**
@@ -202,9 +210,9 @@ export function InvitesList({
   const getRoleDisplay = (role: string) => {
     switch (role) {
       case "SUB_MANAGER":
-        return { label: "서브 관리자", variant: "default" as const };
+        return { label: t("invite.subManager", locale), variant: "default" as const };
       case "PART_TIMER":
-        return { label: "파트타이머", variant: "secondary" as const };
+        return { label: t("invite.partTimer", locale), variant: "secondary" as const };
       default:
         return { label: role, variant: "outline" as const };
     }
@@ -224,7 +232,7 @@ export function InvitesList({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Mail className="h-5 w-5" />
-          {t("invites.list.title")}
+          {t("invites.list.title", locale)}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -232,15 +240,15 @@ export function InvitesList({
           <div className="flex items-center justify-center py-8">
             <div className="flex items-center gap-2">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              <span>초대 목록을 불러오는 중...</span>
+              <span>{t("invite.accept.loading", locale)}</span>
             </div>
           </div>
         ) : invites.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Mail className="h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-muted-foreground">아직 초대가 없습니다</p>
+            <p className="text-muted-foreground">{t("invite.empty", locale)}</p>
             <p className="text-sm text-muted-foreground">
-              새 팀원을 초대해보세요
+              {t("invite.emptyDescription", locale)}
             </p>
           </div>
         ) : (
@@ -248,12 +256,12 @@ export function InvitesList({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>이메일</TableHead>
-                  <TableHead>역할</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead>초대일</TableHead>
-                  <TableHead>만료일</TableHead>
-                  <TableHead className="text-right">작업</TableHead>
+                  <TableHead>{t("invite.email", locale)}</TableHead>
+                  <TableHead>{t("invite.role", locale)}</TableHead>
+                  <TableHead>{t("invite.status", locale)}</TableHead>
+                  <TableHead>{t("invite.invitedAt", locale)}</TableHead>
+                  <TableHead>{t("invite.expiresAt", locale)}</TableHead>
+                  <TableHead className="text-right">{t("invite.actions", locale)}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -302,7 +310,7 @@ export function InvitesList({
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Calendar className="h-3 w-3" />
                           {format(new Date(invite.invited_at), "MM/dd HH:mm", {
-                            locale: ko,
+                            locale: locale === "ko" ? ko : locale === "ja" ? ja : enUS,
                           })}
                         </div>
                       </TableCell>
@@ -310,7 +318,7 @@ export function InvitesList({
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           {format(new Date(invite.expires_at), "MM/dd HH:mm", {
-                            locale: ko,
+                            locale: locale === "ko" ? ko : locale === "ja" ? ja : enUS,
                           })}
                         </div>
                       </TableCell>

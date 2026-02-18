@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { defaultLocale, t, type Locale } from "@/lib/i18n";
+import { resolveRequestLocale } from "@/lib/locale-request";
 
 // 요청 데이터 검증 스키마
 const demoteUserSchema = z.object({
@@ -18,6 +20,7 @@ async function demoteSubManager(
 ): Promise<NextResponse> {
   try {
     const { user, params } = context;
+    const locale = resolveRequestLocale(request);
     const storeId = params.id;
     const body = await request.json();
 
@@ -27,7 +30,7 @@ async function demoteSubManager(
       return NextResponse.json(
         {
           success: false,
-          error: "잘못된 요청 데이터입니다",
+          error: t("auth.login.validation.invalidData", locale),
           details: validationResult.error.errors,
         },
         { status: 400 }
@@ -49,7 +52,7 @@ async function demoteSubManager(
       return NextResponse.json(
         {
           success: false,
-          error: "매장을 찾을 수 없습니다",
+          error: t("store.notFound", locale),
         },
         { status: 404 }
       );
@@ -60,7 +63,7 @@ async function demoteSubManager(
       return NextResponse.json(
         {
           success: false,
-          error: "역할 변경 권한이 없습니다",
+          error: t("role.changePermissionDenied", locale),
         },
         { status: 403 }
       );
@@ -78,7 +81,7 @@ async function demoteSubManager(
       return NextResponse.json(
         {
           success: false,
-          error: "사용자의 역할을 찾을 수 없습니다",
+          error: t("user.roleNotFound", locale),
         },
         { status: 404 }
       );
@@ -88,7 +91,7 @@ async function demoteSubManager(
       return NextResponse.json(
         {
           success: false,
-          error: "서브 매니저만 파트타이머로 전환할 수 있습니다",
+          error: t("user.onlySubManagerCanDemote", locale),
         },
         { status: 400 }
       );
@@ -98,7 +101,7 @@ async function demoteSubManager(
       return NextResponse.json(
         {
           success: false,
-          error: "활성 상태의 서브 매니저만 전환할 수 있습니다",
+          error: t("user.onlyActiveSubManagerCanDemote", locale),
         },
         { status: 400 }
       );
@@ -119,7 +122,7 @@ async function demoteSubManager(
       return NextResponse.json(
         {
           success: false,
-          error: "서브 매니저 전환에 실패했습니다",
+          error: t("user.demoteSubManagerError", locale),
         },
         { status: 500 }
       );
@@ -150,14 +153,15 @@ async function demoteSubManager(
     return NextResponse.json({
       success: true,
       data: { demoted: result },
-      message: "서브 매니저가 파트타이머로 성공적으로 전환되었습니다",
+      message: t("user.demoteSubManagerDescription", locale),
     });
   } catch (error) {
     console.error("서브 매니저 전환 API 오류:", error);
+    const locale: Locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", locale),
       },
       { status: 500 }
     );

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 // 출근 불가 조회 스키마
@@ -123,9 +123,11 @@ export async function GET(request: NextRequest) {
     // 사용자 이름 조회 (store_users에 이름이 없으면 auth.users에서 조회)
     const userIds = data?.map((a: any) => a.store_users?.user_id).filter(Boolean) || [];
     let userNamesMap: Record<string, string> = {};
-    
+
     if (userIds.length > 0) {
-      const { data: users } = await supabase.auth.admin.listUsers();
+      // Admin API 사용을 위해 Service Role Key 클라이언트 사용
+      const adminClient = await createPureClient();
+      const { data: users } = await adminClient.auth.admin.listUsers();
       if (users) {
         users.users.forEach((u) => {
           const name = u.user_metadata?.name || u.email || "";

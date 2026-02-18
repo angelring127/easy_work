@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { t } from "@/lib/i18n";
+import { type Locale } from "@/lib/i18n";
 import { useStore } from "@/contexts/store-context";
 
 export default function SetupPasswordPage() {
@@ -31,7 +32,7 @@ export default function SetupPasswordPage() {
   const [user, setUser] = useState<any>(null);
   const [invitationInfo, setInvitationInfo] = useState<any>(null);
 
-  const locale = params.locale as string;
+  const locale = params.locale as Locale;
   const token = searchParams.get("token");
 
   console.log("=== /invites/setup-password/page.tsx 로드됨 (쿼리 파라미터 버전) ===");
@@ -53,8 +54,8 @@ export default function SetupPasswordPage() {
 
         if (!currentUser) {
           toast({
-            title: "인증 오류",
-            description: "로그인이 필요합니다.",
+            title: t("invite.verify.error", locale),
+            description: t("invite.setupPassword.loginRequired", locale),
             variant: "destructive",
           });
           router.push(`/${locale}/login`);
@@ -78,7 +79,7 @@ export default function SetupPasswordPage() {
             setInvitationInfo(result.data);
           } else {
             toast({
-              title: "초대 오류",
+              title: t("invite.error.title", locale),
               description: result.error,
               variant: "destructive",
             });
@@ -88,8 +89,8 @@ export default function SetupPasswordPage() {
       } catch (error) {
         console.error("사용자 및 초대 정보 확인 실패:", error);
         toast({
-          title: "오류 발생",
-          description: "정보를 불러오는 중 오류가 발생했습니다.",
+          title: t("common.error", locale),
+          description: t("invite.setupPassword.loadError", locale),
           variant: "destructive",
         });
       }
@@ -103,8 +104,8 @@ export default function SetupPasswordPage() {
 
     if (!name || name.trim().length === 0) {
       toast({
-        title: "이름을 입력해주세요",
-        description: "이름은 필수 입력 항목입니다.",
+        title: t("invite.setupPassword.nameRequiredTitle", locale),
+        description: t("invite.setupPassword.nameRequiredDescription", locale),
         variant: "destructive",
       });
       return;
@@ -112,8 +113,8 @@ export default function SetupPasswordPage() {
 
     if (password !== confirmPassword) {
       toast({
-        title: "패스워드가 일치하지 않습니다",
-        description: "패스워드를 다시 확인해주세요.",
+        title: t("invite.setupPassword.passwordMismatchTitle", locale),
+        description: t("invite.setupPassword.passwordMismatchDescription", locale),
         variant: "destructive",
       });
       return;
@@ -121,8 +122,8 @@ export default function SetupPasswordPage() {
 
     if (password.length < 8) {
       toast({
-        title: "패스워드가 너무 짧습니다",
-        description: "최소 8자 이상 입력해주세요.",
+        title: t("invite.setupPassword.passwordTooShortTitle", locale),
+        description: t("invite.setupPassword.passwordTooShortDescription", locale),
         variant: "destructive",
       });
       return;
@@ -187,7 +188,7 @@ export default function SetupPasswordPage() {
           console.log("초대 수락 API 응답:", result);
 
           if (!result.success) {
-            throw new Error(result.error || "초대 수락에 실패했습니다");
+            throw new Error(result.error || t("invite.accept.error", locale));
           }
 
           // 초대 수락 성공 후 세션 새로고침
@@ -210,8 +211,8 @@ export default function SetupPasswordPage() {
       }
 
       toast({
-        title: "패스워드 설정 완료",
-        description: "초대가 성공적으로 수락되었습니다.",
+        title: t("invite.setupPassword.successTitle", locale),
+        description: t("invite.accept.successDescription", locale),
       });
 
       // 대시보드로 이동
@@ -219,8 +220,8 @@ export default function SetupPasswordPage() {
     } catch (error: any) {
       console.error("패스워드 설정 실패:", error);
       toast({
-        title: "패스워드 설정에 실패했습니다",
-        description: error.message || "오류가 발생했습니다.",
+        title: t("invite.setupPassword.failureTitle", locale),
+        description: error.message || t("common.error", locale),
         variant: "destructive",
       });
     } finally {
@@ -233,7 +234,7 @@ export default function SetupPasswordPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>로딩 중...</CardTitle>
+            <CardTitle>{t("common.loading", locale)}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -244,16 +245,19 @@ export default function SetupPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>패스워드 설정</CardTitle>
+          <CardTitle>{t("invite.setupPassword.title", locale)}</CardTitle>
           <CardDescription>
-            {invitationInfo.store?.name || "알 수 없는 매장"} 매장 초대를
-            수락하기 위해 패스워드를 설정해주세요.
+            {t("invite.setupPassword.description", locale, {
+              storeName:
+                invitationInfo.store?.name ||
+                t("invite.setupPassword.unknownStore", locale),
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">이메일</Label>
+              <Label htmlFor="email">{t("auth.login.email", locale)}</Label>
               <Input
                 id="email"
                 type="email"
@@ -264,43 +268,45 @@ export default function SetupPasswordPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">이름 *</Label>
+              <Label htmlFor="name">{`${t("invite.accept.name", locale)} *`}</Label>
               <Input
                 id="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="이름을 입력하세요"
+                placeholder={t("invite.accept.namePlaceholder", locale)}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">새 패스워드</Label>
+              <Label htmlFor="password">{t("invite.setupPassword.newPassword", locale)}</Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="최소 8자 이상"
+                placeholder={t("invite.setupPassword.passwordPlaceholder", locale)}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">패스워드 확인</Label>
+              <Label htmlFor="confirmPassword">{t("invite.accept.confirmPassword", locale)}</Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="패스워드를 다시 입력하세요"
+                placeholder={t("invite.accept.confirmPasswordPlaceholder", locale)}
                 required
               />
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "처리 중..." : "패스워드 설정 및 초대 수락"}
+              {isLoading
+                ? t("common.loading", locale)
+                : t("invite.setupPassword.submit", locale)}
             </Button>
           </form>
         </CardContent>

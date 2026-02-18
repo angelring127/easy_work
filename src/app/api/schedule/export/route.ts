@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 
@@ -105,10 +105,13 @@ export async function GET(request: NextRequest) {
     const userIds = [...new Set(assignments?.map((a) => a.user_id) || [])];
     const userMap = new Map();
 
+    // Admin API 사용을 위해 Service Role Key 클라이언트 사용
+    const adminClient = await createPureClient();
+
     // 각 사용자에 대해 개별적으로 정보 조회
     for (const userId of userIds) {
       const { data: userData, error: userError } =
-        await supabase.auth.admin.getUserById(userId);
+        await adminClient.auth.admin.getUserById(userId);
       if (!userError && userData.user) {
         userMap.set(userId, userData.user);
       }

@@ -81,8 +81,8 @@ export default function VerifyEmailPage() {
             if (sessionError) {
               console.error("VerifyEmailPage: 세션 설정 실패", sessionError);
               toast({
-                title: "인증 오류",
-                description: "초대 링크 처리 중 오류가 발생했습니다.",
+                title: t("invite.verify.error", currentLocale),
+                description: t("invite.error.processing", currentLocale),
                 variant: "destructive",
               });
               return;
@@ -125,13 +125,12 @@ export default function VerifyEmailPage() {
 
                     // 초대가 이미 처리되었거나 만료된 경우
                     if (
-                      result.error === "초대를 찾을 수 없습니다" ||
-                      result.error === "초대가 만료되었습니다"
+                      result.error === t("invite.accept.notFound", currentLocale) ||
+                      result.error === t("invite.accept.expiredToken", currentLocale)
                     ) {
                       toast({
-                        title: "초대 처리 완료",
-                        description:
-                          "이미 처리된 초대이거나 만료된 초대입니다.",
+                        title: t("invite.verify.processedTitle", currentLocale),
+                        description: t("invite.verify.processedDescription", currentLocale),
                         variant: "destructive",
                       });
                       await refreshStores();
@@ -141,7 +140,7 @@ export default function VerifyEmailPage() {
 
                     // 기타 오류의 경우
                     toast({
-                      title: "초대 오류",
+                      title: t("invite.error.title", currentLocale),
                       description: result.error,
                       variant: "destructive",
                     });
@@ -201,8 +200,8 @@ export default function VerifyEmailPage() {
           }
 
           toast({
-            title: "인증 오류",
-            description: "세션 정보를 찾을 수 없습니다.",
+            title: t("invite.verify.error", currentLocale),
+            description: t("invite.verify.sessionNotFound", currentLocale),
             variant: "destructive",
           });
           return;
@@ -217,8 +216,8 @@ export default function VerifyEmailPage() {
           }
 
           toast({
-            title: "인증 오류",
-            description: "세션 정보를 찾을 수 없습니다.",
+            title: t("invite.verify.error", currentLocale),
+            description: t("invite.verify.sessionNotFound", currentLocale),
             variant: "destructive",
           });
           return;
@@ -254,8 +253,8 @@ export default function VerifyEmailPage() {
           }
 
           toast({
-            title: "인증 오류",
-            description: "사용자 정보를 찾을 수 없습니다.",
+            title: t("invite.verify.error", currentLocale),
+            description: t("invite.verify.userNotFound", currentLocale),
             variant: "destructive",
           });
           return;
@@ -270,8 +269,8 @@ export default function VerifyEmailPage() {
           }
 
           toast({
-            title: "인증 오류",
-            description: "사용자 정보를 찾을 수 없습니다.",
+            title: t("invite.verify.error", currentLocale),
+            description: t("invite.verify.userNotFound", currentLocale),
             variant: "destructive",
           });
           return;
@@ -317,8 +316,8 @@ export default function VerifyEmailPage() {
         }
 
         toast({
-          title: "인증 오류",
-          description: "인증 확인 중 오류가 발생했습니다.",
+          title: t("invite.verify.error", currentLocale),
+          description: t("invite.verify.checkError", currentLocale),
           variant: "destructive",
         });
       } finally {
@@ -337,8 +336,8 @@ export default function VerifyEmailPage() {
   const handleSetPassword = async () => {
     if (password !== confirmPassword) {
       toast({
-        title: "패스워드 불일치",
-        description: "패스워드와 확인 패스워드가 일치하지 않습니다.",
+        title: t("invite.setupPassword.passwordMismatchTitle", currentLocale),
+        description: t("invite.setupPassword.passwordMismatchDescription", currentLocale),
         variant: "destructive",
       });
       return;
@@ -346,8 +345,8 @@ export default function VerifyEmailPage() {
 
     if (password.length < 8) {
       toast({
-        title: "패스워드가 너무 짧습니다",
-        description: "패스워드는 최소 8자 이상이어야 합니다.",
+        title: t("invite.setupPassword.passwordTooShortTitle", currentLocale),
+        description: t("invite.setupPassword.passwordTooShortDescription", currentLocale),
         variant: "destructive",
       });
       return;
@@ -371,7 +370,9 @@ export default function VerifyEmailPage() {
         const requestBody = {
           tokenHash: token,
           name:
-            user?.user_metadata?.name || user?.email?.split("@")[0] || "사용자",
+            user?.user_metadata?.name ||
+            user?.email?.split("@")[0] ||
+            t("availability.user", currentLocale),
           password: password,
         };
 
@@ -426,8 +427,8 @@ export default function VerifyEmailPage() {
       }
 
       toast({
-        title: "초대 수락 완료",
-        description: "패스워드가 설정되고 초대가 수락되었습니다.",
+        title: t("invite.accept.success", currentLocale),
+        description: t("invite.verify.passwordSetAndAccepted", currentLocale),
       });
 
       // 매장 목록 새로고침 후 대시보드로 이동
@@ -472,11 +473,11 @@ export default function VerifyEmailPage() {
     } catch (error) {
       console.error("패스워드 설정 및 초대 수락 실패:", error);
       toast({
-        title: "오류 발생",
+        title: t("common.error", currentLocale),
         description:
           error instanceof Error
             ? error.message
-            : "패스워드 설정 중 오류가 발생했습니다.",
+            : t("invite.setupPassword.loadError", currentLocale),
         variant: "destructive",
       });
     } finally {
@@ -490,7 +491,7 @@ export default function VerifyEmailPage() {
         <div className="max-w-md w-full">
           <Card>
             <CardContent className="pt-6">
-              <div className="text-center">인증 확인 중...</div>
+              <div className="text-center">{t("invite.verify.verifying", currentLocale)}</div>
             </CardContent>
           </Card>
         </div>
@@ -504,8 +505,8 @@ export default function VerifyEmailPage() {
         <div className="max-w-md w-full">
           <Card className="border-red-200">
             <CardHeader className="text-center">
-              <CardTitle className="text-red-800">인증 오류</CardTitle>
-              <CardDescription>이메일 인증이 필요합니다.</CardDescription>
+              <CardTitle className="text-red-800">{t("invite.verify.error", currentLocale)}</CardTitle>
+              <CardDescription>{t("invite.verify.errorDescription", currentLocale)}</CardDescription>
             </CardHeader>
           </Card>
         </div>
@@ -519,12 +520,14 @@ export default function VerifyEmailPage() {
         <Card>
           <CardHeader className="text-center">
             <CardTitle>
-              {showPasswordForm ? "패스워드 설정" : "이메일 인증 완료"}
+              {showPasswordForm
+                ? t("invite.setupPassword.title", currentLocale)
+                : t("invite.verify.completedTitle", currentLocale)}
             </CardTitle>
             <CardDescription>
               {showPasswordForm
-                ? "안전한 패스워드를 설정하고 초대를 수락해주세요."
-                : "초대 링크가 성공적으로 확인되었습니다. 패스워드를 설정해주세요."}
+                ? t("invite.verify.passwordSetupPrompt", currentLocale)
+                : t("invite.verify.linkVerifiedPrompt", currentLocale)}
             </CardDescription>
           </CardHeader>
 
@@ -533,59 +536,59 @@ export default function VerifyEmailPage() {
               <>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <h3 className="font-semibold text-green-900 mb-2">
-                    인증 정보
+                    {t("invite.verify.infoTitle", currentLocale)}
                   </h3>
                   <div className="text-sm text-green-800 space-y-1">
                     <div>
-                      <strong>이메일:</strong> {user?.email}
+                      <strong>{t("auth.login.email", currentLocale)}:</strong> {user?.email}
                     </div>
                     <div className="text-xs text-green-600 mt-2">
-                      * 안전한 패스워드를 설정해주세요.
+                      * {t("invite.verify.safePasswordNote", currentLocale)}
                     </div>
                   </div>
                 </div>
 
                 <Button onClick={handleContinueToSetup} className="w-full">
-                  패스워드 설정하기
+                  {t("invite.verify.setPassword", currentLocale)}
                 </Button>
               </>
             ) : (
               <>
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h3 className="font-semibold text-blue-900 mb-2">
-                    사용자 정보
+                    {t("invite.verify.userInfoTitle", currentLocale)}
                   </h3>
                   <div className="text-sm text-blue-800 space-y-1">
                     <div>
-                      <strong>이메일:</strong> {user?.email}
+                      <strong>{t("auth.login.email", currentLocale)}:</strong> {user?.email}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="password">새 패스워드</Label>
+                    <Label htmlFor="password">{t("invite.setupPassword.newPassword", currentLocale)}</Label>
                     <Input
                       id="password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="새 패스워드를 입력하세요 (최소 8자)"
+                      placeholder={t("invite.verify.newPasswordPlaceholder", currentLocale)}
                       disabled={isSettingPassword}
                     />
                     <div className="text-xs text-gray-500 mt-1">
-                      패스워드는 최소 8자 이상이어야 합니다.
+                      {t("invite.setupPassword.passwordTooShortDescription", currentLocale)}
                     </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="confirmPassword">패스워드 확인</Label>
+                    <Label htmlFor="confirmPassword">{t("invite.accept.confirmPassword", currentLocale)}</Label>
                     <Input
                       id="confirmPassword"
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="패스워드를 다시 입력하세요"
+                      placeholder={t("invite.accept.confirmPasswordPlaceholder", currentLocale)}
                       disabled={isSettingPassword}
                     />
                   </div>
@@ -598,7 +601,7 @@ export default function VerifyEmailPage() {
                     disabled={isSettingPassword}
                     className="flex-1"
                   >
-                    뒤로
+                    {t("common.back", currentLocale)}
                   </Button>
                   <Button
                     onClick={handleSetPassword}
@@ -611,8 +614,8 @@ export default function VerifyEmailPage() {
                     className="flex-1"
                   >
                     {isSettingPassword
-                      ? "처리 중..."
-                      : "패스워드 설정 및 초대 수락"}
+                      ? t("common.loading", currentLocale)
+                      : t("invite.setupPassword.submit", currentLocale)}
                   </Button>
                 </div>
               </>

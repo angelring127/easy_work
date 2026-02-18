@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 import { buildAbsoluteUrl } from "@/lib/env";
+import { defaultLocale, isValidLocale, t, type Locale } from "@/lib/i18n";
+
+function resolveLocale(request: NextRequest): Locale {
+  const localeParam = request.nextUrl.searchParams.get("locale");
+  if (localeParam && isValidLocale(localeParam)) {
+    return localeParam;
+  }
+
+  const acceptLanguage = request.headers.get("accept-language");
+  const preferredLocale = acceptLanguage?.split(",")[0]?.split("-")[0];
+  if (preferredLocale && isValidLocale(preferredLocale)) {
+    return preferredLocale;
+  }
+
+  return defaultLocale;
+}
 
 /**
  * 초대 재발송 API
@@ -13,10 +29,13 @@ async function resendInvitation(
 ): Promise<NextResponse> {
   try {
     const { user } = context;
+    const locale = resolveLocale(request);
     const params = await context.params;
     const { id: invitationId } = params;
     console.log("초대 재발송 요청:", { invitationId, userId: user.id });
     const supabase = await createClient();
+    // Admin API 사용을 위해 Service Role Key 클라이언트 사용
+    const adminClient = await createPureClient();
 
     // 초대 정보 조회
     const { data: invitation, error: fetchError } = await supabase
@@ -30,7 +49,7 @@ async function resendInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "초대를 찾을 수 없습니다",
+          error: t("invite.accept.notFound", locale),
           details: fetchError?.message,
         },
         { status: 404 }
@@ -70,7 +89,7 @@ async function resendInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "초대 재발송 권한이 없습니다",
+          error: t("invite.resendPermissionDenied", locale),
         },
         { status: 403 }
       );
@@ -81,7 +100,7 @@ async function resendInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "대기 중인 초대만 재발송할 수 있습니다",
+          error: t("invite.onlyPendingResend", locale),
         },
         { status: 400 }
       );
@@ -103,7 +122,7 @@ async function resendInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "초대 재발송에 실패했습니다",
+          error: t("invite.resendError", locale),
         },
         { status: 500 }
       );
@@ -112,7 +131,7 @@ async function resendInvitation(
     // 기존 사용자 확인
     console.log("재발송 전 기존 사용자 확인:", invitation.invited_email);
 
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(
       (u) => u.email?.toLowerCase() === invitation.invited_email.toLowerCase()
     );
@@ -121,7 +140,7 @@ async function resendInvitation(
     if (existingUser) {
       console.log("기존 사용자 삭제 중:", existingUser.email);
 
-      const { error: deleteError } = await supabase.auth.admin.deleteUser(
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(
         existingUser.id
       );
 
@@ -130,7 +149,7 @@ async function resendInvitation(
         return NextResponse.json(
           {
             success: false,
-            error: "기존 사용자 삭제에 실패했습니다",
+            error: t("invite.userDeleteFailed", locale),
           },
           { status: 500 }
         );
@@ -148,7 +167,7 @@ async function resendInvitation(
         // 잠시 대기
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        const { data: checkUsers } = await supabase.auth.admin.listUsers();
+        const { data: checkUsers } = await adminClient.auth.admin.listUsers();
         const existingUserCheck = checkUsers?.users?.find(
           (u) =>
             u.email?.toLowerCase() === invitation.invited_email.toLowerCase()
@@ -162,7 +181,7 @@ async function resendInvitation(
 
           // 재삭제 시도
           const { error: retryDeleteError } =
-            await supabase.auth.admin.deleteUser(existingUserCheck.id);
+            await adminClient.auth.admin.deleteUser(existingUserCheck.id);
 
           if (retryDeleteError) {
             console.error("재삭제 실패:", retryDeleteError);
@@ -182,7 +201,7 @@ async function resendInvitation(
         return NextResponse.json(
           {
             success: false,
-            error: "사용자 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.",
+            error: t("invite.userDeleteRetryFailed", locale),
           },
           { status: 500 }
         );
@@ -198,7 +217,7 @@ async function resendInvitation(
 
       // 새 사용자 생성
       const { data: signUpData, error: signUpError } =
-        await supabase.auth.admin.createUser({
+        await adminClient.auth.admin.createUser({
           email: invitation.invited_email,
           password: "1q2w3e4r!", // 기본 패스워드
           email_confirm: true, // 이메일 자동 확인
@@ -219,7 +238,7 @@ async function resendInvitation(
         return NextResponse.json(
           {
             success: false,
-            error: "사용자 생성에 실패했습니다",
+            error: t("invite.accept.userCreateFailed", locale),
           },
           { status: 500 }
         );
@@ -232,14 +251,14 @@ async function resendInvitation(
 
       // 더 강력한 사용자 삭제 확인
       console.log("최종 사용자 삭제 확인 중...");
-      const { data: finalCheck } = await supabase.auth.admin.listUsers();
+      const { data: finalCheck } = await adminClient.auth.admin.listUsers();
       const finalUserCheck = finalCheck?.users?.find(
         (u) => u.email?.toLowerCase() === invitation.invited_email.toLowerCase()
       );
 
       if (finalUserCheck) {
         console.log("⚠️ 최종 확인: 사용자 여전히 존재함, 강제 삭제 시도");
-        await supabase.auth.admin.deleteUser(finalUserCheck.id);
+        await adminClient.auth.admin.deleteUser(finalUserCheck.id);
         // 삭제 후 잠시 대기
         await new Promise((resolve) => setTimeout(resolve, 2000));
       } else {
@@ -247,13 +266,13 @@ async function resendInvitation(
       }
 
       const inviteRedirectUrl = buildAbsoluteUrl(
-        `/ko/invites/verify-email?token=${invitation.token_hash}&type=invite`
+        `/${locale}/invites/verify-email?token=${invitation.token_hash}&type=invite`
       );
 
       // 이름이 없으면 이메일의 @ 앞부분을 기본값으로 사용
       const userName = invitation.invited_email.split("@")[0] || "";
 
-      const { error: emailError } = await supabase.auth.admin.inviteUserByEmail(
+      const { error: emailError } = await adminClient.auth.admin.inviteUserByEmail(
         invitation.invited_email,
         {
           data: {
@@ -280,13 +299,13 @@ async function resendInvitation(
 
         // 이메일 발송 실패 시 사용자 삭제
         if (signUpData.user) {
-          await supabase.auth.admin.deleteUser(signUpData.user.id);
+          await adminClient.auth.admin.deleteUser(signUpData.user.id);
         }
 
         // 더 구체적인 에러 메시지
-        let errorMessage = "이메일 발송에 실패했습니다";
+        let errorMessage = t("invite.emailSendFailed", locale);
         if (emailError.message?.includes("already been registered")) {
-          errorMessage = "이미 등록된 이메일입니다. 잠시 후 다시 시도해주세요.";
+          errorMessage = t("invite.alreadyRegisteredRetry", locale);
         }
 
         return NextResponse.json(
@@ -313,7 +332,7 @@ async function resendInvitation(
       return NextResponse.json(
         {
           success: false,
-          error: "이메일 재발송 중 오류가 발생했습니다",
+          error: t("invite.resendEmailError", locale),
         },
         { status: 500 }
       );
@@ -342,14 +361,15 @@ async function resendInvitation(
 
     return NextResponse.json({
       success: true,
-      message: "초대가 성공적으로 재발송되었습니다",
+      message: t("invite.resendSuccess", locale),
     });
   } catch (error) {
     console.error("초대 재발송 API 오류:", error);
+    const locale: Locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", locale),
       },
       { status: 500 }
     );

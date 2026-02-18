@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { defaultLocale, t, type Locale } from "@/lib/i18n";
+import { resolveRequestLocale } from "@/lib/locale-request";
 
 // 요청 데이터 검증 스키마
 const deleteUserSchema = z.object({
@@ -18,6 +20,7 @@ async function deleteUser(
 ): Promise<NextResponse> {
   try {
     const { user, params } = context;
+    const locale = resolveRequestLocale(request);
     const storeId = params.id;
     const body = await request.json();
 
@@ -27,7 +30,7 @@ async function deleteUser(
       return NextResponse.json(
         {
           success: false,
-          error: "잘못된 요청 데이터입니다",
+          error: t("auth.login.validation.invalidData", locale),
           details: validationResult.error.errors,
         },
         { status: 400 }
@@ -49,7 +52,7 @@ async function deleteUser(
       return NextResponse.json(
         {
           success: false,
-          error: "매장을 찾을 수 없습니다",
+          error: t("store.notFound", locale),
         },
         { status: 404 }
       );
@@ -60,7 +63,7 @@ async function deleteUser(
       return NextResponse.json(
         {
           success: false,
-          error: "사용자 삭제 권한이 없습니다",
+          error: t("user.deletePermissionDenied", locale),
         },
         { status: 403 }
       );
@@ -71,7 +74,7 @@ async function deleteUser(
       return NextResponse.json(
         {
           success: false,
-          error: "자기 자신을 삭제할 수 없습니다",
+          error: t("user.cannotDeleteSelf", locale),
         },
         { status: 400 }
       );
@@ -89,7 +92,7 @@ async function deleteUser(
       return NextResponse.json(
         {
           success: false,
-          error: "마스터 권한을 가진 사용자는 삭제할 수 없습니다",
+          error: t("user.cannotDeleteMaster", locale),
         },
         { status: 400 }
       );
@@ -99,7 +102,7 @@ async function deleteUser(
       return NextResponse.json(
         {
           success: false,
-          error: "사용자를 찾을 수 없습니다",
+          error: t("user.notFound", locale),
         },
         { status: 404 }
       );
@@ -109,7 +112,7 @@ async function deleteUser(
       return NextResponse.json(
         {
           success: false,
-          error: "이미 삭제된 사용자입니다",
+          error: t("user.alreadyDeleted", locale),
         },
         { status: 400 }
       );
@@ -130,7 +133,7 @@ async function deleteUser(
       return NextResponse.json(
         {
           success: false,
-          error: "사용자 삭제에 실패했습니다",
+          error: t("user.deleteUserError", locale),
         },
         { status: 500 }
       );
@@ -162,14 +165,15 @@ async function deleteUser(
     return NextResponse.json({
       success: true,
       data: { deleted: result },
-      message: "사용자가 성공적으로 삭제되었습니다. 스케줄 이력은 보존됩니다.",
+      message: t("user.deleteSuccessWithHistory", locale),
     });
   } catch (error) {
     console.error("사용자 삭제 API 오류:", error);
+    const locale: Locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", locale),
       },
       { status: 500 }
     );

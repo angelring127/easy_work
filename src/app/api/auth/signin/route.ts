@@ -1,16 +1,34 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import {
+  defaultLocale,
+  isValidLocale,
+  t,
+  type Locale,
+} from "@/lib/i18n";
+import { createSignInSchema } from "@/lib/validations/auth";
 
-// 로그인 요청 스키마
-const signInSchema = z.object({
-  email: z.string().email("유효한 이메일 주소를 입력하세요"),
-  password: z.string().min(1, "비밀번호를 입력하세요"),
-});
+function resolveLocale(request: NextRequest, localeParam?: string): Locale {
+  if (localeParam && isValidLocale(localeParam)) {
+    return localeParam;
+  }
+
+  const acceptLanguage = request.headers.get("accept-language");
+  const preferredLocale = acceptLanguage?.split(",")[0]?.split("-")[0];
+
+  if (preferredLocale && isValidLocale(preferredLocale)) {
+    return preferredLocale;
+  }
+
+  return defaultLocale;
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const localeParam = typeof body?.locale === "string" ? body.locale : undefined;
+    const locale = resolveLocale(request, localeParam);
+    const signInSchema = createSignInSchema(locale);
 
     // 입력 데이터 검증
     const validationResult = signInSchema.safeParse(body);
@@ -18,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "입력 데이터가 유효하지 않습니다",
+          error: t("auth.login.validation.invalidData", locale),
           details: validationResult.error.issues,
         },
         { status: 400 }
@@ -38,20 +56,19 @@ export async function POST(request: NextRequest) {
       console.error("로그인 처리 중 오류:", error);
 
       // Supabase 에러 코드에 따른 사용자 친화적 메시지
-      let errorMessage = "로그인 중 오류가 발생했습니다";
+      let errorMessage = t("auth.login.error.general", locale);
 
       if (
         error.message.includes("Invalid login credentials") ||
         error.message.includes("invalid_credentials")
       ) {
-        errorMessage = "이메일 또는 비밀번호가 올바르지 않습니다";
+        errorMessage = t("auth.login.error.invalidCredentials", locale);
       } else if (error.message.includes("Email not confirmed")) {
-        errorMessage =
-          "이메일 확인이 필요합니다. 가입 시 받은 이메일을 확인해주세요";
+        errorMessage = t("auth.login.error.emailNotConfirmed", locale);
       } else if (error.message.includes("Too many requests")) {
-        errorMessage = "너무 많은 로그인 시도입니다. 잠시 후 다시 시도해주세요";
+        errorMessage = t("auth.login.error.tooManyRequests", locale);
       } else if (error.message.includes("User not found")) {
-        errorMessage = "등록되지 않은 이메일 주소입니다";
+        errorMessage = t("auth.login.error.userNotFound", locale);
       }
 
       return NextResponse.json(
@@ -67,7 +84,7 @@ export async function POST(request: NextRequest) {
     // 로그인 성공
     return NextResponse.json({
       success: true,
-      message: "로그인이 완료되었습니다",
+      message: t("auth.login.successDescription", locale),
       data: {
         user: {
           id: data.user?.id,
@@ -83,10 +100,11 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("로그인 API 오류:", error);
+    const locale: Locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.login.error.general", locale),
       },
       { status: 500 }
     );

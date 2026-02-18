@@ -11,6 +11,7 @@ import { usePermissions, useAdminAccess } from "@/hooks/use-permissions";
 import { RoleBadge } from "@/components/auth/role-badge";
 import { AdminOnly, MasterOnly } from "@/components/auth/permission-guard";
 import { UserRole } from "@/types/auth";
+import { ResponsiveHeader } from "@/components/layout/responsive-header";
 import {
   Card,
   CardContent,
@@ -169,33 +170,13 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <h1 className="text-3xl font-bold text-gray-900">Workeasy</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <LanguageSwitcher />
-              <StoreSwitcher />
-              <div className="flex items-center space-x-2">
-                <User className="h-5 w-5" />
-                <span className="text-sm font-medium">{user.email}</span>
-                {userRole && <RoleBadge role={userRole} className="text-xs" />}
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleSignOut}
-                className="flex items-center space-x-2"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>{t("dashboard.logout", currentLocale)}</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Responsive Header */}
+      <ResponsiveHeader
+        userEmail={user?.email}
+        currentStoreRole={userRole as UserRole}
+        locale={locale as string}
+        onLogout={handleSignOut}
+      />
 
       {/* 메인 콘텐츠 */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -23,21 +24,30 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { t } from "@/lib/i18n";
+import { defaultLocale } from "@/lib/i18n-config";
+import { t, type Locale } from "@/lib/i18n";
 import { UserPlus, Mail, Shield } from "lucide-react";
 
 /**
  * 초대 폼 스키마
  */
-const inviteFormSchema = z.object({
-  email: z.string().email("유효한 이메일 주소를 입력해주세요"),
-  role: z.enum(["SUB_MANAGER", "PART_TIMER"], {
-    errorMap: () => ({ message: "역할을 선택해주세요" }),
-  }),
-  store_id: z.string().min(1, "매장을 선택해주세요"),
+const inviteFormSchemaBase = z.object({
+  email: z.string().email(),
+  role: z.enum(["SUB_MANAGER", "PART_TIMER"]),
+  store_id: z.string().min(1),
 });
 
-type InviteFormData = z.infer<typeof inviteFormSchema>;
+function createInviteFormSchema(locale: Locale) {
+  return z.object({
+    email: z.string().email(t("auth.login.validation.invalidEmail", locale)),
+    role: z.enum(["SUB_MANAGER", "PART_TIMER"], {
+      errorMap: () => ({ message: t("invite.rolePlaceholder", locale) }),
+    }),
+    store_id: z.string().min(1, t("invites.form.storeRequired", locale)),
+  });
+}
+
+type InviteFormData = z.infer<typeof inviteFormSchemaBase>;
 
 interface InviteUserFormProps {
   stores: Array<{
@@ -59,6 +69,9 @@ export function InviteUserForm({
 }: InviteUserFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const params = useParams();
+  const locale = (params?.locale as Locale) || defaultLocale;
+  const inviteFormSchema = useMemo(() => createInviteFormSchema(locale), [locale]);
 
   const form = useForm<InviteFormData>({
     resolver: zodResolver(inviteFormSchema),
@@ -87,13 +100,15 @@ export function InviteUserForm({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "초대 생성에 실패했습니다");
+        throw new Error(result.error || t("invite.createError", locale));
       }
 
       // 성공 처리
       toast({
-        title: "초대 생성 완료",
-        description: `${data.email}에게 초대가 발송되었습니다`,
+        title: t("invite.createSuccess", locale),
+        description: t("invites.form.invitedDescription", locale, {
+          email: data.email,
+        }),
       });
 
       // 폼 초기화
@@ -104,11 +119,11 @@ export function InviteUserForm({
     } catch (error) {
       console.error("초대 생성 오류:", error);
       toast({
-        title: "초대 생성 실패",
+        title: t("invite.createError", locale),
         description:
           error instanceof Error
             ? error.message
-            : "알 수 없는 오류가 발생했습니다",
+            : t("common.unknownError", locale),
         variant: "destructive",
       });
     } finally {
@@ -122,9 +137,9 @@ export function InviteUserForm({
   const getRoleDescription = (role: string) => {
     switch (role) {
       case "SUB_MANAGER":
-        return "스케줄 관리, 교대 승인, 파트타이머 초대 권한";
+        return t("invite.roleDescription.subManager", locale);
       case "PART_TIMER":
-        return "스케줄 확인, 교대 요청 권한";
+        return t("invite.roleDescription.partTimer", locale);
       default:
         return "";
     }
@@ -135,7 +150,7 @@ export function InviteUserForm({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <UserPlus className="h-5 w-5" />
-          {t("invites.form.title")}
+          {t("invites.form.title", locale)}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -150,7 +165,7 @@ export function InviteUserForm({
               name="store_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t("invites.form.store")}</FormLabel>
+                  <FormLabel>{t("invites.form.store", locale)}</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
@@ -158,7 +173,7 @@ export function InviteUserForm({
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="매장을 선택하세요" />
+                        <SelectValue placeholder={t("invite.storePlaceholder", locale)} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -189,12 +204,12 @@ export function InviteUserForm({
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
                     <Mail className="h-4 w-4" />
-                    {t("invites.form.email")}
+                    {t("invites.form.email", locale)}
                   </FormLabel>
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="초대할 사용자의 이메일 주소"
+                      placeholder={t("invite.emailPlaceholder", locale)}
                       disabled={isLoading}
                       {...field}
                     />
@@ -212,7 +227,7 @@ export function InviteUserForm({
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
                     <Shield className="h-4 w-4" />
-                    {t("invites.form.role")}
+                    {t("invites.form.role", locale)}
                   </FormLabel>
                   <Select
                     onValueChange={field.onChange}
@@ -221,13 +236,13 @@ export function InviteUserForm({
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="역할을 선택하세요" />
+                        <SelectValue placeholder={t("invite.rolePlaceholder", locale)} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="PART_TIMER">
                         <div className="flex flex-col">
-                          <span className="font-medium">파트타이머</span>
+                          <span className="font-medium">{t("invite.partTimer", locale)}</span>
                           <span className="text-sm text-muted-foreground">
                             {getRoleDescription("PART_TIMER")}
                           </span>
@@ -235,7 +250,7 @@ export function InviteUserForm({
                       </SelectItem>
                       <SelectItem value="SUB_MANAGER">
                         <div className="flex flex-col">
-                          <span className="font-medium">서브 관리자</span>
+                          <span className="font-medium">{t("invite.subManager", locale)}</span>
                           <span className="text-sm text-muted-foreground">
                             {getRoleDescription("SUB_MANAGER")}
                           </span>
@@ -253,12 +268,12 @@ export function InviteUserForm({
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  초대 생성 중...
+                  {t("invites.form.sending", locale)}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <UserPlus className="h-4 w-4" />
-                  초대 보내기
+                  {t("invites.form.send", locale)}
                 </div>
               )}
             </Button>
@@ -268,7 +283,6 @@ export function InviteUserForm({
     </Card>
   );
 }
-
 
 
 

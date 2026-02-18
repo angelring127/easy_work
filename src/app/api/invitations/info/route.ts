@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { defaultLocale, isValidLocale, t, type Locale } from "@/lib/i18n";
+
+function resolveLocale(request: NextRequest): Locale {
+  const localeParam = request.nextUrl.searchParams.get("locale");
+  if (localeParam && isValidLocale(localeParam)) {
+    return localeParam;
+  }
+
+  const acceptLanguage = request.headers.get("accept-language");
+  const preferredLocale = acceptLanguage?.split(",")[0]?.split("-")[0];
+  if (preferredLocale && isValidLocale(preferredLocale)) {
+    return preferredLocale;
+  }
+
+  return defaultLocale;
+}
 
 /**
  * 초대 정보 조회 API
@@ -8,6 +24,7 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function GET(request: NextRequest) {
   try {
+    const locale = resolveLocale(request);
     const { searchParams } = new URL(request.url);
     const token = searchParams.get("token");
     const authToken = searchParams.get("auth_token");
@@ -16,7 +33,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "초대 토큰 또는 인증 토큰이 필요합니다",
+          error: t("invite.accept.tokenRequired", locale),
         },
         { status: 400 }
       );
@@ -170,7 +187,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "초대를 찾을 수 없습니다",
+          error: t("invite.accept.notFound", locale),
         },
         { status: 404 }
       );
@@ -182,17 +199,17 @@ export async function GET(request: NextRequest) {
     const isExpired = now > expiresAt;
 
     let status = "valid";
-    let statusMessage = "유효한 초대입니다";
+    let statusMessage = t("invite.accept.status.valid", locale);
 
     if (invitation.status === "CANCELLED") {
       status = "cancelled";
-      statusMessage = "취소된 초대입니다";
+      statusMessage = t("invite.accept.status.cancelled", locale);
     } else if (invitation.status === "ACCEPTED") {
       status = "accepted";
-      statusMessage = "이미 수락된 초대입니다";
+      statusMessage = t("invite.accept.status.used", locale);
     } else if (isExpired) {
       status = "expired";
-      statusMessage = "만료된 초대입니다";
+      statusMessage = t("invite.accept.status.expired", locale);
     }
 
     return NextResponse.json({
@@ -206,10 +223,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("초대 정보 조회 API 오류:", error);
+    const locale: Locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", locale),
       },
       { status: 500 }
     );

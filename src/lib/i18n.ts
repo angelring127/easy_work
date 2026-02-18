@@ -45,6 +45,21 @@ const translations = {
     "auth.login.successDescription": "로그인이 완료되었습니다",
     "auth.login.error": "로그인 실패",
     "auth.login.errorDescription": "로그인에 실패했습니다",
+    "auth.login.validation.invalidData": "입력 데이터가 유효하지 않습니다",
+    "auth.login.validation.emailRequired": "이메일을 입력하세요",
+    "auth.login.validation.invalidEmail": "유효한 이메일 주소를 입력하세요",
+    "auth.login.validation.passwordRequired": "비밀번호를 입력하세요",
+    "auth.login.error.general": "로그인 중 오류가 발생했습니다",
+    "auth.login.error.invalidCredentials":
+      "이메일 또는 비밀번호가 올바르지 않습니다",
+    "auth.login.error.emailNotConfirmed":
+      "이메일 확인이 필요합니다. 가입 시 받은 이메일을 확인해주세요",
+    "auth.login.error.tooManyRequests":
+      "너무 많은 로그인 시도입니다. 잠시 후 다시 시도해주세요",
+    "auth.login.error.userNotFound": "등록되지 않은 이메일 주소입니다",
+    "auth.login.loading": "로딩 중...",
+    "auth.logout.success": "로그아웃이 완료되었습니다.",
+    "auth.logout.error": "로그아웃 중 오류가 발생했습니다.",
     "auth.signup.title": "새 계정 만들기",
     "auth.signup.hasAccount": "이미 계정이 있으신가요?",
     "auth.signup.login": "로그인",
@@ -152,6 +167,10 @@ const translations = {
     "dashboard.teamChat": "팀 채팅",
     // 초대 관련
     "invites.form.title": "팀원 초대",
+    "invites.form.send": "초대 보내기",
+    "invites.form.sending": "초대 생성 중...",
+    "invites.form.storeRequired": "매장을 선택해주세요",
+    "invites.form.invitedDescription": "{email}에게 초대가 발송되었습니다",
     // 직무 역할 관련
     "jobRoles.title": "직무 관리",
     "jobRoles.description": "매장에서 필요한 직무를 관리합니다",
@@ -228,6 +247,9 @@ const translations = {
     "role.management.changing": "변경 중...",
     "role.management.changeRole": "직무 변경",
     "role.management.userList": "사용자 목록",
+    "role.changePermissionDenied": "역할 변경 권한이 없습니다",
+    "role.grantPermissionDenied": "역할 부여 권한이 없습니다",
+    "role.revokePermissionDenied": "역할 회수 권한이 없습니다",
     // 매장 관련
     "store.noStores": "매장 없음",
     "store.loading": "매장 로딩 중...",
@@ -274,6 +296,7 @@ const translations = {
     "common.create": "생성",
     "common.info": "정보",
     "common.error": "오류",
+    "common.unknownError": "알 수 없는 오류가 발생했습니다",
     "common.success": "성공",
     "common.back": "뒤로",
     "common.view": "보기",
@@ -344,6 +367,21 @@ const translations = {
     "user.deleteUserDescription":
       "사용자를 삭제합니다 (스케줄 이력은 보존됩니다)",
     "user.deleteUserError": "사용자 삭제 실패",
+    "user.notFound": "사용자를 찾을 수 없습니다",
+    "user.alreadyInactive": "이미 비활성화된 사용자입니다",
+    "user.alreadyActive": "이미 활성화된 사용자입니다",
+    "user.deletePermissionDenied": "사용자 삭제 권한이 없습니다",
+    "user.deactivatePermissionDenied": "사용자 비활성화 권한이 없습니다",
+    "user.reactivatePermissionDenied": "사용자 재활성화 권한이 없습니다",
+    "user.cannotDeleteSelf": "자기 자신을 삭제할 수 없습니다",
+    "user.cannotDeleteMaster": "마스터 권한을 가진 사용자는 삭제할 수 없습니다",
+    "user.roleNotFound": "사용자의 역할을 찾을 수 없습니다",
+    "user.onlySubManagerCanDemote":
+      "서브 매니저만 파트타이머로 전환할 수 있습니다",
+    "user.onlyActiveSubManagerCanDemote":
+      "활성 상태의 서브 매니저만 전환할 수 있습니다",
+    "user.deleteSuccessWithHistory":
+      "사용자가 성공적으로 삭제되었습니다. 스케줄 이력은 보존됩니다.",
     "user.alreadyDeleted": "이미 삭제된 사용자",
     "user.alreadyDeletedDescription": "이 사용자는 이미 삭제되었습니다.",
     "user.confirmDemote": "서브 매니저 전환 확인",
@@ -365,8 +403,12 @@ const translations = {
     "invite.createInvite": "초대 생성",
     "invite.email": "이메일",
     "invite.emailPlaceholder": "초대할 사용자의 이메일을 입력하세요",
+    "invite.storePlaceholder": "매장을 선택하세요",
     "invite.role": "역할",
     "invite.rolePlaceholder": "부여할 역할을 선택하세요",
+    "invite.roleDescription.subManager":
+      "스케줄 관리, 교대 승인, 파트타이머 초대 권한",
+    "invite.roleDescription.partTimer": "스케줄 확인, 교대 요청 권한",
     "invite.message": "메시지 (선택사항)",
     "invite.messagePlaceholder": "초대 메시지를 입력하세요",
     "invite.send": "초대 보내기",
@@ -382,6 +424,7 @@ const translations = {
     "invite.cancel": "취소",
     "invite.noInvites": "초대가 없습니다",
     "invite.expiresAt": "만료일",
+    "invite.invitedAt": "초대일",
     "invite.status": "상태",
     "invite.actions": "작업",
     "invite.create": "초대 생성",
@@ -391,10 +434,33 @@ const translations = {
     "invite.days": "일",
     "invite.createSuccess": "초대가 성공적으로 생성되었습니다",
     "invite.createError": "초대 생성 실패",
+    "invite.loadError": "초대 목록 로드 실패",
+    "invite.linkCopied": "링크 복사됨",
+    "invite.linkCopiedDescription": "초대 링크가 클립보드에 복사되었습니다",
+    "invite.copyError": "링크 복사에 실패했습니다",
+    "invite.empty": "아직 초대가 없습니다",
+    "invite.emptyDescription": "새 팀원을 초대해보세요",
+    "invite.accessDenied": "매장에 대한 접근 권한이 없습니다",
+    "invite.managePermissionDenied": "해당 매장의 관리 권한이 없습니다",
+    "invite.cancelUsed": "이미 사용된 초대는 취소할 수 없습니다",
+    "invite.alreadyCancelled": "이미 취소된 초대입니다",
+    "invite.duplicateActiveInvite": "이미 해당 이메일로 유효한 초대가 존재합니다",
+    "invite.tokenCreateError": "초대 토큰 생성에 실패했습니다",
+    "invite.storeIdRequired": "매장 ID가 필요합니다",
+    "invite.listLoadError": "초대 목록 조회에 실패했습니다",
     "invite.resendSuccess": "초대가 재전송되었습니다",
     "invite.resendError": "초대 재전송 실패",
     "invite.cancelSuccess": "초대가 취소되었습니다",
     "invite.cancelError": "초대 취소 실패",
+    "invite.cancelPermissionDenied": "초대 취소 권한이 없습니다",
+    "invite.resendPermissionDenied": "초대 재발송 권한이 없습니다",
+    "invite.userDeleteFailed": "기존 사용자 삭제에 실패했습니다",
+    "invite.userDeleteRetryFailed":
+      "사용자 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.",
+    "invite.emailSendFailed": "이메일 발송에 실패했습니다",
+    "invite.alreadyRegisteredRetry":
+      "이미 등록된 이메일입니다. 잠시 후 다시 시도해주세요.",
+    "invite.resendEmailError": "이메일 재발송 중 오류가 발생했습니다",
     "invite.emailRequired": "이메일을 입력해주세요",
     "invite.expiresIn": "만료 기간",
     "invite.list": "초대 목록",
@@ -486,12 +552,91 @@ const translations = {
     "invite.accept.existingUserMessage":
       "이미 등록된 이메일입니다. 로그인 후 초대를 수락해주세요.",
     "invite.accept.loginToAccept": "로그인하여 초대 수락",
+    "invite.accept.emailMismatch":
+      "초대된 이메일과 현재 로그인한 이메일이 일치하지 않습니다",
+    "invite.accept.alreadyMember": "이미 해당 매장의 구성원입니다",
+    "invite.accept.processingError": "초대 수락 처리 중 오류가 발생했습니다",
+    "invite.accept.tokenRequired": "초대 토큰이 필요합니다",
+    "invite.accept.notFound": "초대를 찾을 수 없습니다",
+    "invite.accept.status.valid": "유효한 초대입니다",
+    "invite.accept.status.cancelled": "취소된 초대입니다",
+    "invite.accept.status.used": "이미 사용된 초대입니다",
+    "invite.accept.status.expired": "만료된 초대입니다",
+    "invite.accept.joinedRoleMessage":
+      "{storeName}에 {roleName}로 성공적으로 합류했습니다",
+    "invite.accept.signInFailed":
+      "로그인 실패: {details}. 기본 패스워드(1q2w3e4r!)로 시도해보세요.",
+    "invite.accept.userCreateFailed": "사용자 생성에 실패했습니다",
+    "invite.accept.storeAddFailed": "매장 추가에 실패했습니다",
+    "invite.setupPassword.title": "패스워드 설정",
+    "invite.setupPassword.description":
+      "{storeName} 매장 초대를 수락하기 위해 패스워드를 설정해주세요.",
+    "invite.setupPassword.unknownStore": "알 수 없는 매장",
+    "invite.setupPassword.newPassword": "새 패스워드",
+    "invite.setupPassword.passwordPlaceholder": "최소 8자 이상",
+    "invite.setupPassword.passwordPlaceholderMin6": "최소 6자 이상",
+    "invite.setupPassword.submit": "패스워드 설정 및 초대 수락",
+    "invite.setupPassword.successTitle": "패스워드 설정 완료",
+    "invite.setupPassword.failureTitle": "패스워드 설정에 실패했습니다",
+    "invite.setupPassword.loginRequiredTitle": "로그인이 필요합니다",
+    "invite.setupPassword.loginRequired": "초대 링크를 통해 로그인해주세요.",
+    "invite.setupPassword.nameRequiredTitle": "이름을 입력해주세요",
+    "invite.setupPassword.nameRequiredDescription": "이름은 필수 입력 항목입니다.",
+    "invite.setupPassword.passwordMismatchTitle": "패스워드가 일치하지 않습니다",
+    "invite.setupPassword.passwordMismatchDescription":
+      "패스워드를 다시 확인해주세요.",
+    "invite.setupPassword.passwordTooShortTitle": "패스워드가 너무 짧습니다",
+    "invite.setupPassword.passwordTooShortDescription":
+      "최소 8자 이상 입력해주세요.",
+    "invite.setupPassword.passwordTooShortMin6Description":
+      "최소 6자 이상 입력해주세요.",
+    "invite.setupPassword.loadError": "정보를 불러오는 중 오류가 발생했습니다.",
+    "invite.setupPassword.invitationLoadError":
+      "초대 정보를 불러오는데 실패했습니다.",
+    "invite.setupPassword.userLoadError":
+      "사용자 정보를 확인하는 중 오류가 발생했습니다.",
+    "invite.setupPassword.checkingUser": "사용자 정보를 확인하는 중...",
     "invite.error.title": "초대 링크 오류",
+    "invite.error.processing":
+      "초대 링크 처리 중 오류가 발생했습니다. 다시 시도해주세요.",
     "invite.error.requestNew": "새로운 초대 요청",
+    "invite.error.requestNewDescription": "관리자에게 새로운 초대를 요청해주세요.",
+    "invite.error.message.otpExpired": "이메일 링크가 만료되었습니다.",
+    "invite.error.message.accessDenied": "접근이 거부되었습니다.",
+    "invite.error.message.invalidInvite": "초대 링크에 문제가 있습니다.",
+    "invite.error.description.default": "초대 링크를 다시 확인해주세요.",
+    "invite.error.description.otpExpired":
+      "초대 링크의 유효기간이 만료되었습니다. 새로운 초대를 요청해주세요.",
+    "invite.error.description.accessDenied":
+      "이 초대 링크에 대한 접근 권한이 없습니다. 관리자에게 문의해주세요.",
+    "invite.error.description.invalidInvite":
+      "초대 링크가 유효하지 않거나 손상되었습니다.",
+    "invite.error.code": "오류 코드",
+    "invite.error.type": "오류 타입",
+    "invite.error.detail": "상세",
     "invite.error.goHome": "홈으로 돌아가기",
     "invite.verify.title": "이메일 인증",
     "invite.verify.description": "이메일 인증이 완료되었습니다.",
     "invite.verify.verifying": "인증 확인 중...",
+    "invite.verify.completedTitle": "이메일 인증 완료",
+    "invite.verify.processedTitle": "초대 처리 완료",
+    "invite.verify.processedDescription":
+      "이미 처리된 초대이거나 만료된 초대입니다.",
+    "invite.verify.sessionNotFound": "세션 정보를 찾을 수 없습니다.",
+    "invite.verify.userNotFound": "사용자 정보를 찾을 수 없습니다.",
+    "invite.verify.checkError": "인증 확인 중 오류가 발생했습니다.",
+    "invite.verify.passwordSetAndAccepted":
+      "패스워드가 설정되고 초대가 수락되었습니다.",
+    "invite.verify.passwordSetupPrompt":
+      "안전한 패스워드를 설정하고 초대를 수락해주세요.",
+    "invite.verify.linkVerifiedPrompt":
+      "초대 링크가 성공적으로 확인되었습니다. 패스워드를 설정해주세요.",
+    "invite.verify.infoTitle": "인증 정보",
+    "invite.verify.safePasswordNote": "안전한 패스워드를 설정해주세요.",
+    "invite.verify.setPassword": "패스워드 설정하기",
+    "invite.verify.userInfoTitle": "사용자 정보",
+    "invite.verify.newPasswordPlaceholder":
+      "새 패스워드를 입력하세요 (최소 8자)",
     "invite.verify.error": "인증 오류",
     "invite.verify.errorDescription": "이메일 인증이 필요합니다.",
     "invite.verify.acceptTitle": "초대 수락",
@@ -822,6 +967,21 @@ const translations = {
     "auth.login.successDescription": "Sign in completed successfully",
     "auth.login.error": "Sign in failed",
     "auth.login.errorDescription": "Failed to sign in",
+    "auth.login.validation.invalidData": "Invalid input data",
+    "auth.login.validation.emailRequired": "Please enter your email",
+    "auth.login.validation.invalidEmail": "Please enter a valid email address",
+    "auth.login.validation.passwordRequired": "Please enter your password",
+    "auth.login.error.general": "An error occurred during sign in",
+    "auth.login.error.invalidCredentials":
+      "The email or password you entered is incorrect",
+    "auth.login.error.emailNotConfirmed":
+      "Email verification is required. Please check your inbox",
+    "auth.login.error.tooManyRequests":
+      "Too many sign-in attempts. Please try again later",
+    "auth.login.error.userNotFound": "No account found for this email address",
+    "auth.login.loading": "Loading...",
+    "auth.logout.success": "You have been signed out.",
+    "auth.logout.error": "An error occurred while signing out.",
     "auth.signup.title": "Create new account",
     "auth.signup.hasAccount": "Already have an account?",
     "auth.signup.login": "Sign in",
@@ -932,6 +1092,10 @@ const translations = {
     "dashboard.teamChat": "Team Chat",
     // Invites related
     "invites.form.title": "Invite Team Member",
+    "invites.form.send": "Send Invitation",
+    "invites.form.sending": "Creating invitation...",
+    "invites.form.storeRequired": "Please select a store",
+    "invites.form.invitedDescription": "Invitation sent to {email}",
     "invites.form.store": "Select Store",
     "invites.form.email": "Email Address",
     "invites.form.role": "Role",
@@ -959,6 +1123,9 @@ const translations = {
     "role.management.changing": "Changing...",
     "role.management.changeRole": "Change Role",
     "role.management.userList": "User List",
+    "role.changePermissionDenied": "You do not have permission to change roles",
+    "role.grantPermissionDenied": "You do not have permission to grant roles",
+    "role.revokePermissionDenied": "You do not have permission to revoke roles",
     // Store related
     "store.noStores": "No Stores",
     "store.loading": "Loading stores...",
@@ -1005,6 +1172,7 @@ const translations = {
     "common.create": "Create",
     "common.info": "Info",
     "common.error": "Error",
+    "common.unknownError": "An unknown error occurred",
     "common.success": "Success",
     "common.back": "Back",
     "common.view": "View",
@@ -1062,6 +1230,36 @@ const translations = {
     "user.roleRevoked": "Role Revoked",
     "user.roleRevokedDescription": "Role revoked successfully from the user",
     "user.roleRevokeError": "Role revoke failed",
+    "user.demoteSubManager": "Demote Sub Manager",
+    "user.demoteSubManagerDescription":
+      "Demote a sub manager to part timer",
+    "user.demoteSubManagerError": "Failed to demote sub manager",
+    "user.deactivateUser": "Deactivate User",
+    "user.deactivateUserDescription": "Deactivate this user",
+    "user.deactivateUserError": "Failed to deactivate user",
+    "user.reactivateUser": "Reactivate User",
+    "user.reactivateUserDescription": "Reactivate this user",
+    "user.reactivateUserError": "Failed to reactivate user",
+    "user.deleteUser": "Delete User",
+    "user.deleteUserDescription":
+      "Delete this user (schedule history is preserved)",
+    "user.deleteUserError": "Failed to delete user",
+    "user.notFound": "User not found",
+    "user.alreadyInactive": "User is already inactive",
+    "user.alreadyActive": "User is already active",
+    "user.deletePermissionDenied": "You do not have permission to delete users",
+    "user.deactivatePermissionDenied":
+      "You do not have permission to deactivate users",
+    "user.reactivatePermissionDenied":
+      "You do not have permission to reactivate users",
+    "user.cannotDeleteSelf": "You cannot delete your own account",
+    "user.cannotDeleteMaster": "Users with master role cannot be deleted",
+    "user.roleNotFound": "User role not found",
+    "user.onlySubManagerCanDemote": "Only sub managers can be demoted",
+    "user.onlyActiveSubManagerCanDemote":
+      "Only active sub managers can be demoted",
+    "user.deleteSuccessWithHistory":
+      "User deleted successfully. Schedule history is preserved.",
     "user.temporaryAssigned": "Temporary assignment completed",
     "user.temporaryAssignedDescription": "Temporary work assigned successfully",
     "user.temporaryAssignError": "Temporary assignment failed",
@@ -1151,12 +1349,97 @@ const translations = {
     "invite.accept.existingUserMessage":
       "This email is already registered. Please sign in to accept the invitation.",
     "invite.accept.loginToAccept": "Sign in to Accept Invitation",
+    "invite.accept.emailMismatch":
+      "The invited email and the currently signed-in email do not match",
+    "invite.accept.alreadyMember": "You are already a member of this store",
+    "invite.accept.processingError":
+      "An error occurred while processing invitation acceptance",
+    "invite.accept.tokenRequired": "Invitation token is required",
+    "invite.accept.notFound": "Invitation not found",
+    "invite.accept.status.valid": "Valid invitation",
+    "invite.accept.status.cancelled": "Cancelled invitation",
+    "invite.accept.status.used": "Already used invitation",
+    "invite.accept.status.expired": "Expired invitation",
+    "invite.accept.joinedRoleMessage":
+      "Successfully joined {storeName} as {roleName}",
+    "invite.accept.signInFailed":
+      "Sign-in failed: {details}. Try the default password (1q2w3e4r!).",
+    "invite.accept.userCreateFailed": "Failed to create user",
+    "invite.accept.storeAddFailed": "Failed to add user to store",
+    "invite.setupPassword.title": "Set Password",
+    "invite.setupPassword.description":
+      "Set your password to accept the invitation to {storeName}.",
+    "invite.setupPassword.unknownStore": "Unknown store",
+    "invite.setupPassword.newPassword": "New password",
+    "invite.setupPassword.passwordPlaceholder": "At least 8 characters",
+    "invite.setupPassword.passwordPlaceholderMin6": "At least 6 characters",
+    "invite.setupPassword.submit": "Set Password and Accept Invitation",
+    "invite.setupPassword.successTitle": "Password set successfully",
+    "invite.setupPassword.failureTitle": "Failed to set password",
+    "invite.setupPassword.loginRequiredTitle": "Login required",
+    "invite.setupPassword.loginRequired":
+      "Please sign in through the invitation link.",
+    "invite.setupPassword.nameRequiredTitle": "Please enter your name",
+    "invite.setupPassword.nameRequiredDescription": "Name is required.",
+    "invite.setupPassword.passwordMismatchTitle": "Passwords do not match",
+    "invite.setupPassword.passwordMismatchDescription":
+      "Please check your password again.",
+    "invite.setupPassword.passwordTooShortTitle": "Password is too short",
+    "invite.setupPassword.passwordTooShortDescription":
+      "Please enter at least 8 characters.",
+    "invite.setupPassword.passwordTooShortMin6Description":
+      "Please enter at least 6 characters.",
+    "invite.setupPassword.loadError":
+      "An error occurred while loading the information.",
+    "invite.setupPassword.invitationLoadError":
+      "Failed to load invitation information.",
+    "invite.setupPassword.userLoadError":
+      "An error occurred while checking user information.",
+    "invite.setupPassword.checkingUser": "Checking user information...",
     "invite.error.title": "Invitation Link Error",
+    "invite.error.processing":
+      "An error occurred while processing the invitation link. Please try again.",
     "invite.error.requestNew": "Request New Invitation",
+    "invite.error.requestNewDescription":
+      "Please ask the administrator for a new invitation.",
+    "invite.error.message.otpExpired": "The email link has expired.",
+    "invite.error.message.accessDenied": "Access denied.",
+    "invite.error.message.invalidInvite":
+      "There is a problem with the invitation link.",
+    "invite.error.description.default":
+      "Please check the invitation link again.",
+    "invite.error.description.otpExpired":
+      "The invitation link has expired. Please request a new invitation.",
+    "invite.error.description.accessDenied":
+      "You do not have access to this invitation link. Please contact the administrator.",
+    "invite.error.description.invalidInvite":
+      "The invitation link is invalid or corrupted.",
+    "invite.error.code": "Error Code",
+    "invite.error.type": "Error Type",
+    "invite.error.detail": "Details",
     "invite.error.goHome": "Go to Home",
     "invite.verify.title": "Email Verification",
     "invite.verify.description": "Email verification completed.",
     "invite.verify.verifying": "Verifying...",
+    "invite.verify.completedTitle": "Email Verification Complete",
+    "invite.verify.processedTitle": "Invitation Already Processed",
+    "invite.verify.processedDescription":
+      "This invitation has already been processed or has expired.",
+    "invite.verify.sessionNotFound": "Session information was not found.",
+    "invite.verify.userNotFound": "User information was not found.",
+    "invite.verify.checkError": "An error occurred while checking verification.",
+    "invite.verify.passwordSetAndAccepted":
+      "Password has been set and invitation accepted.",
+    "invite.verify.passwordSetupPrompt":
+      "Set a secure password and accept the invitation.",
+    "invite.verify.linkVerifiedPrompt":
+      "Invitation link has been verified. Please set your password.",
+    "invite.verify.infoTitle": "Verification Information",
+    "invite.verify.safePasswordNote": "Please set a secure password.",
+    "invite.verify.setPassword": "Set Password",
+    "invite.verify.userInfoTitle": "User Information",
+    "invite.verify.newPasswordPlaceholder":
+      "Enter a new password (minimum 8 characters)",
     "invite.verify.error": "Verification Error",
     "invite.verify.errorDescription": "Email verification required.",
     "invite.verify.acceptTitle": "Accept Invitation",
@@ -1173,9 +1456,18 @@ const translations = {
     "invite.verify.acceptError": "Failed to accept invitation.",
     "invite.title": "Invitation Management",
     "invite.email": "Email",
+    "invite.emailPlaceholder": "Enter the email to invite",
+    "invite.storePlaceholder": "Select a store",
     "invite.role": "Role",
+    "invite.rolePlaceholder": "Select a role to assign",
+    "invite.roleDescription.subManager":
+      "Can manage schedules, approve swaps, and invite part-timers",
+    "invite.roleDescription.partTimer":
+      "Can view schedules and request shift swaps",
     "invite.status": "Status",
     "invite.actions": "Actions",
+    "invite.invitedAt": "Invited At",
+    "invite.expiresAt": "Expires At",
     "invite.accepted": "Accepted",
     "invite.pending": "Pending",
     "invite.expired": "Expired",
@@ -1189,10 +1481,37 @@ const translations = {
     "invite.days": "days",
     "invite.createSuccess": "Invitation created successfully",
     "invite.createError": "Failed to create invitation",
+    "invite.loadError": "Failed to load invitations",
+    "invite.linkCopied": "Link copied",
+    "invite.linkCopiedDescription": "Invitation link copied to clipboard",
+    "invite.copyError": "Failed to copy link",
+    "invite.empty": "No invitations yet",
+    "invite.emptyDescription": "Invite a new team member",
+    "invite.accessDenied": "You do not have access to this store",
+    "invite.managePermissionDenied":
+      "You do not have management permission for this store",
+    "invite.cancelUsed": "Used invitations cannot be cancelled",
+    "invite.alreadyCancelled": "This invitation is already cancelled",
+    "invite.duplicateActiveInvite":
+      "An active invitation already exists for this email",
+    "invite.tokenCreateError": "Failed to generate invitation token",
+    "invite.storeIdRequired": "Store ID is required",
+    "invite.listLoadError": "Failed to load invitation list",
     "invite.resendSuccess": "Invitation resent successfully",
     "invite.resendError": "Failed to resend invitation",
     "invite.cancelSuccess": "Invitation cancelled successfully",
     "invite.cancelError": "Failed to cancel invitation",
+    "invite.cancelPermissionDenied": "You do not have permission to cancel invitations",
+    "invite.resendPermissionDenied":
+      "You do not have permission to resend invitations",
+    "invite.userDeleteFailed": "Failed to delete existing user",
+    "invite.userDeleteRetryFailed":
+      "Failed to delete user. Please try again later.",
+    "invite.emailSendFailed": "Failed to send email",
+    "invite.alreadyRegisteredRetry":
+      "This email is already registered. Please try again later.",
+    "invite.resendEmailError":
+      "An error occurred while resending the invitation email",
     "invite.emailRequired": "Please enter email",
     "invite.expiresIn": "Expires In",
     "invite.list": "Invitation List",
@@ -1614,6 +1933,23 @@ const translations = {
     "auth.login.successDescription": "ログインが正常に完了しました",
     "auth.login.error": "ログイン失敗",
     "auth.login.errorDescription": "ログインに失敗しました",
+    "auth.login.validation.invalidData": "入力データが無効です",
+    "auth.login.validation.emailRequired": "メールアドレスを入力してください",
+    "auth.login.validation.invalidEmail":
+      "有効なメールアドレスを入力してください",
+    "auth.login.validation.passwordRequired": "パスワードを入力してください",
+    "auth.login.error.general": "ログイン中にエラーが発生しました",
+    "auth.login.error.invalidCredentials":
+      "メールアドレスまたはパスワードが正しくありません",
+    "auth.login.error.emailNotConfirmed":
+      "メール確認が必要です。登録時のメールをご確認ください",
+    "auth.login.error.tooManyRequests":
+      "ログイン試行回数が多すぎます。しばらくしてから再試行してください",
+    "auth.login.error.userNotFound":
+      "このメールアドレスのアカウントは見つかりませんでした",
+    "auth.login.loading": "読み込み中...",
+    "auth.logout.success": "ログアウトが完了しました。",
+    "auth.logout.error": "ログアウト中にエラーが発生しました。",
     "auth.signup.title": "新しいアカウントを作成",
     "auth.signup.hasAccount": "既にアカウントをお持ちですか？",
     "auth.signup.login": "ログイン",
@@ -1726,6 +2062,10 @@ const translations = {
     "dashboard.teamChat": "チームチャット",
     // 招待関連
     "invites.form.title": "チームメンバー招待",
+    "invites.form.send": "招待を送信",
+    "invites.form.sending": "招待を作成中...",
+    "invites.form.storeRequired": "店舗を選択してください",
+    "invites.form.invitedDescription": "{email}に招待を送信しました",
     "invites.form.store": "店舗選択",
     "invites.form.email": "メールアドレス",
     "invites.form.role": "役割",
@@ -1744,8 +2084,13 @@ const translations = {
     "invite.email": "メールアドレス",
     "invite.emailPlaceholder":
       "招待するユーザーのメールアドレスを入力してください",
+    "invite.storePlaceholder": "店舗を選択してください",
     "invite.role": "役割",
     "invite.rolePlaceholder": "付与する役割を選択してください",
+    "invite.roleDescription.subManager":
+      "スケジュール管理、交代承認、アルバイト招待が可能です",
+    "invite.roleDescription.partTimer":
+      "スケジュール確認、交代申請が可能です",
     "invite.message": "メッセージ (任意)",
     "invite.messagePlaceholder": "招待メッセージを入力してください",
     "invite.send": "招待送信",
@@ -1761,6 +2106,7 @@ const translations = {
     "invite.cancel": "キャンセル",
     "invite.noInvites": "招待がありません",
     "invite.expiresAt": "有効期限",
+    "invite.invitedAt": "招待日",
     "invite.status": "ステータス",
     "invite.actions": "操作",
     "invite.create": "招待作成",
@@ -1770,10 +2116,36 @@ const translations = {
     "invite.days": "日",
     "invite.createSuccess": "招待が正常に作成されました",
     "invite.createError": "招待作成に失敗しました",
+    "invite.loadError": "招待一覧の読み込みに失敗しました",
+    "invite.linkCopied": "リンクをコピーしました",
+    "invite.linkCopiedDescription":
+      "招待リンクがクリップボードにコピーされました",
+    "invite.copyError": "リンクのコピーに失敗しました",
+    "invite.empty": "まだ招待がありません",
+    "invite.emptyDescription": "新しいチームメンバーを招待しましょう",
+    "invite.accessDenied": "この店舗へのアクセス権限がありません",
+    "invite.managePermissionDenied":
+      "この店舗の管理権限がありません",
+    "invite.cancelUsed": "使用済みの招待はキャンセルできません",
+    "invite.alreadyCancelled": "この招待は既にキャンセルされています",
+    "invite.duplicateActiveInvite":
+      "このメールアドレスには有効な招待が既に存在します",
+    "invite.tokenCreateError": "招待トークンの生成に失敗しました",
+    "invite.storeIdRequired": "店舗IDが必要です",
+    "invite.listLoadError": "招待一覧の取得に失敗しました",
     "invite.resendSuccess": "招待が再送信されました",
     "invite.resendError": "招待再送信に失敗しました",
     "invite.cancelSuccess": "招待がキャンセルされました",
     "invite.cancelError": "招待キャンセルに失敗しました",
+    "invite.cancelPermissionDenied": "招待をキャンセルする権限がありません",
+    "invite.resendPermissionDenied": "招待を再送信する権限がありません",
+    "invite.userDeleteFailed": "既存ユーザーの削除に失敗しました",
+    "invite.userDeleteRetryFailed":
+      "ユーザーの削除に失敗しました。しばらくしてから再試行してください。",
+    "invite.emailSendFailed": "メール送信に失敗しました",
+    "invite.alreadyRegisteredRetry":
+      "このメールアドレスは既に登録されています。しばらくしてから再試行してください。",
+    "invite.resendEmailError": "メール再送信中にエラーが発生しました",
     "invite.emailRequired": "メールアドレスを入力してください",
     "invite.expiresIn": "有効期限",
     "invite.list": "招待リスト",
@@ -1795,6 +2167,9 @@ const translations = {
     "role.management.changing": "変更中...",
     "role.management.changeRole": "ロール変更",
     "role.management.userList": "ユーザー一覧",
+    "role.changePermissionDenied": "ロールを変更する権限がありません",
+    "role.grantPermissionDenied": "ロールを付与する権限がありません",
+    "role.revokePermissionDenied": "ロールを取り消す権限がありません",
     // 店舗関連
     "store.noStores": "店舗なし",
     "store.loading": "店舗読み込み中...",
@@ -1841,6 +2216,7 @@ const translations = {
     "common.create": "作成",
     "common.info": "情報",
     "common.error": "エラー",
+    "common.unknownError": "不明なエラーが発生しました",
     "common.success": "成功",
     "common.back": "戻る",
     "common.view": "表示",
@@ -1897,6 +2273,37 @@ const translations = {
     "user.roleRevoked": "役割が回収されました",
     "user.roleRevokedDescription": "ユーザーの役割が正常に回収されました",
     "user.roleRevokeError": "役割回収に失敗しました",
+    "user.demoteSubManager": "サブマネージャー降格",
+    "user.demoteSubManagerDescription":
+      "サブマネージャーをアルバイトに変更します",
+    "user.demoteSubManagerError": "サブマネージャーの降格に失敗しました",
+    "user.deactivateUser": "ユーザー無効化",
+    "user.deactivateUserDescription": "このユーザーを無効化します",
+    "user.deactivateUserError": "ユーザーの無効化に失敗しました",
+    "user.reactivateUser": "ユーザー再有効化",
+    "user.reactivateUserDescription": "このユーザーを再有効化します",
+    "user.reactivateUserError": "ユーザーの再有効化に失敗しました",
+    "user.deleteUser": "ユーザー削除",
+    "user.deleteUserDescription":
+      "このユーザーを削除します（スケジュール履歴は保持されます）",
+    "user.deleteUserError": "ユーザーの削除に失敗しました",
+    "user.notFound": "ユーザーが見つかりません",
+    "user.alreadyInactive": "既に無効化されているユーザーです",
+    "user.alreadyActive": "既に有効化されているユーザーです",
+    "user.deletePermissionDenied": "ユーザーを削除する権限がありません",
+    "user.deactivatePermissionDenied": "ユーザーを無効化する権限がありません",
+    "user.reactivatePermissionDenied":
+      "ユーザーを再有効化する権限がありません",
+    "user.cannotDeleteSelf": "自分自身を削除することはできません",
+    "user.cannotDeleteMaster":
+      "マスターロールを持つユーザーは削除できません",
+    "user.roleNotFound": "ユーザーのロールが見つかりません",
+    "user.onlySubManagerCanDemote":
+      "サブマネージャーのみアルバイトに変更できます",
+    "user.onlyActiveSubManagerCanDemote":
+      "有効状態のサブマネージャーのみ変更できます",
+    "user.deleteSuccessWithHistory":
+      "ユーザーを削除しました。スケジュール履歴は保持されます。",
     "user.temporaryAssigned": "臨時勤務配置が完了しました",
     "user.temporaryAssignedDescription": "臨時勤務が正常に配置されました",
     "user.temporaryAssignError": "臨時勤務配置に失敗しました",
@@ -1988,12 +2395,97 @@ const translations = {
     "invite.accept.existingUserMessage":
       "このメールアドレスは既に登録されています。ログインして招待を受諾してください。",
     "invite.accept.loginToAccept": "ログインして招待受諾",
+    "invite.accept.emailMismatch":
+      "招待されたメールアドレスと現在ログイン中のメールアドレスが一致しません",
+    "invite.accept.alreadyMember": "既にこの店舗のメンバーです",
+    "invite.accept.processingError": "招待受諾処理中にエラーが発生しました",
+    "invite.accept.tokenRequired": "招待トークンが必要です",
+    "invite.accept.notFound": "招待が見つかりません",
+    "invite.accept.status.valid": "有効な招待です",
+    "invite.accept.status.cancelled": "キャンセルされた招待です",
+    "invite.accept.status.used": "既に使用された招待です",
+    "invite.accept.status.expired": "期限切れの招待です",
+    "invite.accept.joinedRoleMessage":
+      "{storeName}に{roleName}として正常に参加しました",
+    "invite.accept.signInFailed":
+      "ログイン失敗: {details}。デフォルトパスワード(1q2w3e4r!)をお試しください。",
+    "invite.accept.userCreateFailed": "ユーザーの作成に失敗しました",
+    "invite.accept.storeAddFailed": "店舗への追加に失敗しました",
+    "invite.setupPassword.title": "パスワード設定",
+    "invite.setupPassword.description":
+      "{storeName}への招待を受諾するためにパスワードを設定してください。",
+    "invite.setupPassword.unknownStore": "不明な店舗",
+    "invite.setupPassword.newPassword": "新しいパスワード",
+    "invite.setupPassword.passwordPlaceholder": "8文字以上",
+    "invite.setupPassword.passwordPlaceholderMin6": "6文字以上",
+    "invite.setupPassword.submit": "パスワード設定して招待受諾",
+    "invite.setupPassword.successTitle": "パスワード設定完了",
+    "invite.setupPassword.failureTitle": "パスワード設定に失敗しました",
+    "invite.setupPassword.loginRequiredTitle": "ログインが必要です",
+    "invite.setupPassword.loginRequired":
+      "招待リンクからログインしてください。",
+    "invite.setupPassword.nameRequiredTitle": "名前を入力してください",
+    "invite.setupPassword.nameRequiredDescription": "名前は必須項目です。",
+    "invite.setupPassword.passwordMismatchTitle":
+      "パスワードが一致しません",
+    "invite.setupPassword.passwordMismatchDescription":
+      "パスワードをもう一度確認してください。",
+    "invite.setupPassword.passwordTooShortTitle":
+      "パスワードが短すぎます",
+    "invite.setupPassword.passwordTooShortDescription":
+      "8文字以上で入力してください。",
+    "invite.setupPassword.passwordTooShortMin6Description":
+      "6文字以上で入力してください。",
+    "invite.setupPassword.loadError":
+      "情報の読み込み中にエラーが発生しました。",
+    "invite.setupPassword.invitationLoadError":
+      "招待情報の読み込みに失敗しました。",
+    "invite.setupPassword.userLoadError":
+      "ユーザー情報の確認中にエラーが発生しました。",
+    "invite.setupPassword.checkingUser": "ユーザー情報を確認中...",
     "invite.error.title": "招待リンクエラー",
+    "invite.error.processing":
+      "招待リンクの処理中にエラーが発生しました。もう一度お試しください。",
     "invite.error.requestNew": "新しい招待をリクエスト",
+    "invite.error.requestNewDescription":
+      "管理者に新しい招待を依頼してください。",
+    "invite.error.message.otpExpired": "メールリンクの有効期限が切れました。",
+    "invite.error.message.accessDenied": "アクセスが拒否されました。",
+    "invite.error.message.invalidInvite": "招待リンクに問題があります。",
+    "invite.error.description.default":
+      "招待リンクをもう一度確認してください。",
+    "invite.error.description.otpExpired":
+      "招待リンクの有効期限が切れています。新しい招待を依頼してください。",
+    "invite.error.description.accessDenied":
+      "この招待リンクにアクセスする権限がありません。管理者にお問い合わせください。",
+    "invite.error.description.invalidInvite":
+      "招待リンクが無効か破損しています。",
+    "invite.error.code": "エラーコード",
+    "invite.error.type": "エラータイプ",
+    "invite.error.detail": "詳細",
     "invite.error.goHome": "ホームに戻る",
     "invite.verify.title": "メール認証",
     "invite.verify.description": "メール認証が完了しました。",
     "invite.verify.verifying": "認証確認中...",
+    "invite.verify.completedTitle": "メール認証完了",
+    "invite.verify.processedTitle": "招待処理完了",
+    "invite.verify.processedDescription":
+      "既に処理済みの招待、または期限切れの招待です。",
+    "invite.verify.sessionNotFound": "セッション情報が見つかりません。",
+    "invite.verify.userNotFound": "ユーザー情報が見つかりません。",
+    "invite.verify.checkError": "認証確認中にエラーが発生しました。",
+    "invite.verify.passwordSetAndAccepted":
+      "パスワードが設定され、招待が受諾されました。",
+    "invite.verify.passwordSetupPrompt":
+      "安全なパスワードを設定して招待を受諾してください。",
+    "invite.verify.linkVerifiedPrompt":
+      "招待リンクの確認が完了しました。パスワードを設定してください。",
+    "invite.verify.infoTitle": "認証情報",
+    "invite.verify.safePasswordNote": "安全なパスワードを設定してください。",
+    "invite.verify.setPassword": "パスワードを設定",
+    "invite.verify.userInfoTitle": "ユーザー情報",
+    "invite.verify.newPasswordPlaceholder":
+      "新しいパスワードを入力してください（8文字以上）",
     "invite.verify.error": "認証エラー",
     "invite.verify.errorDescription": "メール認証が必要です。",
     "invite.verify.acceptTitle": "招待受諾",

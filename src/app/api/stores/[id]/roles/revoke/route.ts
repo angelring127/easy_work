@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { defaultLocale, t, type Locale } from "@/lib/i18n";
+import { resolveRequestLocale } from "@/lib/locale-request";
 
 // 요청 데이터 검증 스키마
 const revokeRoleSchema = z.object({
@@ -18,6 +20,7 @@ async function revokeUserRole(
 ): Promise<NextResponse> {
   try {
     const { user, params } = context;
+    const locale = resolveRequestLocale(request);
     const storeId = params.id;
     const body = await request.json();
 
@@ -27,7 +30,7 @@ async function revokeUserRole(
       return NextResponse.json(
         {
           success: false,
-          error: "잘못된 요청 데이터입니다",
+          error: t("auth.login.validation.invalidData", locale),
           details: validationResult.error.errors,
         },
         { status: 400 }
@@ -49,7 +52,7 @@ async function revokeUserRole(
       return NextResponse.json(
         {
           success: false,
-          error: "매장을 찾을 수 없습니다",
+          error: t("store.notFound", locale),
         },
         { status: 404 }
       );
@@ -60,7 +63,7 @@ async function revokeUserRole(
       return NextResponse.json(
         {
           success: false,
-          error: "역할 회수 권한이 없습니다",
+          error: t("role.revokePermissionDenied", locale),
         },
         { status: 403 }
       );
@@ -78,7 +81,7 @@ async function revokeUserRole(
       return NextResponse.json(
         {
           success: false,
-          error: "사용자의 역할을 찾을 수 없습니다",
+          error: t("user.roleNotFound", locale),
         },
         { status: 404 }
       );
@@ -88,7 +91,7 @@ async function revokeUserRole(
       return NextResponse.json(
         {
           success: false,
-          error: "이미 비활성화된 사용자입니다",
+          error: t("user.alreadyInactive", locale),
         },
         { status: 400 }
       );
@@ -109,7 +112,7 @@ async function revokeUserRole(
       return NextResponse.json(
         {
           success: false,
-          error: "역할 회수에 실패했습니다",
+          error: t("user.roleRevokeError", locale),
         },
         { status: 500 }
       );
@@ -140,14 +143,15 @@ async function revokeUserRole(
     return NextResponse.json({
       success: true,
       data: { revoked: result },
-      message: "역할이 성공적으로 회수되었습니다",
+      message: t("user.roleRevokedDescription", locale),
     });
   } catch (error) {
     console.error("역할 회수 API 오류:", error);
+    const locale: Locale = defaultLocale;
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", locale),
       },
       { status: 500 }
     );

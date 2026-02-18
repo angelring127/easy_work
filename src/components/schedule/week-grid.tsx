@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RoleBadge } from "@/components/auth/role-badge";
+import { AssignmentSheet } from "@/components/schedule/assignment-sheet";
 import {
   Tooltip,
   TooltipContent,
@@ -491,6 +492,16 @@ export function WeekGrid({
     return time.substring(0, 5); // HH:mm 형식으로 변환
   };
 
+  // 역할 이니셜 변환
+  const getRoleInitial = (role: string): string => {
+    const roleMap: Record<string, string> = {
+      MASTER: "M",
+      SUB_MANAGER: "S",
+      PART_TIMER: "P",
+    };
+    return roleMap[role] || role.charAt(0).toUpperCase();
+  };
+
   // 분을 시간:분 형식으로 변환
   const formatTimeFromMinutes = (minutes: number): string => {
     const hours = Math.floor(minutes / 60);
@@ -668,41 +679,42 @@ export function WeekGrid({
     <TooltipProvider>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
               {t("schedule.weekGrid", locale)}
             </CardTitle>
-            {canManage && (
+            {/* Debug: canManage={String(canManage)} */}
+            {canManage ? (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCopyDialogOpen(true)}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 min-h-[44px] touch-manipulation"
               >
                 <Copy className="h-4 w-4" />
-                {t("schedule.copyWeek", locale)}
+                <span>{t("schedule.copyWeek", locale)}</span>
               </Button>
-            )}
+            ) : null}
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <div className="min-w-full">
+          <div className="overflow-x-auto -mx-2 md:mx-0">
+            <div className="min-w-max px-2 md:px-0">
               {/* 헤더 행 - 날짜 */}
-              <div className="grid grid-cols-8 gap-1 mb-2">
-                <div className="p-2 font-semibold text-sm text-muted-foreground bg-muted/50 border rounded-md">
+              <div className="grid grid-cols-8 gap-px md:gap-1 mb-0.5 md:mb-2 min-w-max">
+                <div className="min-w-[50px] md:min-w-0 md:w-auto p-0.5 md:p-3 font-semibold text-[9px] md:text-sm text-muted-foreground bg-muted/50 border rounded-sm md:rounded-md">
                   {t("schedule.user", locale)}
                 </div>
                 {weekDays.map((day, index) => (
                   <div
                     key={index}
-                    className="p-2 text-center border rounded-md bg-muted/50"
+                    className="min-w-[32px] md:min-w-0 md:w-auto p-0.5 md:p-3 text-center border rounded-sm md:rounded-md bg-muted/50"
                   >
-                    <div className="text-sm font-semibold">
+                    <div className="text-[9px] md:text-sm font-semibold">
                       {formatWeekday(day)}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-[8px] md:text-xs text-muted-foreground">
                       {formatDate(day)}
                     </div>
                   </div>
@@ -710,13 +722,13 @@ export function WeekGrid({
               </div>
 
               {/* 오전/오후 라벨 행 */}
-              <div className="grid grid-cols-8 gap-1 mb-2">
-                <div className="p-2 text-center border rounded-md bg-muted/30">
-                  <div className="flex flex-col gap-1">
-                    <div className="text-xs text-blue-600 font-medium">
+              <div className="grid grid-cols-8 gap-px md:gap-1 mb-0.5 md:mb-2 min-w-max">
+                <div className="min-w-[50px] md:min-w-0 md:w-auto p-0.5 md:p-2 text-center border rounded-sm md:rounded-md bg-muted/30">
+                  <div className="flex flex-col gap-px">
+                    <div className="text-[8px] md:text-xs text-blue-600 font-medium">
                       {t("schedule.morningStaff", locale)}
                     </div>
-                    <div className="text-xs text-orange-600 font-medium">
+                    <div className="text-[8px] md:text-xs text-orange-600 font-medium">
                       {t("schedule.afternoonStaff", locale)}
                     </div>
                   </div>
@@ -726,13 +738,13 @@ export function WeekGrid({
                   return (
                     <div
                       key={index}
-                      className="p-2 text-center border rounded-md bg-muted/30"
+                      className="min-w-[32px] md:min-w-0 md:w-auto p-0.5 md:p-2 text-center border rounded-sm md:rounded-md bg-muted/30"
                     >
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs text-blue-600 font-medium">
+                      <div className="flex flex-col gap-px">
+                        <div className="text-[9px] md:text-xs text-blue-600 font-medium">
                           {morning}
                         </div>
-                        <div className="text-xs text-orange-600 font-medium">
+                        <div className="text-[9px] md:text-xs text-orange-600 font-medium">
                           {afternoon}
                         </div>
                       </div>
@@ -743,42 +755,34 @@ export function WeekGrid({
 
               {/* 사용자별 행 */}
               {users.map((user) => (
-                <div key={user.id} className="grid grid-cols-8 gap-1 mb-1">
+                <div key={user.id} className="grid grid-cols-8 gap-px md:gap-1 mb-px md:mb-1 min-w-max">
                   {/* 사용자 정보 */}
                   <div
-                    className={`p-2 border rounded-md bg-muted/50 ${
+                    className={`min-w-[50px] md:min-w-0 md:w-auto p-0.5 md:p-2 border rounded-sm md:rounded-md bg-muted/50 ${
                       canManage
-                        ? "cursor-pointer hover:bg-muted/70 transition-colors"
+                        ? "cursor-pointer hover:bg-muted/70 transition-colors touch-manipulation"
                         : ""
                     }`}
                     onClick={() => handleUserNameClick(user.id)}
                   >
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs">
+                    <div className="flex items-center gap-0.5 md:gap-2">
+                      <Avatar className="h-3 w-3 md:h-6 md:w-6">
+                        <AvatarFallback className="text-[8px] md:text-xs">
                           {user.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">
+                        <div className="text-[9px] md:text-sm font-medium truncate">
                           {user.name}
                         </div>
-                        <div className="text-xs text-blue-600 font-medium">
+                        <div className="text-[8px] md:text-xs text-blue-600 font-medium">
                           {getUserTotalHours(user.id)}h
                         </div>
                         {user.roles.length > 0 && (
-                          <div className="flex gap-1 mt-1 flex-wrap">
-                            {user.roles.slice(0, 2).map((role, index) => (
-                              <RoleBadge key={index} role={role as any} />
-                            ))}
-                            {user.roles.length > 2 && (
-                              <Badge
-                                variant="secondary"
-                                className="text-xs px-1 py-0"
-                              >
-                                +{user.roles.length - 2}
-                              </Badge>
-                            )}
+                          <div className="flex gap-0.5 mt-px flex-wrap items-center">
+                            <span className="text-[7px] md:text-xs font-semibold text-muted-foreground">
+                              {user.roles.map(getRoleInitial).join("/")}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -827,7 +831,7 @@ export function WeekGrid({
                       <div
                         key={dayIndex}
                         className={`
-                          p-2 border rounded-md min-h-[100px] cursor-pointer transition-colors
+                          min-w-[32px] md:min-w-0 md:w-auto p-px md:p-2 border rounded-sm md:rounded-md min-h-[48px] md:min-h-[100px] cursor-pointer transition-colors touch-manipulation
                           ${
                             isSelected
                               ? "bg-primary/10 border-primary"
@@ -846,21 +850,16 @@ export function WeekGrid({
                           handleCellClick(user.id, dayStr);
                         }}
                       >
-                        <div className="space-y-1">
+                        <div className="space-y-px md:space-y-1">
                           {/* Unavailable 표시 (스케줄과 함께 표시) */}
                           {isUnavailable && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 p-1 rounded bg-red-50 border border-red-200 text-red-600">
-                                  <AlertCircle className="h-3 w-3 flex-shrink-0" />
-                                  <span className="text-xs font-medium truncate">
-                                    {t("availability.unavailable", locale)}
+                                <div className="flex items-center gap-px p-px md:p-1 rounded-sm md:rounded bg-red-50 border border-red-200 text-red-600">
+                                  <AlertCircle className="h-2 w-2 md:h-3 md:w-3 flex-shrink-0" />
+                                  <span className="text-[8px] md:text-xs font-medium truncate">
+                                    X
                                   </span>
-                                  {availability.reason && (
-                                    <span className="text-xs text-red-500 truncate">
-                                      - {availability.reason}
-                                    </span>
-                                  )}
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -885,7 +884,7 @@ export function WeekGrid({
                                   <TooltipTrigger asChild>
                                     <div
                                       className={`
-                                      p-1.5 rounded text-xs cursor-pointer
+                                      p-px md:p-1.5 rounded-sm md:rounded text-xs cursor-pointer
                                       ${
                                         assignment.status === "CONFIRMED"
                                           ? "bg-green-100 text-green-800 border border-green-200"
@@ -899,29 +898,42 @@ export function WeekGrid({
                                         onAssignmentClick?.(assignment);
                                       }}
                                     >
-                                      <div className="flex items-center gap-1 mb-0.5">
-                                        <Clock className="h-3 w-3 flex-shrink-0" />
-                                        <span className="font-medium truncate">
-                                          {assignment.workItemName}
+                                      {/* 워크 아이템 이름 - 모바일에서는 축약 */}
+                                      <div className="flex items-center gap-px mb-px">
+                                        <Clock className="h-2 w-2 md:h-3 md:w-3 flex-shrink-0" />
+                                        <span className="font-medium truncate text-[8px] md:text-xs leading-tight">
+                                          <span className="md:hidden">{assignment.workItemName.slice(0, 3)}</span>
+                                          <span className="hidden md:inline">{assignment.workItemName}</span>
                                         </span>
                                       </div>
-                                      <div className="text-xs opacity-75">
-                                        {formatTime(assignment.startTime)} -{" "}
-                                        {formatTime(assignment.endTime)}
+                                      {/* 시간 - 두 줄로 표시 */}
+                                      <div className="text-[7px] md:text-xs opacity-75 leading-tight">
+                                        <div className="md:hidden space-y-px">
+                                          <div className="flex items-center gap-px">
+                                            <span className="opacity-50">▼</span>
+                                            <span>{formatTime(assignment.startTime)}</span>
+                                          </div>
+                                          <div className="flex items-center gap-px">
+                                            <span className="opacity-50">▲</span>
+                                            <span>{formatTime(assignment.endTime)}</span>
+                                          </div>
+                                        </div>
+                                        <div className="hidden md:block">
+                                          {formatTime(assignment.startTime)}-{formatTime(assignment.endTime)}
+                                        </div>
                                       </div>
-                                      {(assignment.requiredRoles?.length ?? 0) >
-                                        0 && (
-                                        <div className="flex gap-1 mt-1 flex-wrap">
+                                      {/* 역할 이니셜 표시 */}
+                                      {(assignment.requiredRoles?.length ?? 0) > 0 && (
+                                        <div className="flex gap-px mt-px flex-wrap">
                                           {(assignment.requiredRoles || [])
-                                            .slice(0, 2)
+                                            .slice(0, 3)
                                             .map((role, roleIndex) => (
-                                              <Badge
+                                              <span
                                                 key={roleIndex}
-                                                variant="outline"
-                                                className="text-xs px-1 py-0"
+                                                className="text-[7px] md:text-xs font-semibold opacity-60"
                                               >
-                                                {role}
-                                              </Badge>
+                                                {getRoleInitial(role)}
+                                              </span>
                                             ))}
                                         </div>
                                       )}
@@ -2745,7 +2757,7 @@ export function WeekGrid({
                     setSelectedSourceWeek(new Date(value));
                   }}
                 >
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="flex-1 min-h-[44px]">
                     <SelectValue
                       placeholder={t("schedule.selectWeekToCopy", locale)}
                     />

@@ -2,20 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAdminAuth } from "@/lib/auth/middleware";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import type { Database, Tables } from "@/lib/supabase/types";
+import { defaultLocale, isValidLocale, t, type Locale } from "@/lib/i18n";
+
+function resolveLocale(request: NextRequest, localeParam?: string): Locale {
+  if (localeParam && isValidLocale(localeParam)) {
+    return localeParam;
+  }
+
+  const localeFromQuery = request.nextUrl.searchParams.get("locale");
+  if (localeFromQuery && isValidLocale(localeFromQuery)) {
+    return localeFromQuery;
+  }
+
+  const acceptLanguage = request.headers.get("accept-language");
+  const preferredLocale = acceptLanguage?.split(",")[0]?.split("-")[0];
+  if (preferredLocale && isValidLocale(preferredLocale)) {
+    return preferredLocale;
+  }
+
+  return defaultLocale;
+}
 
 /**
  * 초대 생성 요청 스키마
  */
-const createInviteSchema = z.object({
-  email: z.string().email("유효한 이메일 주소를 입력해주세요"),
-  role: z.enum(["SUB_MANAGER", "PART_TIMER"], {
-    errorMap: () => ({ message: "유효한 역할을 선택해주세요" }),
-  }),
-  store_id: z.string().uuid("유효한 매장 ID를 입력해주세요"),
-});
+const createCreateInviteSchema = (locale: Locale) =>
+  z.object({
+    email: z.string().email(t("auth.login.validation.invalidEmail", locale)),
+    role: z.enum(["SUB_MANAGER", "PART_TIMER"], {
+      errorMap: () => ({ message: t("invite.rolePlaceholder", locale) }),
+    }),
+    store_id: z.string().uuid(t("invites.form.storeRequired", locale)),
+    locale: z.string().optional(),
+  });
 
-type CreateInviteRequest = z.infer<typeof createInviteSchema>;
+type CreateInviteRequest = z.infer<ReturnType<typeof createCreateInviteSchema>>;
 
 /**
  * 초대 생성 API
@@ -31,6 +52,11 @@ async function createInvite(
 
     // 요청 데이터 검증
     const body = await request.json();
+    const locale = resolveLocale(
+      request,
+      typeof body?.locale === "string" ? body.locale : undefined
+    );
+    const createInviteSchema = createCreateInviteSchema(locale);
     const validatedData = createInviteSchema.parse(body);
     const { email, role, store_id } = validatedData;
 
@@ -45,7 +71,7 @@ async function createInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "매장을 찾을 수 없거나 접근 권한이 없습니다",
+          error: t("invite.accessDenied", locale),
         },
         { status: 404 }
       );
@@ -66,7 +92,7 @@ async function createInvite(
         return NextResponse.json(
           {
             success: false,
-            error: "해당 매장의 관리 권한이 없습니다",
+            error: t("invite.managePermissionDenied", locale),
           },
           { status: 403 }
         );
@@ -88,7 +114,7 @@ async function createInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "이미 해당 이메일로 유효한 초대가 존재합니다",
+          error: t("invite.duplicateActiveInvite", locale),
         },
         { status: 409 }
       );
@@ -109,7 +135,7 @@ async function createInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "초대 토큰 생성에 실패했습니다",
+          error: t("invite.tokenCreateError", locale),
         },
         { status: 500 }
       );
@@ -138,7 +164,7 @@ async function createInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "초대 생성에 실패했습니다",
+          error: t("invite.createError", locale),
         },
         { status: 500 }
       );
@@ -150,9 +176,9 @@ async function createInvite(
       data: {
         ...invite,
         store: storeAccess,
-        invite_url: `${request.nextUrl.origin}/ko/invites/accept/${tokenResult}`,
+        invite_url: `${request.nextUrl.origin}/${locale}/invites/accept/${tokenResult}`,
       },
-      message: "초대가 성공적으로 생성되었습니다",
+      message: t("invite.createSuccess", locale),
     };
 
     return NextResponse.json(response);
@@ -163,7 +189,7 @@ async function createInvite(
       return NextResponse.json(
         {
           success: false,
-          error: "입력 데이터가 유효하지 않습니다",
+          error: t("auth.login.validation.invalidData", defaultLocale),
           details: error.errors,
         },
         { status: 400 }
@@ -173,7 +199,7 @@ async function createInvite(
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", defaultLocale),
       },
       { status: 500 }
     );
@@ -190,6 +216,7 @@ async function getInvites(
 ): Promise<NextResponse> {
   try {
     const { user } = context;
+    const locale = resolveLocale(request);
     const { searchParams } = new URL(request.url);
     const storeId = searchParams.get("store_id");
 
@@ -197,7 +224,7 @@ async function getInvites(
       return NextResponse.json(
         {
           success: false,
-          error: "매장 ID가 필요합니다",
+          error: t("invite.storeIdRequired", locale),
         },
         { status: 400 }
       );
@@ -216,7 +243,7 @@ async function getInvites(
       return NextResponse.json(
         {
           success: false,
-          error: "매장을 찾을 수 없거나 접근 권한이 없습니다",
+          error: t("invite.accessDenied", locale),
         },
         { status: 404 }
       );
@@ -240,7 +267,7 @@ async function getInvites(
       return NextResponse.json(
         {
           success: false,
-          error: "초대 목록 조회에 실패했습니다",
+          error: t("invite.listLoadError", locale),
         },
         { status: 500 }
       );
@@ -255,7 +282,7 @@ async function getInvites(
     return NextResponse.json(
       {
         success: false,
-        error: "서버 오류가 발생했습니다",
+        error: t("auth.signup.error.serverError", defaultLocale),
       },
       { status: 500 }
     );
