@@ -31,7 +31,14 @@ import { ResponsiveHeader } from "@/components/layout/responsive-header";
 import { useAuth } from "@/contexts/auth-context";
 import { useStore } from "@/contexts/store-context";
 import { t, type Locale } from "@/lib/i18n";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
+import {
+  format,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  subWeeks,
+  getWeekOfMonth,
+} from "date-fns";
 import { ko, enUS, ja } from "date-fns/locale";
 import { UserRole } from "@/types/auth";
 
@@ -368,6 +375,20 @@ export default function SchedulePage() {
     )}`;
   };
 
+  const formatWeekOfMonth = () => {
+    const dateLocale = dateLocales[currentLocale];
+    const month = format(weekStart, "M", { locale: dateLocale });
+    const week = String(getWeekOfMonth(weekStart, { weekStartsOn: 1 }));
+    return t("schedule.weekOfMonth", currentLocale, { month, week });
+  };
+
+  const formatWeekRangeWithMeta = () => {
+    return t("schedule.weekRangeWithMeta", currentLocale, {
+      weekMeta: formatWeekOfMonth(),
+      range: formatWeekRange(),
+    });
+  };
+
   const handleAutoAssign = async () => {
     if (!currentStore?.id) return;
     const from = format(weekStart, "yyyy-MM-dd");
@@ -427,7 +448,7 @@ export default function SchedulePage() {
                 {t("schedule.title", currentLocale)}
               </h1>
               <p className="text-xs md:text-sm text-muted-foreground">
-                {currentStore.name} • {formatWeekRange()}
+                {currentStore.name} • {formatWeekRangeWithMeta()}
               </p>
             </div>
           </div>
@@ -497,7 +518,7 @@ export default function SchedulePage() {
               </div>
 
               <Badge variant="secondary" className="hidden sm:inline-flex">
-                {formatWeekRange()}
+                {formatWeekRangeWithMeta()}
               </Badge>
             </div>
           </CardContent>

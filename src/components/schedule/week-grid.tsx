@@ -53,6 +53,7 @@ import {
   addWeeks,
   subWeeks,
   differenceInDays,
+  getWeekOfMonth,
 } from "date-fns";
 import { ko, enUS, ja } from "date-fns/locale";
 
@@ -546,6 +547,26 @@ export function WeekGrid({
   const formatDate = (date: Date): string => {
     const dateLocale = dateLocales[locale];
     return format(date, "MM/dd", { locale: dateLocale });
+  };
+
+  const formatWeekOfMonth = (date: Date): string => {
+    const dateLocale = dateLocales[locale];
+    const month = format(date, "M", { locale: dateLocale });
+    const week = String(getWeekOfMonth(date, { weekStartsOn: 1 }));
+    return t("schedule.weekOfMonth", locale, { month, week });
+  };
+
+  const formatWeekRangeWithMeta = (start: Date, end: Date): string => {
+    const dateLocale = dateLocales[locale];
+    const range = `${format(start, "MM/dd", { locale: dateLocale })} - ${format(
+      end,
+      "MM/dd",
+      { locale: dateLocale }
+    )}`;
+    return t("schedule.weekRangeWithMeta", locale, {
+      weekMeta: formatWeekOfMonth(start),
+      range,
+    });
   };
 
   // 오전/오후 인원수 계산
@@ -3048,6 +3069,14 @@ export function WeekGrid({
             <DialogTitle>{t("schedule.copyWeek", locale)}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <div className="text-muted-foreground">
+                {t("schedule.copyTargetWeek", locale)}
+              </div>
+              <div className="font-medium mt-1">
+                {formatWeekRangeWithMeta(weekStart, weekEnd)}
+              </div>
+            </div>
             <div>
               <Label>{t("schedule.selectWeekToCopy", locale)}</Label>
               <div className="flex items-center gap-2 mt-2">
@@ -3055,7 +3084,8 @@ export function WeekGrid({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const prevWeek = subWeeks(currentWeek, 1);
+                    const baseWeek = selectedSourceWeek || currentWeek;
+                    const prevWeek = subWeeks(baseWeek, 1);
                     setSelectedSourceWeek(prevWeek);
                   }}
                 >
@@ -3064,13 +3094,15 @@ export function WeekGrid({
                 <Select
                   value={
                     selectedSourceWeek
-                      ? startOfWeek(selectedSourceWeek, { weekStartsOn: 1 })
-                          .toISOString()
-                          .split("T")[0]
+                      ? format(
+                          startOfWeek(selectedSourceWeek, { weekStartsOn: 1 }),
+                          "yyyy-MM-dd"
+                        )
                       : ""
                   }
                   onValueChange={(value) => {
-                    setSelectedSourceWeek(new Date(value));
+                    const [year, month, day] = value.split("-").map(Number);
+                    setSelectedSourceWeek(new Date(year, month - 1, day));
                   }}
                 >
                   <SelectTrigger className="flex-1 min-h-[44px]">
@@ -3079,21 +3111,21 @@ export function WeekGrid({
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* 최근 8주 표시 */}
-                    {Array.from({ length: 8 }, (_, i) => {
-                      const weekDate = subWeeks(currentWeek, i);
-                      const weekStart = startOfWeek(weekDate, {
+                    {/* 현재 기준 과거/미래 8주 표시 */}
+                    {Array.from({ length: 17 }, (_, i) => {
+                      const offset = i - 8;
+                      const weekDate = addWeeks(currentWeek, offset);
+                      const optionWeekStart = startOfWeek(weekDate, {
                         weekStartsOn: 1,
                       });
-                      const weekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
-                      const dateLocale = dateLocales[locale];
+                      const optionWeekEnd = endOfWeek(weekDate, {
+                        weekStartsOn: 1,
+                      });
+                      const optionValue = format(optionWeekStart, "yyyy-MM-dd");
+
                       return (
-                        <SelectItem
-                          key={weekStart.toISOString()}
-                          value={weekStart.toISOString().split("T")[0]}
-                        >
-                          {format(weekStart, "MM/dd", { locale: dateLocale })} -{" "}
-                          {format(weekEnd, "MM/dd", { locale: dateLocale })}
+                        <SelectItem key={optionValue} value={optionValue}>
+                          {formatWeekRangeWithMeta(optionWeekStart, optionWeekEnd)}
                         </SelectItem>
                       );
                     })}
@@ -3103,7 +3135,8 @@ export function WeekGrid({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const nextWeek = addWeeks(currentWeek, 1);
+                    const baseWeek = selectedSourceWeek || currentWeek;
+                    const nextWeek = addWeeks(baseWeek, 1);
                     setSelectedSourceWeek(nextWeek);
                   }}
                 >
