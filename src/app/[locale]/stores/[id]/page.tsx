@@ -6,9 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useStore } from "@/contexts/store-context";
 import { usePermissions, useAdminAccess } from "@/hooks/use-permissions";
-import { LanguageSwitcher } from "@/components/ui/language-switcher";
-import { StoreSwitcher } from "@/components/ui/store-switcher";
-import { RoleBadge } from "@/components/auth/role-badge";
+import { ResponsiveHeader } from "@/components/layout/responsive-header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,10 +25,6 @@ import {
   Phone,
   Clock,
   Users,
-  Calendar,
-  Settings,
-  User,
-  LogOut,
   Loader2,
 } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
@@ -109,10 +103,6 @@ export default function StoreDetailPage() {
     }
   };
 
-  const handleEditStore = () => {
-    router.push(`/${locale}/stores/${storeId}/edit`);
-  };
-
   const handleSignOut = async () => {
     await signOut();
     router.push(`/${locale}/login`);
@@ -172,33 +162,12 @@ export default function StoreDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <h1 className="text-3xl font-bold text-gray-900">Workeasy</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <LanguageSwitcher />
-              <StoreSwitcher />
-              <div className="flex items-center space-x-2">
-                <User className="h-5 w-5" />
-                <span className="text-sm font-medium">{user.email}</span>
-                {userRole && <RoleBadge role={userRole} className="text-xs" />}
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleSignOut}
-                className="flex items-center space-x-2"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>{t("dashboard.logout", currentLocale)}</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <ResponsiveHeader
+        userEmail={user?.email}
+        currentStoreRole={userRole}
+        locale={locale as string}
+        onLogout={handleSignOut}
+      />
 
       {/* 메인 콘텐츠 */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -216,26 +185,27 @@ export default function StoreDetailPage() {
 
         {/* 매장 정보 헤더 */}
         <div className="mb-6">
-          <div className="flex items-center space-x-4 mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="flex items-center gap-2 break-words text-2xl font-bold text-gray-900 sm:text-3xl">
                 <Store className="h-8 w-8" />
                 {store.name}
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 break-words">
                 {store.description || t("store.noDescription", currentLocale)}
               </p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
               <Badge
                 variant={store.user_role === "MASTER" ? "default" : "secondary"}
               >
                 {getRoleDisplayName(store.user_role)}
               </Badge>
               {/* 액션 버튼들 */}
-              <div className="flex gap-2">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <Button
                   variant="outline"
+                  className="w-full sm:w-auto"
                   onClick={() =>
                     router.push(`/${locale as Locale}/stores/${storeId}/users`)
                   }
@@ -245,6 +215,7 @@ export default function StoreDetailPage() {
                 </Button>
                 <Button
                   variant="outline"
+                  className="w-full sm:w-auto"
                   onClick={() =>
                     router.push(`/${locale as Locale}/stores/${storeId}/edit`)
                   }
