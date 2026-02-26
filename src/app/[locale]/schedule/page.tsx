@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -450,7 +449,7 @@ export default function SchedulePage() {
                 {t("schedule.title", currentLocale)}
               </h1>
               <p className="text-xs md:text-sm text-muted-foreground">
-                {currentStore.name} • {formatWeekRangeWithMeta()}
+                {currentStore.name}
               </p>
             </div>
           </div>
@@ -487,47 +486,6 @@ export default function SchedulePage() {
             </div>
           </div>
         </div>
-
-        {/* Week Navigation */}
-        <Card>
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1 md:gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToPreviousWeek}
-                  disabled={loading}
-                  className="min-h-[44px] min-w-[44px] touch-manipulation"
-                >
-                  ←
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToCurrentWeek}
-                  disabled={loading}
-                  className="min-h-[44px] touch-manipulation text-xs md:text-sm"
-                >
-                  {t("schedule.currentWeek", currentLocale)}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToNextWeek}
-                  disabled={loading}
-                  className="min-h-[44px] min-w-[44px] touch-manipulation"
-                >
-                  →
-                </Button>
-              </div>
-
-              <Badge variant="secondary" className="hidden sm:inline-flex">
-                {formatWeekRangeWithMeta()}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Main Content - Tabs */}
         <Tabs
@@ -571,6 +529,10 @@ export default function SchedulePage() {
               onAvailabilityToggle={handleAvailabilityToggle}
               onScheduleChange={loadScheduleData}
               onLoadingChange={setWeekGridLoading}
+              onGoToPreviousWeek={goToPreviousWeek}
+              onGoToCurrentWeek={goToCurrentWeek}
+              onGoToNextWeek={goToNextWeek}
+              isWeekNavigationLoading={loading}
               canManage={canManage}
             />
             {(loading || weekGridLoading) && (

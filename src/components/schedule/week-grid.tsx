@@ -118,6 +118,10 @@ interface WeekGridProps {
   ) => void;
   onScheduleChange?: () => void; // 스케줄 변경 시 콜백
   onLoadingChange?: (isLoading: boolean) => void;
+  onGoToPreviousWeek?: () => void;
+  onGoToCurrentWeek?: () => void;
+  onGoToNextWeek?: () => void;
+  isWeekNavigationLoading?: boolean;
   canManage?: boolean;
 }
 
@@ -133,6 +137,10 @@ export function WeekGrid({
   onAvailabilityToggle,
   onScheduleChange,
   onLoadingChange,
+  onGoToPreviousWeek,
+  onGoToCurrentWeek,
+  onGoToNextWeek,
+  isWeekNavigationLoading = false,
   canManage = false,
 }: WeekGridProps) {
   const [loading, setLoading] = useState(false);
@@ -1044,6 +1052,47 @@ export function WeekGrid({
               </Button>
             ) : null}
           </div>
+          {onGoToPreviousWeek && onGoToCurrentWeek && onGoToNextWeek && (
+            <div className="flex items-center justify-between gap-2 mt-2">
+              <div className="flex items-center gap-1 md:gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onGoToPreviousWeek}
+                  disabled={isWeekNavigationLoading}
+                  className="min-h-[44px] min-w-[44px] touch-manipulation"
+                >
+                  ←
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onGoToCurrentWeek}
+                  disabled={isWeekNavigationLoading}
+                  className="min-h-[44px] touch-manipulation text-xs md:text-sm"
+                >
+                  {t("schedule.currentWeek", locale)}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onGoToNextWeek}
+                  disabled={isWeekNavigationLoading}
+                  className="min-h-[44px] min-w-[44px] touch-manipulation"
+                >
+                  →
+                </Button>
+              </div>
+              <div className="text-right leading-tight">
+                <div className="text-sm md:text-base font-semibold">
+                  {formatWeekOfMonth(weekStart)}
+                </div>
+                <div className="text-xs md:text-sm text-muted-foreground">
+                  {formatDate(weekStart)} - {formatDate(weekEnd)}
+                </div>
+              </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="px-1.5 py-3 md:p-6">
           <div className="overflow-x-auto -mx-1 md:mx-0">
