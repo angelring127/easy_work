@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Loader2,
   Copy,
+  Settings2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -223,6 +224,22 @@ export function WeekGrid({
     null
   );
   const [isCopying, setIsCopying] = useState(false);
+  const [isWeekdayPreferenceModalOpen, setIsWeekdayPreferenceModalOpen] =
+    useState(false);
+  const [isWeekdayPreferenceLoading, setIsWeekdayPreferenceLoading] =
+    useState(false);
+  const [isWeekdayPreferenceSaving, setIsWeekdayPreferenceSaving] =
+    useState(false);
+  const [weekdayPreferenceUser, setWeekdayPreferenceUser] = useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
+  const [preferredWeekdays, setPreferredWeekdays] = useState<Set<number>>(
+    new Set()
+  );
+  const [difficultWeekdays, setDifficultWeekdays] = useState<Set<number>>(
+    new Set()
+  );
   const { toast } = useToast();
   const toMessage = (v: unknown) =>
     typeof v === "string"
@@ -496,6 +513,16 @@ export function WeekGrid({
     return name.length > 8 ? `${name.slice(0, 8)}…` : name;
   };
 
+  const weekdayOptions = [
+    { weekday: 0, label: t("user.weekdays.sunday", locale) },
+    { weekday: 1, label: t("user.weekdays.monday", locale) },
+    { weekday: 2, label: t("user.weekdays.tuesday", locale) },
+    { weekday: 3, label: t("user.weekdays.wednesday", locale) },
+    { weekday: 4, label: t("user.weekdays.thursday", locale) },
+    { weekday: 5, label: t("user.weekdays.friday", locale) },
+    { weekday: 6, label: t("user.weekdays.saturday", locale) },
+  ];
+
   // 역할 이니셜 변환
   const getRoleInitial = (role: string): string => {
     const roleMap: Record<string, string> = {
@@ -647,6 +674,147 @@ export function WeekGrid({
       setSelectedDays(new Set());
       setMultiDayWarnings([]);
       setIsMultiDayModalOpen(true);
+    }
+  };
+
+  const openWeekdayPreferenceModal = async () => {
+    if (!multiDayModalUser) return;
+
+    setIsWeekdayPreferenceLoading(true);
+    try {
+      const response = await fetch(
+        `/api/stores/${storeId}/users/${multiDayModalUser.userId}`
+      );
+      const result = await response.json();
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "failed_to_load_user_preferences");
+      }
+
+      const weekdays = result.data.preferredWeekdays || [];
+      const nextDifficult = new Set<number>();
+      const nextPreferred = new Set<number>();
+
+      weekdays.forEach((item: { weekday: number; is_preferred: boolean }) => {
+        if (item.is_preferred) {
+          nextDifficult.add(item.weekday);
+        } else {
+          nextPreferred.add(item.weekday);
+        }
+      });
+
+      setDifficultWeekdays(nextDifficult);
+      setPreferredWeekdays(nextPreferred);
+      setWeekdayPreferenceUser(multiDayModalUser);
+      setIsWeekdayPreferenceModalOpen(true);
+    } catch (error) {
+      console.error("요일 선호 정보 조회 오류:", error);
+      toast({
+        title: t("common.error", locale),
+        description: t("schedule.weekdayPreferences.loadError", locale),
+        variant: "destructive",
+      });
+    } finally {
+      setIsWeekdayPreferenceLoading(false);
+    }
+  };
+
+  const handlePreferredDayToggle = (weekday: number, checked: boolean) => {
+    setPreferredWeekdays((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(weekday);
+      } else {
+        next.delete(weekday);
+      }
+      return next;
+    });
+
+    if (checked) {
+      setDifficultWeekdays((prev) => {
+        const next = new Set(prev);
+        next.delete(weekday);
+        return next;
+      });
+    }
+  };
+
+  const handleDifficultDayToggle = (weekday: number, checked: boolean) => {
+    setDifficultWeekdays((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(weekday);
+      } else {
+        next.delete(weekday);
+      }
+      return next;
+    });
+
+    if (checked) {
+      setPreferredWeekdays((prev) => {
+        const next = new Set(prev);
+        next.delete(weekday);
+        return next;
+      });
+    }
+  };
+
+  const saveWeekdayPreferences = async () => {
+    if (!weekdayPreferenceUser) return;
+
+    setIsWeekdayPreferenceSaving(true);
+    try {
+      const payload = [
+        ...Array.from(difficultWeekdays).map((weekday) => ({
+          weekday,
+          isPreferred: true,
+        })),
+        ...Array.from(preferredWeekdays)
+          .filter((weekday) => !difficultWeekdays.has(weekday))
+          .map((weekday) => ({
+            weekday,
+            isPreferred: false,
+          })),
+      ].sort((a, b) => a.weekday - b.weekday);
+
+      const response = await fetch(
+        `/api/stores/${storeId}/users/${weekdayPreferenceUser.userId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            preferredWeekdays: payload,
+          }),
+        }
+      );
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || "failed_to_save_user_preferences");
+      }
+
+      setUserDifficultDays((prev) => {
+        const next = new Map(prev);
+        next.set(weekdayPreferenceUser.userId, new Set(difficultWeekdays));
+        return next;
+      });
+
+      toast({
+        title: t("common.success", locale),
+        description: t("schedule.weekdayPreferences.saveSuccess", locale),
+      });
+      setIsWeekdayPreferenceModalOpen(false);
+    } catch (error) {
+      console.error("요일 선호 저장 오류:", error);
+      toast({
+        title: t("common.error", locale),
+        description: t("schedule.weekdayPreferences.saveError", locale),
+        variant: "destructive",
+      });
+    } finally {
+      setIsWeekdayPreferenceSaving(false);
     }
   };
 
@@ -2328,6 +2496,22 @@ export function WeekGrid({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={openWeekdayPreferenceModal}
+                disabled={isModalLoading || isWeekdayPreferenceLoading}
+              >
+                {isWeekdayPreferenceLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Settings2 className="h-4 w-4 mr-2" />
+                )}
+                {t("schedule.weekdayPreferences.manage", locale)}
+              </Button>
+            </div>
             {/* 근무 항목 선택 */}
             <div className="space-y-2">
               <label className="text-sm font-medium">
@@ -2763,6 +2947,94 @@ export function WeekGrid({
                 {isModalLoading
                   ? t("schedule.processing", locale)
                   : t("schedule.register", locale)}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 요일 선호 설정 모달 */}
+      <Dialog
+        open={isWeekdayPreferenceModalOpen}
+        onOpenChange={(open) => {
+          if (!isWeekdayPreferenceSaving) {
+            setIsWeekdayPreferenceModalOpen(open);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {weekdayPreferenceUser
+                ? `${weekdayPreferenceUser.userName} - ${t(
+                    "schedule.weekdayPreferences.title",
+                    locale
+                  )}`
+                : t("schedule.weekdayPreferences.title", locale)}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {t("schedule.weekdayPreferences.description", locale)}
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  {t("schedule.weekdayPreferences.preferredDays", locale)}
+                </p>
+                {weekdayOptions.map((day) => (
+                  <div key={`preferred-${day.weekday}`} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`preferred-${day.weekday}`}
+                      checked={preferredWeekdays.has(day.weekday)}
+                      disabled={isWeekdayPreferenceSaving}
+                      onCheckedChange={(checked) =>
+                        handlePreferredDayToggle(day.weekday, checked === true)
+                      }
+                    />
+                    <Label htmlFor={`preferred-${day.weekday}`}>{day.label}</Label>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  {t("schedule.weekdayPreferences.difficultDays", locale)}
+                </p>
+                {weekdayOptions.map((day) => (
+                  <div key={`difficult-${day.weekday}`} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`difficult-${day.weekday}`}
+                      checked={difficultWeekdays.has(day.weekday)}
+                      disabled={isWeekdayPreferenceSaving}
+                      onCheckedChange={(checked) =>
+                        handleDifficultDayToggle(day.weekday, checked === true)
+                      }
+                    />
+                    <Label htmlFor={`difficult-${day.weekday}`}>{day.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                disabled={isWeekdayPreferenceSaving}
+                onClick={() => setIsWeekdayPreferenceModalOpen(false)}
+              >
+                {t("common.cancel", locale)}
+              </Button>
+              <Button
+                disabled={isWeekdayPreferenceSaving}
+                onClick={saveWeekdayPreferences}
+              >
+                {isWeekdayPreferenceSaving && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                {t("common.save", locale)}
               </Button>
             </div>
           </div>

@@ -678,34 +678,40 @@ async function updateUserProfile(
       }
     }
 
-    // 사용자 메타데이터 업데이트 (퇴사 예정일, 희망 근무 시간)
-    const currentMetadata = targetUser.user.user_metadata || {};
-    const updatedMetadata = {
-      ...currentMetadata,
-      ...(validatedData.resignationDate !== undefined && {
-        resignation_date: validatedData.resignationDate,
-      }),
-      ...(validatedData.desiredWeeklyHours !== undefined && {
-        desired_weekly_hours: validatedData.desiredWeeklyHours,
-      }),
-    };
+    // 사용자 메타데이터 업데이트 (퇴사 예정일, 희망 근무 시간 변경 시에만)
+    const hasMetadataUpdates =
+      validatedData.resignationDate !== undefined ||
+      validatedData.desiredWeeklyHours !== undefined;
 
-    const { error: updateError } = await adminClient.auth.admin.updateUserById(
-      userId,
-      {
-        user_metadata: updatedMetadata,
-      }
-    );
+    if (hasMetadataUpdates) {
+      const currentMetadata = targetUser.user.user_metadata || {};
+      const updatedMetadata = {
+        ...currentMetadata,
+        ...(validatedData.resignationDate !== undefined && {
+          resignation_date: validatedData.resignationDate,
+        }),
+        ...(validatedData.desiredWeeklyHours !== undefined && {
+          desired_weekly_hours: validatedData.desiredWeeklyHours,
+        }),
+      };
 
-    if (updateError) {
-      console.error("사용자 메타데이터 업데이트 오류:", updateError);
-      return NextResponse.json(
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(
+        authUserId,
         {
-          success: false,
-          error: "프로필 업데이트에 실패했습니다",
-        },
-        { status: 500 }
+          user_metadata: updatedMetadata,
+        }
       );
+
+      if (updateError) {
+        console.error("사용자 메타데이터 업데이트 오류:", updateError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "프로필 업데이트에 실패했습니다",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({

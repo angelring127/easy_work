@@ -927,6 +927,18 @@ const translations = {
     "schedule.transferError": "스케줄 이전 중 오류가 발생했습니다",
     "schedule.multiDaySchedule": "복수 요일 스케줄 등록",
     "schedule.selectDays": "요일 선택",
+    "schedule.weekdayPreferences.manage": "요일 선호 설정",
+    "schedule.weekdayPreferences.title": "요일 선호 설정",
+    "schedule.weekdayPreferences.description":
+      "선호 요일과 출근이 어려운 요일을 함께 설정하세요.",
+    "schedule.weekdayPreferences.preferredDays": "출근 선호 요일",
+    "schedule.weekdayPreferences.difficultDays": "출근 어려운 요일",
+    "schedule.weekdayPreferences.loadError":
+      "요일 선호 정보를 불러오지 못했습니다",
+    "schedule.weekdayPreferences.saveSuccess":
+      "요일 선호 정보가 저장되었습니다",
+    "schedule.weekdayPreferences.saveError":
+      "요일 선호 정보 저장에 실패했습니다",
     "schedule.warnings": "경고",
     "schedule.register": "등록",
     "schedule.warning.multiDayMessage":
@@ -1803,6 +1815,18 @@ const translations = {
     "schedule.transferError": "Error occurred while transferring schedule",
     "schedule.multiDaySchedule": "Multi-Day Schedule Registration",
     "schedule.selectDays": "Select Days",
+    "schedule.weekdayPreferences.manage": "Set Day Preferences",
+    "schedule.weekdayPreferences.title": "Day Preferences",
+    "schedule.weekdayPreferences.description":
+      "Set preferred work days and difficult work days together.",
+    "schedule.weekdayPreferences.preferredDays": "Preferred Work Days",
+    "schedule.weekdayPreferences.difficultDays": "Difficult Work Days",
+    "schedule.weekdayPreferences.loadError":
+      "Failed to load day preference settings",
+    "schedule.weekdayPreferences.saveSuccess":
+      "Day preference settings saved",
+    "schedule.weekdayPreferences.saveError":
+      "Failed to save day preference settings",
     "schedule.warnings": "Warnings",
     "schedule.register": "Register",
     "schedule.warning.multiDayMessage":
@@ -2772,6 +2796,18 @@ const translations = {
     "schedule.transferError": "スケジュール移転中にエラーが発生しました",
     "schedule.multiDaySchedule": "複数日スケジュール登録",
     "schedule.selectDays": "日付選択",
+    "schedule.weekdayPreferences.manage": "曜日希望設定",
+    "schedule.weekdayPreferences.title": "曜日希望設定",
+    "schedule.weekdayPreferences.description":
+      "希望曜日と出勤困難な曜日をまとめて設定します。",
+    "schedule.weekdayPreferences.preferredDays": "出勤希望曜日",
+    "schedule.weekdayPreferences.difficultDays": "出勤困難な曜日",
+    "schedule.weekdayPreferences.loadError":
+      "曜日希望情報の読み込みに失敗しました",
+    "schedule.weekdayPreferences.saveSuccess":
+      "曜日希望情報を保存しました",
+    "schedule.weekdayPreferences.saveError":
+      "曜日希望情報の保存に失敗しました",
     "schedule.warnings": "警告",
     "schedule.register": "登録",
     "schedule.warning.multiDayMessage":
