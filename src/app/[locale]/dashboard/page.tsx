@@ -433,7 +433,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 분석 (관리자만) */}
-          {canViewAnalytics && (
+          {(canViewAnalytics || isManager) && (
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -449,8 +449,8 @@ export default function DashboardPage() {
                   <Button
                     variant="outline"
                     className="w-full justify-start"
-                    onClick={() => router.push(`/${locale}/analytics`)}
-                    disabled
+                    onClick={() => router.push(`/${locale}/dashboard/analytics`)}
+                    disabled={!currentStore}
                   >
                     {t("dashboard.viewAnalytics", currentLocale)}
                   </Button>
