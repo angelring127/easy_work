@@ -105,6 +105,7 @@ export default function SchedulePage() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const [weekGridLoading, setWeekGridLoading] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [workItems, setWorkItems] = useState<any[]>([]);
   const [showWorkItemsModal, setShowWorkItemsModal] = useState(false);
@@ -569,9 +570,10 @@ export default function SchedulePage() {
               onUserClick={handleUserClick}
               onAvailabilityToggle={handleAvailabilityToggle}
               onScheduleChange={loadScheduleData}
+              onLoadingChange={setWeekGridLoading}
               canManage={canManage}
             />
-            {loading && (
+            {(loading || weekGridLoading) && (
               <div className="absolute inset-0 bg-background/70 backdrop-blur-[1px] flex items-center justify-center rounded-md z-10">
                 <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />

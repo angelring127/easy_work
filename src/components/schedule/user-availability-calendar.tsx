@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Calendar, AlertCircle, CheckCircle, X, Plus } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Calendar, AlertCircle, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { DateActionSheet } from "@/components/schedule/date-action-sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,8 +30,8 @@ import {
   endOfMonth,
   startOfWeek,
   endOfWeek,
+  addDays,
   eachDayOfInterval,
-  isSameDay,
   isToday,
   isPast,
 } from "date-fns";
@@ -89,6 +87,7 @@ export function UserAvailabilityCalendar({
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [actionDialogOpen, setActionDialogOpen] = useState(false); // 액션 선택 모달 (등록/해제 선택)
   const [dialogMode, setDialogMode] = useState<"add" | "remove">("add"); // 모달 모드: 등록 또는 해제
   const [reason, setReason] = useState("");
@@ -115,6 +114,7 @@ export function UserAvailabilityCalendar({
       close_min: number;
     }>
   >([]);
+  const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
   const toMessage = (v: unknown) =>
     typeof v === "string"
@@ -225,6 +225,14 @@ export function UserAvailabilityCalendar({
     fetchStoreData();
   }, [storeId]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const updateMobileState = () => setIsMobile(mediaQuery.matches);
+    updateMobileState();
+    mediaQuery.addEventListener("change", updateMobileState);
+    return () => mediaQuery.removeEventListener("change", updateMobileState);
+  }, []);
+
   // 출근 불가 데이터 로드
   useEffect(() => {
     loadAvailabilities();
@@ -293,97 +301,25 @@ export function UserAvailabilityCalendar({
     return availabilities.filter((a) => a.date === dateStr);
   };
 
-  // 출근 불가 등록/해제
-  const toggleAvailability = async (
-    date: Date,
-    isUnavailable: boolean,
-    reason?: string
-  ) => {
-    if (!storeId) return;
+  const openAddDialog = () => {
+    setSelectedUserId(userId || "current");
+    setReason("");
+    setHasTimeRestriction(false);
+    setStartTime("");
+    setEndTime("");
+    setTimePeriod("morning");
+    setDialogMode("add");
+    setDialogOpen(true);
+  };
 
-    const dateStr = date.toISOString().split("T")[0];
-    // 관리자인 경우 선택한 유저 사용, 아니면 현재 유저 또는 userId 사용
-    const targetUserId =
-      canManage && selectedUserId !== "current"
-        ? selectedUserId
-        : userId || "current";
-    console.log("Availability toggle:", {
-      storeId,
-      targetUserId,
-      dateStr,
-      isUnavailable,
-      reason,
-    });
-
-    try {
-      if (isUnavailable) {
-        // 출근 불가 등록
-        const response = await fetch("/api/schedule/availability", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            store_id: storeId,
-            user_id: targetUserId,
-            date: dateStr,
-            reason: reason || undefined,
-          }),
-        });
-
-        const result = await response.json();
-        if (result.success) {
-          toast({
-            title: t("availability.markUnavailable", locale),
-            description: t("availability.success", locale),
-          });
-          loadAvailabilities();
-          onAvailabilityChange?.(dateStr, true, reason);
-        } else {
-          toast({
-            title: t("common.error", locale),
-            description: toMessage(
-              result.error || "Failed to mark as unavailable"
-            ),
-            variant: "destructive",
-          });
-        }
-      } else {
-        // 출근 불가 해제
-        const params = new URLSearchParams({
-          store_id: storeId,
-          user_id: targetUserId,
-          date: dateStr,
-        });
-
-        const response = await fetch(`/api/schedule/availability?${params}`, {
-          method: "DELETE",
-        });
-
-        const result = await response.json();
-        if (result.success) {
-          toast({
-            title: t("availability.markAvailable", locale),
-            description: t("availability.success", locale),
-          });
-          loadAvailabilities();
-          onAvailabilityChange?.(dateStr, false);
-        } else {
-          toast({
-            title: t("common.error", locale),
-            description: toMessage(
-              result.error || "Failed to mark as available"
-            ),
-            variant: "destructive",
-          });
-        }
-      }
-    } catch (error) {
-      console.error("출근 불가 상태 변경 오류:", error);
-      toast({
-        title: t("common.error", locale),
-        description: toMessage(error),
-        variant: "destructive",
-      });
+  const openRemoveDialog = (dateAvailabilities: UserAvailability[]) => {
+    if (dateAvailabilities.length === 1) {
+      setSelectedRemoveUserId(dateAvailabilities[0].userId);
+    } else {
+      setSelectedRemoveUserId("");
     }
+    setDialogMode("remove");
+    setDialogOpen(true);
   };
 
   // 날짜 클릭 핸들러
@@ -399,59 +335,43 @@ export function UserAvailabilityCalendar({
 
     const dateStr = date.toISOString().split("T")[0];
     setSelectedDate(dateStr);
+    const dateAvailabilities = canManage
+      ? getAvailabilitiesForDate(date)
+      : getAvailabilityForDate(date)
+      ? [getAvailabilityForDate(date)!]
+      : [];
+
+    if (isMobile) {
+      setDetailDialogOpen(true);
+      return;
+    }
 
     if (canManage) {
-      // 관리자인 경우
-      const dateAvailabilities = getAvailabilitiesForDate(date);
       if (dateAvailabilities.length > 0) {
         // unavailable이 있는 경우: 액션 선택 모달 표시
-        if (dateAvailabilities.length === 1) {
-          // 단일 유저인 경우 자동 선택
-          setSelectedRemoveUserId(dateAvailabilities[0].userId);
-        } else {
-          // 복수 유저인 경우 선택 필요
-          setSelectedRemoveUserId("");
-        }
+        if (dateAvailabilities.length === 1) setSelectedRemoveUserId(dateAvailabilities[0].userId);
+        else setSelectedRemoveUserId("");
         setActionDialogOpen(true);
       } else {
-        // unavailable이 없는 경우: 바로 등록 모달 표시
-        setSelectedUserId(userId || "current");
-        setReason("");
-        setDialogMode("add");
-        setDialogOpen(true);
+        openAddDialog();
       }
     } else {
-      // 일반 사용자인 경우: 기존 로직
-      const availability = getAvailabilityForDate(date);
-      if (availability) {
-        // 출근 불가 해제
-        toggleAvailability(date, false);
-      } else {
-        // 출근 불가 등록
-        setReason("");
-        setDialogMode("add");
-        setDialogOpen(true);
-      }
+      if (dateAvailabilities.length > 0) openRemoveDialog(dateAvailabilities);
+      else openAddDialog();
     }
   };
 
   // 액션 선택 핸들러 (등록 또는 해제)
   const handleActionSelect = (action: "add" | "remove") => {
     setActionDialogOpen(false);
-    setDialogMode(action);
 
     if (action === "add") {
-      // 등록 모달
-      setSelectedUserId(userId || "current");
-      setReason("");
-      setHasTimeRestriction(false);
-      setStartTime("");
-      setEndTime("");
-      setTimePeriod("morning");
-      setDialogOpen(true);
+      openAddDialog();
     } else {
-      // 해제 모달
-      setDialogOpen(true);
+      const dateAvailabilities = selectedDate
+        ? getAvailabilitiesForDate(new Date(selectedDate))
+        : [];
+      openRemoveDialog(dateAvailabilities);
     }
   };
 
@@ -582,18 +502,27 @@ export function UserAvailabilityCalendar({
       }
 
       if (successCount > 0) {
+        const failText =
+          failCount > 0
+            ? t("availability.multiDateRegisterFailSuffix", locale, {
+                failCount: String(failCount),
+              })
+            : "";
         toast({
           title: t("availability.markUnavailable", locale),
-          description: 
+          description:
             datesToProcess.length > 1
-              ? `${successCount}개의 날짜가 등록되었습니다.${failCount > 0 ? ` (${failCount}개 실패)` : ""}`
+              ? t("availability.multiDateRegisterResult", locale, {
+                  successCount: String(successCount),
+                  failText,
+                })
               : t("availability.success", locale),
         });
         loadAvailabilities();
       } else {
         toast({
           title: t("common.error", locale),
-          description: "모든 날짜 등록에 실패했습니다.",
+          description: t("availability.allDateRegisterFailed", locale),
           variant: "destructive",
         });
       }
@@ -692,10 +621,13 @@ export function UserAvailabilityCalendar({
     return format(date, "MMMM yyyy", { locale: dateLocale });
   };
 
-  const formatWeekday = (date: Date): string => {
+  const weekdayLabels = useMemo(() => {
     const dateLocale = dateLocales[locale];
-    return format(date, "EEE", { locale: dateLocale });
-  };
+    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, index) =>
+      format(addDays(start, index), "EEE", { locale: dateLocale })
+    );
+  }, [locale]);
 
   return (
     <Card>
@@ -706,20 +638,35 @@ export function UserAvailabilityCalendar({
         </CardTitle>
 
         {/* 월 네비게이션 */}
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={goToPreviousMonth}>
+        <div className="flex items-center justify-between mt-4 gap-2">
+          <div className="flex items-center gap-1 md:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToPreviousMonth}
+              className="min-h-[40px] min-w-[40px] touch-manipulation"
+            >
               ←
             </Button>
-            <Button variant="outline" size="sm" onClick={goToCurrentMonth}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToCurrentMonth}
+              className="min-h-[40px] touch-manipulation text-xs md:text-sm"
+            >
               {t("availability.currentMonth", locale)}
             </Button>
-            <Button variant="outline" size="sm" onClick={goToNextMonth}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToNextMonth}
+              className="min-h-[40px] min-w-[40px] touch-manipulation"
+            >
               →
             </Button>
           </div>
 
-          <div className="text-lg font-semibold">
+          <div className="text-sm md:text-lg font-semibold">
             {formatMonthYear(currentMonth)}
           </div>
         </div>
@@ -739,11 +686,11 @@ export function UserAvailabilityCalendar({
           <div className="space-y-2 md:space-y-4">
             {/* 요일 헤더 */}
             <div className="grid grid-cols-7 gap-1 md:gap-2">
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+              {weekdayLabels.map(
                 (day, index) => (
                   <div
                     key={index}
-                    className="p-1 md:p-2 text-center text-xs md:text-sm font-medium text-muted-foreground"
+                    className="p-1 md:p-2 text-center text-[10px] md:text-sm font-medium text-muted-foreground"
                   >
                     {day}
                   </div>
@@ -771,7 +718,7 @@ export function UserAvailabilityCalendar({
                   <div
                     key={index}
                     className={`
-                      aspect-square p-1 md:p-2 border rounded-md transition-colors touch-manipulation
+                      aspect-square p-0.5 md:p-2 border rounded-md transition-colors touch-manipulation
                       ${!isCurrentMonth ? "opacity-30" : ""}
                       ${isCurrentDay ? "bg-primary/10 border-primary" : ""}
                       ${
@@ -792,7 +739,7 @@ export function UserAvailabilityCalendar({
                     <div className="flex flex-col items-center justify-center h-full">
                       <div
                         className={`
-                        text-xs md:text-sm font-medium
+                        text-[11px] md:text-sm font-medium
                         ${isCurrentDay ? "text-primary" : ""}
                         ${isUnavailable ? "text-red-600" : ""}
                       `}
@@ -800,8 +747,16 @@ export function UserAvailabilityCalendar({
                         {formatDate(date)}
                       </div>
 
+                      <div className="mt-0.5 md:hidden">
+                        <span
+                          className={`block h-1.5 w-1.5 rounded-full ${
+                            isUnavailable ? "bg-red-500" : "bg-border"
+                          }`}
+                        />
+                      </div>
+
                       {isUnavailable && (
-                        <div className="mt-0.5 md:mt-1 flex flex-col items-center gap-0.5">
+                        <div className="mt-0.5 md:mt-1 hidden md:flex flex-col items-center gap-0.5">
                           <AlertCircle className="h-2.5 w-2.5 md:h-3 md:w-3 text-red-500" />
                           {canManage && unavailableCount > 1 && (
                             <Badge
@@ -815,7 +770,7 @@ export function UserAvailabilityCalendar({
                       )}
 
                       {canManage && isUnavailable && (
-                        <div className="mt-0.5 flex flex-col items-center gap-0.5 w-full">
+                        <div className="mt-0.5 hidden md:flex flex-col items-center gap-0.5 w-full">
                           {dateAvailabilities.map((availability, idx) => (
                             <div
                               key={availability.userId}
@@ -849,7 +804,7 @@ export function UserAvailabilityCalendar({
                       )}
 
                       {!isUnavailable && !isPastDay && (
-                        <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
                           <Plus className="h-3 w-3 text-muted-foreground" />
                         </div>
                       )}
@@ -860,7 +815,7 @@ export function UserAvailabilityCalendar({
             </div>
 
             {/* 범례 */}
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-red-50 border border-red-200 rounded"></div>
                 <span>{t("availability.unavailable", locale)}</span>
@@ -872,6 +827,92 @@ export function UserAvailabilityCalendar({
             </div>
           </div>
         )}
+
+        {/* 모바일 날짜 상세 다이얼로그 */}
+        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t("availability.detailsTitle", locale)}</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label>{t("availability.date", locale)}</Label>
+                <Input
+                  value={
+                    selectedDate ? new Date(selectedDate).toLocaleDateString() : ""
+                  }
+                  disabled
+                />
+              </div>
+
+              {selectedDate &&
+              getAvailabilitiesForDate(new Date(selectedDate)).length > 0 ? (
+                <div className="space-y-2">
+                  {getAvailabilitiesForDate(new Date(selectedDate)).map((availability) => (
+                    <div
+                      key={`${availability.userId}-${availability.date}`}
+                      className="rounded-md border p-2 text-sm"
+                    >
+                      {canManage && (
+                        <p className="font-medium">
+                          {availability.userName || availability.userId}
+                        </p>
+                      )}
+                      {availability.hasTimeRestriction &&
+                        availability.startTime &&
+                        availability.endTime && (
+                          <p className="text-muted-foreground">
+                            {formatTime(availability.startTime)} -{" "}
+                            {formatTime(availability.endTime)}
+                          </p>
+                        )}
+                      {availability.reason && (
+                        <p className="text-muted-foreground">{availability.reason}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {t("availability.noUnavailableDetails", locale)}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDetailDialogOpen(false)}
+                >
+                  {t("common.close", locale)}
+                </Button>
+                {selectedDate &&
+                  getAvailabilitiesForDate(new Date(selectedDate)).length > 0 && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        const dateAvailabilities = getAvailabilitiesForDate(
+                          new Date(selectedDate)
+                        );
+                        setDetailDialogOpen(false);
+                        openRemoveDialog(dateAvailabilities);
+                      }}
+                    >
+                      {t("availability.removeUnavailable", locale)}
+                    </Button>
+                  )}
+                <Button
+                  onClick={() => {
+                    setDetailDialogOpen(false);
+                    openAddDialog();
+                  }}
+                >
+                  {t("availability.markUnavailable", locale)}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* 액션 선택 다이얼로그 (관리자용) */}
         <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
@@ -1047,7 +1088,7 @@ export function UserAvailabilityCalendar({
                       <div className="space-y-2">
                         {/* 요일 헤더 */}
                         <div className="grid grid-cols-7 gap-1">
-                          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+                          {weekdayLabels.map(
                             (day, index) => (
                               <div
                                 key={index}

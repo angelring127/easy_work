@@ -117,6 +117,7 @@ interface WeekGridProps {
     isUnavailable: boolean
   ) => void;
   onScheduleChange?: () => void; // 스케줄 변경 시 콜백
+  onLoadingChange?: (isLoading: boolean) => void;
   canManage?: boolean;
 }
 
@@ -131,6 +132,7 @@ export function WeekGrid({
   onUserClick,
   onAvailabilityToggle,
   onScheduleChange,
+  onLoadingChange,
   canManage = false,
 }: WeekGridProps) {
   const [loading, setLoading] = useState(false);
@@ -159,6 +161,11 @@ export function WeekGrid({
   >([]);
   const [selectedWorkItem, setSelectedWorkItem] = useState<string>("");
   const [isModalLoading, setIsModalLoading] = useState(false);
+  const [isModalDifficultLoading, setIsModalDifficultLoading] =
+    useState(false);
+  const [modalDifficultWeekdays, setModalDifficultWeekdays] = useState<
+    Set<number>
+  >(new Set());
   const [modalError, setModalError] = useState<string | null>(null);
   const [showTransferMode, setShowTransferMode] = useState(false);
   const [selectedTransferUserId, setSelectedTransferUserId] =
@@ -220,6 +227,7 @@ export function WeekGrid({
   const [userDifficultDays, setUserDifficultDays] = useState<
     Map<string, Set<number>>
   >(new Map());
+  const [isDifficultDaysLoading, setIsDifficultDaysLoading] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [copyWarningDialogOpen, setCopyWarningDialogOpen] = useState(false);
   const [selectedSourceWeek, setSelectedSourceWeek] = useState<Date | null>(
@@ -459,11 +467,27 @@ export function WeekGrid({
     roles: string[];
   }>;
 
+  const userIdsKey = useMemo(
+    () => users.map((u) => u.id).sort().join(","),
+    [users]
+  );
+
   // 사용자별 difficult days 조회
   useEffect(() => {
-    const fetchUserDifficultDays = async () => {
-      if (!storeId || users.length === 0) return;
+    let isCancelled = false;
 
+    const fetchUserDifficultDays = async () => {
+      if (!storeId || users.length === 0) {
+        if (!isCancelled) {
+          setUserDifficultDays(new Map());
+          setIsDifficultDaysLoading(false);
+        }
+        return;
+      }
+
+      if (!isCancelled) {
+        setIsDifficultDaysLoading(true);
+      }
       const difficultDaysMap = new Map<string, Set<number>>();
 
       await Promise.all(
@@ -483,7 +507,14 @@ export function WeekGrid({
                   }
                 }
               );
+
+              // API 응답 ID와 그리드 ID가 다를 수 있어 둘 다 매핑
+              const resolvedUserId =
+                typeof result.data.id === "string" ? result.data.id : null;
               difficultDaysMap.set(user.id, difficultDays);
+              if (resolvedUserId && resolvedUserId !== user.id) {
+                difficultDaysMap.set(resolvedUserId, difficultDays);
+              }
             }
           } catch (error) {
             console.error(
@@ -494,12 +525,18 @@ export function WeekGrid({
         })
       );
 
-      setUserDifficultDays(difficultDaysMap);
+      if (!isCancelled) {
+        setUserDifficultDays(difficultDaysMap);
+        setIsDifficultDaysLoading(false);
+      }
     };
 
     fetchUserDifficultDays();
+    return () => {
+      isCancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, allUserIds.size]);
+  }, [storeId, userIdsKey]);
 
   // 특정 사용자의 특정 날짜 출근 불가 상태 조회
   const getAvailabilityForUserDate = (
@@ -521,6 +558,11 @@ export function WeekGrid({
 
   const formatMobileUserName = (name: string): string => {
     return name.length > 8 ? `${name.slice(0, 8)}…` : name;
+  };
+
+  const getLocalWeekday = (date: string): number => {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day).getDay();
   };
 
   const weekdayOptions = [
@@ -696,6 +738,58 @@ export function WeekGrid({
     onUserClick?.(userId, date);
   };
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadModalDifficultWeekdays = async () => {
+      if (!isModalOpen || !modalCell || !storeId) {
+        if (!isCancelled) {
+          setModalDifficultWeekdays(new Set());
+          setIsModalDifficultLoading(false);
+        }
+        return;
+      }
+
+      if (!isCancelled) {
+        setIsModalDifficultLoading(true);
+      }
+
+      try {
+        const response = await fetch(
+          `/api/stores/${storeId}/users/${modalCell.userId}`
+        );
+        const result = await response.json();
+
+        const difficultDays = new Set<number>();
+        if (response.ok && result.success && result.data?.preferredWeekdays) {
+          result.data.preferredWeekdays.forEach(
+            (pw: { weekday: number; is_preferred: boolean }) => {
+              if (pw.is_preferred) {
+                difficultDays.add(pw.weekday);
+              }
+            }
+          );
+        }
+
+        if (!isCancelled) {
+          setModalDifficultWeekdays(difficultDays);
+          setIsModalDifficultLoading(false);
+        }
+      } catch (error) {
+        console.error("모달 요일 출근 불가 조회 오류:", error);
+        if (!isCancelled) {
+          setModalDifficultWeekdays(new Set());
+          setIsModalDifficultLoading(false);
+        }
+      }
+    };
+
+    loadModalDifficultWeekdays();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isModalOpen, modalCell, storeId]);
+
   // 유저명 클릭 핸들러 (복수 요일 선택 모달)
   const handleUserNameClick = (userId: string) => {
     const user = users.find((u) => u.id === userId);
@@ -861,6 +955,13 @@ export function WeekGrid({
 
   // 복사 원본 주 미리보기 데이터 조회
   useEffect(() => {
+    onLoadingChange?.(loading || isDifficultDaysLoading);
+    return () => {
+      onLoadingChange?.(false);
+    };
+  }, [loading, isDifficultDaysLoading, onLoadingChange]);
+
+  useEffect(() => {
     const fetchSourceWeekPreview = async () => {
       if (!copyDialogOpen || !selectedSourceWeek || !storeId) {
         setSourceWeekPreviewAssignments([]);
@@ -900,7 +1001,7 @@ export function WeekGrid({
     fetchSourceWeekPreview();
   }, [copyDialogOpen, selectedSourceWeek, storeId, locale]);
 
-  if (loading) {
+  if ((loading || isDifficultDaysLoading) && !onLoadingChange) {
     return (
       <Card>
         <CardHeader>
@@ -1309,6 +1410,73 @@ export function WeekGrid({
                 <AlertDescription>{modalError}</AlertDescription>
               </Alert>
             )}
+
+            {/* 선택 셀의 출근 불가/요일 출근 불가 정보 */}
+            {modalCell &&
+              (() => {
+                const availability = getAvailabilityForUserDate(
+                  modalCell.userId,
+                  modalCell.date
+                );
+                const weekday = getLocalWeekday(modalCell.date);
+                const cachedDifficultDay =
+                  userDifficultDays.get(modalCell.userId)?.has(weekday) ||
+                  false;
+                const isDifficultDay =
+                  modalDifficultWeekdays.has(weekday) || cachedDifficultDay;
+
+                if (!availability && !isDifficultDay && !isModalDifficultLoading) {
+                  return null;
+                }
+
+                const weekdayNames = [
+                  t("user.weekdays.sunday", locale),
+                  t("user.weekdays.monday", locale),
+                  t("user.weekdays.tuesday", locale),
+                  t("user.weekdays.wednesday", locale),
+                  t("user.weekdays.thursday", locale),
+                  t("user.weekdays.friday", locale),
+                  t("user.weekdays.saturday", locale),
+                ];
+
+                return (
+                  <Alert className="border-amber-200 bg-amber-50">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertTitle className="text-amber-700">
+                      {t("schedule.warnings", locale)}
+                    </AlertTitle>
+                    <AlertDescription className="space-y-1 text-amber-700">
+                      {isModalDifficultLoading && (
+                        <div className="text-xs text-amber-600">
+                          {t("common.loading", locale)}
+                        </div>
+                      )}
+                      {availability && (
+                        <div>
+                          <span className="font-medium">
+                            {t("availability.unavailable", locale)}
+                          </span>
+                          {availability.reason && (
+                            <span>
+                              {" "}
+                              ({t("availability.reason", locale)}:{" "}
+                              {availability.reason})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {isDifficultDay && (
+                        <div>
+                          <span className="font-medium">
+                            {t("schedule.warning.difficultDayName", locale)}
+                          </span>
+                          : {weekdayNames[weekday]}
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                );
+              })()}
 
             {/* 기존 스케줄 정보 표시 */}
             {modalCell &&

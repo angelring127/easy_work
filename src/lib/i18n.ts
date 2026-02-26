@@ -22,6 +22,8 @@ const translations = {
     "schedule.afternoonStaff": "오후 인원",
     "schedule.morningStaffShort": "오전",
     "schedule.afternoonStaffShort": "오후",
+    "schedule.morning": "오전",
+    "schedule.afternoon": "오후",
     "home.title": "스마트 스케줄 관리",
     "home.description":
       "소규모 카페와 음식점을 위한 스마트 교대 근무표 자동 생성 및 팀 커뮤니케이션 솔루션",
@@ -812,10 +814,10 @@ const translations = {
     "schedule.warning.totalHours": "총 근무 시간",
     "schedule.warning.desiredHours": "희망 주 근무 시간",
     "schedule.warning.exceedBy": "초과 시간",
-    "schedule.warning.difficultDay": "출근 어려운 요일 경고",
+    "schedule.warning.difficultDay": "출근 불가 요일 경고",
     "schedule.warning.difficultDayMessage":
-      "이 스케줄은 해당 사용자가 출근하기 어려운 요일입니다.",
-    "schedule.warning.difficultDayName": "출근 어려운 요일",
+      "이 스케줄은 해당 사용자의 출근 불가 요일입니다.",
+    "schedule.warning.difficultDayName": "출근 불가 요일",
     "schedule.warning.maxStaff": "최대 근무 인원 초과 경고",
     "schedule.warning.maxStaffMessage":
       "이 스케줄을 추가하면 해당 시간대의 최대 근무 인원을 초과합니다.",
@@ -831,9 +833,9 @@ const translations = {
     "schedule.warning.transferDesiredHoursMessage":
       "이 스케줄을 이전하면 님의 이번 주 총 근무 시간이 희망 주 근무 시간을 초과합니다.",
     "schedule.warning.transferDifficultDay":
-      "스케줄 이전 - 출근 어려운 요일 경고",
+      "스케줄 이전 - 출근 불가 요일 경고",
     "schedule.warning.transferDifficultDayMessage":
-      "이 스케줄은 대상 사용자가 출근하기 어려운 요일입니다.",
+      "이 스케줄은 대상 사용자의 출근 불가 요일입니다.",
     // schedule management
     "schedule.title": "스케줄 관리",
     "schedule.noStoreSelected": "매장을 선택해주세요",
@@ -937,9 +939,9 @@ const translations = {
     "schedule.weekdayPreferences.manage": "요일 선호 설정",
     "schedule.weekdayPreferences.title": "요일 선호 설정",
     "schedule.weekdayPreferences.description":
-      "선호 요일과 출근이 어려운 요일을 함께 설정하세요.",
+      "선호 요일과 출근 불가 요일을 함께 설정하세요.",
     "schedule.weekdayPreferences.preferredDays": "출근 선호 요일",
-    "schedule.weekdayPreferences.difficultDays": "출근 어려운 요일",
+    "schedule.weekdayPreferences.difficultDays": "출근 불가 요일",
     "schedule.weekdayPreferences.loadError":
       "요일 선호 정보를 불러오지 못했습니다",
     "schedule.weekdayPreferences.saveSuccess":
@@ -957,6 +959,22 @@ const translations = {
     "availability.pastDate": "과거 날짜",
     "availability.pastDateDescription": "과거 날짜는 수정할 수 없습니다",
     "availability.success": "상태가 성공적으로 변경되었습니다",
+    "availability.detailsTitle": "날짜 상세",
+    "availability.noUnavailableDetails":
+      "해당 날짜에 등록된 출근 불가 내역이 없습니다",
+    "availability.multiDateMode": "다른 날짜도 함께 등록",
+    "availability.selectAdditionalDates": "추가 날짜 선택",
+    "availability.selectedDates": "선택한 날짜",
+    "availability.dateAlreadyUnavailable":
+      "이미 출근 불가로 등록된 날짜입니다",
+    "availability.hasTimeRestriction": "시간 제한",
+    "availability.timePeriod": "시간대",
+    "availability.startTime": "시작 시간",
+    "availability.endTime": "종료 시간",
+    "availability.multiDateRegisterResult":
+      "{successCount}개 날짜가 등록되었습니다{failText}",
+    "availability.multiDateRegisterFailSuffix": " ({failCount}개 실패)",
+    "availability.allDateRegisterFailed": "모든 날짜 등록에 실패했습니다",
   },
   en: {
     "schedule.autoAssign": "Auto Assign",
@@ -964,6 +982,8 @@ const translations = {
     "schedule.afternoonStaff": "Afternoon Staff",
     "schedule.morningStaffShort": "AM",
     "schedule.afternoonStaffShort": "PM",
+    "schedule.morning": "Morning",
+    "schedule.afternoon": "Afternoon",
     "home.title": "Smart Schedule Management",
     "home.description":
       "Smart shift schedule automation and team communication solution for small cafes and restaurants",
@@ -1708,10 +1728,10 @@ const translations = {
     "schedule.warning.totalHours": "Total Hours",
     "schedule.warning.desiredHours": "Desired Weekly Hours",
     "schedule.warning.exceedBy": "Exceed By",
-    "schedule.warning.difficultDay": "Difficult Work Day Warning",
+    "schedule.warning.difficultDay": "Unavailable Work Day Warning",
     "schedule.warning.difficultDayMessage":
-      "This schedule is on a day that is difficult for this user to work.",
-    "schedule.warning.difficultDayName": "Difficult Day",
+      "This schedule falls on a work-unavailable day for this user.",
+    "schedule.warning.difficultDayName": "Unavailable Work Day",
     "schedule.warning.maxStaff": "Maximum Staff Limit Warning",
     "schedule.warning.maxStaffMessage":
       "Adding this schedule will exceed the maximum staff limit for this time period.",
@@ -1727,9 +1747,9 @@ const translations = {
     "schedule.warning.transferDesiredHoursMessage":
       "'s total weekly hours will exceed their desired weekly hours after transferring this schedule.",
     "schedule.warning.transferDifficultDay":
-      "Transfer Schedule - Difficult Work Day Warning",
+      "Transfer Schedule - Unavailable Work Day Warning",
     "schedule.warning.transferDifficultDayMessage":
-      "This schedule is on a day that is difficult for the target user to work.",
+      "This schedule falls on a work-unavailable day for the target user.",
     // schedule management
     "schedule.title": "Schedule Management",
     "schedule.noStoreSelected": "Please select a store",
@@ -1832,9 +1852,9 @@ const translations = {
     "schedule.weekdayPreferences.manage": "Set Day Preferences",
     "schedule.weekdayPreferences.title": "Day Preferences",
     "schedule.weekdayPreferences.description":
-      "Set preferred work days and difficult work days together.",
+      "Set preferred work days and unavailable work days together.",
     "schedule.weekdayPreferences.preferredDays": "Preferred Work Days",
-    "schedule.weekdayPreferences.difficultDays": "Difficult Work Days",
+    "schedule.weekdayPreferences.difficultDays": "Unavailable Work Days",
     "schedule.weekdayPreferences.loadError":
       "Failed to load day preference settings",
     "schedule.weekdayPreferences.saveSuccess":
@@ -1852,6 +1872,22 @@ const translations = {
     "availability.pastDate": "Past Date",
     "availability.pastDateDescription": "Cannot modify past dates",
     "availability.success": "Status updated successfully",
+    "availability.detailsTitle": "Date Details",
+    "availability.noUnavailableDetails":
+      "No unavailable records are registered for this date",
+    "availability.multiDateMode": "Register additional dates together",
+    "availability.selectAdditionalDates": "Select Additional Dates",
+    "availability.selectedDates": "Selected Dates",
+    "availability.dateAlreadyUnavailable":
+      "This date is already marked as unavailable",
+    "availability.hasTimeRestriction": "Time Restriction",
+    "availability.timePeriod": "Time Period",
+    "availability.startTime": "Start Time",
+    "availability.endTime": "End Time",
+    "availability.multiDateRegisterResult":
+      "{successCount} dates registered{failText}",
+    "availability.multiDateRegisterFailSuffix": " ({failCount} failed)",
+    "availability.allDateRegisterFailed": "Failed to register all selected dates",
     // work item roles
     "workItemRoles.title": "Work Item Role Requirements",
     "workItemRoles.description": "Set required roles for this work item",
@@ -1951,6 +1987,8 @@ const translations = {
     "schedule.afternoonStaff": "午後人員",
     "schedule.morningStaffShort": "午前",
     "schedule.afternoonStaffShort": "午後",
+    "schedule.morning": "午前",
+    "schedule.afternoon": "午後",
     "home.title": "スマートスケジュール管理",
     "home.description":
       "小規模カフェ・レストラン向けのスマートシフトスケジュール自動生成・チームコミュニケーションソリューション",
@@ -2704,10 +2742,10 @@ const translations = {
     "schedule.warning.totalHours": "総勤務時間",
     "schedule.warning.desiredHours": "希望週勤務時間",
     "schedule.warning.exceedBy": "超過時間",
-    "schedule.warning.difficultDay": "出勤困難な曜日警告",
+    "schedule.warning.difficultDay": "出勤不可曜日警告",
     "schedule.warning.difficultDayMessage":
-      "このスケジュールは、このユーザーが出勤するのが困難な曜日です。",
-    "schedule.warning.difficultDayName": "出勤困難な曜日",
+      "このスケジュールは、このユーザーの出勤不可曜日です。",
+    "schedule.warning.difficultDayName": "出勤不可曜日",
     "schedule.warning.maxStaff": "最大勤務人数超過警告",
     "schedule.warning.maxStaffMessage":
       "このスケジュールを追加すると、該当時間帯の最大勤務人数を超過します。",
@@ -2723,9 +2761,9 @@ const translations = {
     "schedule.warning.transferDesiredHoursMessage":
       "このスケジュールを移転すると、さんの今週の総勤務時間が希望週勤務時間を超過します。",
     "schedule.warning.transferDifficultDay":
-      "スケジュール移転 - 出勤困難な曜日警告",
+      "スケジュール移転 - 出勤不可曜日警告",
     "schedule.warning.transferDifficultDayMessage":
-      "このスケジュールは、対象ユーザーが出勤するのが困難な曜日です。",
+      "このスケジュールは、対象ユーザーの出勤不可曜日です。",
     // schedule management
     "schedule.title": "スケジュール管理",
     "schedule.noStoreSelected": "店舗を選択してください",
@@ -2815,9 +2853,9 @@ const translations = {
     "schedule.weekdayPreferences.manage": "曜日希望設定",
     "schedule.weekdayPreferences.title": "曜日希望設定",
     "schedule.weekdayPreferences.description":
-      "希望曜日と出勤困難な曜日をまとめて設定します。",
+      "希望曜日と出勤不可曜日をまとめて設定します。",
     "schedule.weekdayPreferences.preferredDays": "出勤希望曜日",
-    "schedule.weekdayPreferences.difficultDays": "出勤困難な曜日",
+    "schedule.weekdayPreferences.difficultDays": "出勤不可曜日",
     "schedule.weekdayPreferences.loadError":
       "曜日希望情報の読み込みに失敗しました",
     "schedule.weekdayPreferences.saveSuccess":
@@ -2844,6 +2882,14 @@ const translations = {
     "availability.timePeriod": "時間帯",
     "availability.startTime": "開始時間",
     "availability.endTime": "終了時間",
+    "availability.detailsTitle": "日付詳細",
+    "availability.noUnavailableDetails":
+      "この日付に登録された出勤不可情報はありません",
+    "availability.multiDateRegisterResult":
+      "{successCount}件の日付を登録しました{failText}",
+    "availability.multiDateRegisterFailSuffix": " ({failCount}件失敗)",
+    "availability.allDateRegisterFailed":
+      "選択したすべての日付の登録に失敗しました",
     "schedule.copyWeek": "週コピー",
     "schedule.copyTargetWeek": "コピー適用対象週",
     "schedule.selectWeekToCopy": "コピーする週を選択",
