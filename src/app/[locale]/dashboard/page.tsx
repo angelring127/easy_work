@@ -1,17 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useStore } from "@/contexts/store-context";
-import { LanguageSwitcher } from "@/components/ui/language-switcher";
-import { StoreSwitcher } from "@/components/ui/store-switcher";
 import { usePermissions, useAdminAccess } from "@/hooks/use-permissions";
-import { RoleBadge } from "@/components/auth/role-badge";
-import { AdminOnly, MasterOnly } from "@/components/auth/permission-guard";
+import { MasterOnly } from "@/components/auth/permission-guard";
 import { UserRole } from "@/types/auth";
 import { ResponsiveHeader } from "@/components/layout/responsive-header";
+import { WorkHoursAnalyticsPanel } from "@/components/dashboard/work-hours-analytics-panel";
 import {
   Card,
   CardContent,
@@ -29,14 +27,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Loader2,
-  LogOut,
-  User,
+  BarChart3,
   Calendar,
+  Loader2,
   MessageSquare,
-  UserPlus,
-  Store,
   Settings,
+  Store,
+  UserPlus,
 } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { defaultLocale } from "@/lib/i18n-config";
@@ -53,8 +50,7 @@ export default function DashboardPage() {
   const currentLocale = (locale as Locale) || defaultLocale;
   const [showNoStoreModal, setShowNoStoreModal] = useState(false);
 
-  // 권한 관련 훅
-  const { userRole, roleDisplayName } = usePermissions();
+  const { userRole } = usePermissions();
   const {
     canManageStore,
     canManageUsers,
@@ -63,10 +59,8 @@ export default function DashboardPage() {
     isManager,
   } = useAdminAccess();
 
-  // 사용자가 변경될 때마다 매장 목록 새로고침
   useEffect(() => {
     if (!loading && user) {
-      // 매장 목록 새로고침
       const refreshStores = async () => {
         try {
           const response = await fetch("/api/stores?mine=1", {
@@ -93,7 +87,6 @@ export default function DashboardPage() {
     }
   }, [loading, user]);
 
-  // 디버깅을 위한 상태 로그 (최소화)
   useEffect(() => {
     if (process.env.NODE_ENV === "development" && !loading) {
       console.log("Dashboard: 렌더링", {
@@ -104,7 +97,6 @@ export default function DashboardPage() {
     }
   }, [loading, user, currentStore, accessibleStores]);
 
-  // 마스터 사용자이고 스토어가 없으면 모달 표시
   useEffect(() => {
     if (
       !loading &&
@@ -125,7 +117,6 @@ export default function DashboardPage() {
     router.push(`/${locale}/stores/create`);
   };
 
-  // 로그인하지 않은 경우 로그인 페이지로 리다이렉트 (useEffect 사용)
   useEffect(() => {
     if (!loading && !user) {
       if (process.env.NODE_ENV === "development") {
@@ -137,7 +128,6 @@ export default function DashboardPage() {
     }
   }, [loading, user, router, locale]);
 
-  // 로딩 중인 경우에만 로딩 UI 표시
   if (loading || storesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -154,14 +144,77 @@ export default function DashboardPage() {
     );
   }
 
-  // 사용자가 없으면 리다이렉트 중이므로 아무것도 표시하지 않음
   if (!user) {
     return null;
   }
 
-  // 패스워드 변경이 필요한 경우 알림 표시
-  const needsPasswordChange = (user as any).user_metadata
-    ?.needs_password_change;
+  const desktopNavItems = useMemo(() => {
+    const items: Array<{
+      key: string;
+      label: string;
+      icon: typeof Calendar;
+      onClick: () => void;
+      disabled?: boolean;
+    }> = [
+      {
+        key: "schedule",
+        label: t("dashboard.schedule", currentLocale),
+        icon: Calendar,
+        onClick: () => router.push(`/${locale}/schedule`),
+      },
+      {
+        key: "shiftRequests",
+        label: t("dashboard.shiftRequests", currentLocale),
+        icon: MessageSquare,
+        onClick: () => router.push(`/${locale}/shifts`),
+        disabled: true,
+      },
+      {
+        key: "settings",
+        label: t("dashboard.settings", currentLocale),
+        icon: Settings,
+        onClick: () => router.push(`/${locale}/profile`),
+      },
+    ];
+
+    if (canManageUsers || isManager) {
+      items.push({
+        key: "users",
+        label: t("dashboard.userManagement", currentLocale),
+        icon: UserPlus,
+        onClick: () => router.push(`/${locale}/stores/${currentStore?.id}/users`),
+        disabled: !currentStore,
+      });
+    }
+
+    if (userRole === "MASTER") {
+      items.push({
+        key: "stores",
+        label: t("dashboard.storeManagement", currentLocale),
+        icon: Store,
+        onClick: () => router.push(`/${locale}/stores`),
+      });
+    }
+
+    items.push({
+      key: "analytics",
+      label: t("dashboard.analytics", currentLocale),
+      icon: BarChart3,
+      onClick: () => {},
+      disabled: !(canViewAnalytics || isManager),
+    });
+
+    return items;
+  }, [
+    canManageUsers,
+    canViewAnalytics,
+    currentLocale,
+    currentStore,
+    isManager,
+    locale,
+    router,
+    userRole,
+  ]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -170,7 +223,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Responsive Header */}
       <ResponsiveHeader
         userEmail={user?.email}
         currentStoreRole={userRole as UserRole}
@@ -178,9 +230,7 @@ export default function DashboardPage() {
         onLogout={handleSignOut}
       />
 
-      {/* 메인 콘텐츠 */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* 환영 메시지 */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             {t("dashboard.welcome", currentLocale, { name: user.email })}
@@ -200,7 +250,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* 패스워드 변경 안내 (초대된 사용자) */}
         {(user as any).user_metadata?.is_invited_user &&
           (user as any).user_metadata?.needs_password_change && (
             <Card className="mb-6 border-orange-200 bg-orange-50">
@@ -233,7 +282,6 @@ export default function DashboardPage() {
             </Card>
           )}
 
-        {/* 매장이 없는 경우 안내 */}
         {accessibleStores.length === 0 && (
           <Card className="mb-6">
             <CardContent className="pt-6">
@@ -246,9 +294,7 @@ export default function DashboardPage() {
                   {t("dashboard.noStoresDescription", currentLocale)}
                 </p>
                 <MasterOnly>
-                  <Button
-                    onClick={() => router.push(`/${locale}/stores/create`)}
-                  >
+                  <Button onClick={() => router.push(`/${locale}/stores/create`)}>
                     <Store className="h-4 w-4 mr-2" />
                     {t("store.createFirst", currentLocale)}
                   </Button>
@@ -258,9 +304,64 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* 기능 카드 그리드 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* 스케줄 관리 */}
+        <div className="hidden lg:grid lg:grid-cols-[280px_minmax(0,1fr)] gap-6">
+          <aside className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("dashboard.title", currentLocale)}</CardTitle>
+                <CardDescription>{t("dashboard.quickActions", currentLocale)}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {desktopNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const isAnalytics = item.key === "analytics";
+                  return (
+                    <Button
+                      key={item.key}
+                      variant={isAnalytics ? "default" : "outline"}
+                      className="w-full justify-start"
+                      onClick={item.onClick}
+                      disabled={item.disabled}
+                    >
+                      <Icon className="h-4 w-4 mr-2" />
+                      {item.label}
+                    </Button>
+                  );
+                })}
+              </CardContent>
+            </Card>
+
+            {canManageStore && currentStore && (
+              <Card>
+                <CardContent className="pt-6">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() =>
+                      router.push(
+                        `/${locale}/stores/${currentStore.id}/edit?from=dashboard`
+                      )
+                    }
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    {t("dashboard.storeSettings", currentLocale)}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </aside>
+
+          <section>
+            <WorkHoursAnalyticsPanel
+              locale={currentLocale}
+              storeId={currentStore?.id}
+              storeName={currentStore?.name}
+              hasAnalyticsAccess={canViewAnalytics || isManager}
+            />
+          </section>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-6">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -284,7 +385,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* 교대 요청 */}
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -319,7 +419,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* 사용자 관리 */}
           {(canManageUsers || isManager) && (
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
@@ -348,9 +447,7 @@ export default function DashboardPage() {
                       variant="outline"
                       className="w-full justify-start"
                       onClick={() =>
-                        router.push(
-                          `/${locale}/stores/${currentStore?.id}/users`
-                        )
+                        router.push(`/${locale}/stores/${currentStore?.id}/users`)
                       }
                       disabled={!currentStore}
                     >
@@ -362,7 +459,6 @@ export default function DashboardPage() {
             </Card>
           )}
 
-          {/* 매장 관리 */}
           <MasterOnly>
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
@@ -395,7 +491,6 @@ export default function DashboardPage() {
             </Card>
           </MasterOnly>
 
-          {/* 설정 */}
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -432,12 +527,11 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* 분석 (관리자만) */}
           {(canViewAnalytics || isManager) && (
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+                  <BarChart3 className="h-5 w-5" />
                   {t("dashboard.analytics", currentLocale)}
                 </CardTitle>
                 <CardDescription>
@@ -461,7 +555,6 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* 스토어 없음 확인 모달 */}
       <Dialog open={showNoStoreModal} onOpenChange={setShowNoStoreModal}>
         <DialogContent>
           <DialogHeader>
