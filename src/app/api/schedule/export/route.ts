@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     // scope가 "me"이고 관리자가 아닌 경우 본인 데이터만
-    const isManager = ["MASTER", "SUB"].includes(userRole.role);
+    const isManager = ["MASTER", "SUB", "SUB_MANAGER"].includes(userRole.role);
     const userIdFilter =
       scope === "me" && !isManager ? user.user.id : undefined;
 
@@ -158,12 +158,9 @@ export async function GET(request: NextRequest) {
       .from("user_store_job_roles")
       .select(
         `
-        *,
-        users:auth.users!inner(
-          id,
-          email,
-          raw_user_meta_data
-        ),
+        id,
+        user_id,
+        job_role_id,
         store_job_roles!inner(
           id,
           name
@@ -179,6 +176,39 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // 사용자 표시명 조회 (store_users 기반)
+    const { data: storeUsers, error: storeUsersError } = await supabase
+      .from("store_users")
+      .select("id, user_id, name, email")
+      .eq("store_id", store_id);
+
+    if (storeUsersError) {
+      console.error("내보내기용 사용자 조회 오류:", storeUsersError);
+      return NextResponse.json(
+        { success: false, error: storeUsersError.message },
+        { status: 500 }
+      );
+    }
+
+    const storeUserById = new Map(
+      (storeUsers || []).map((u) => [u.id, u] as const)
+    );
+    const storeUserByAuthId = new Map(
+      (storeUsers || [])
+        .filter((u) => Boolean(u.user_id))
+        .map((u) => [u.user_id as string, u] as const)
+    );
+
+    const normalizedUserRoles = (userRoles || []).map((ur) => {
+      const mappedUser =
+        storeUserById.get(ur.user_id) || storeUserByAuthId.get(ur.user_id);
+      return {
+        ...ur,
+        user_name: mappedUser?.name || mappedUser?.email || ur.user_id,
+        user_email: mappedUser?.email || "",
+      };
+    });
 
     // 엑셀 워크북 생성
     const workbook = XLSX.utils.book_new();
@@ -202,7 +232,11 @@ export async function GET(request: NextRequest) {
     XLSX.utils.book_append_sheet(workbook, assignmentsSheet, "Assignments");
 
     // 3. Roles 시트
-    const rolesData = generateRolesData(roles, userRoles, include_private_info);
+    const rolesData = generateRolesData(
+      roles,
+      normalizedUserRoles,
+      include_private_info
+    );
     const rolesSheet = XLSX.utils.aoa_to_sheet(rolesData);
     XLSX.utils.book_append_sheet(workbook, rolesSheet, "Roles");
 
@@ -347,7 +381,7 @@ function generateRolesData(
   data.push(["Role", "Active", "User Count"]);
 
   roles.forEach((role) => {
-    const userCount = userRoles.filter((ur) => ur.role_id === role.id).length;
+    const userCount = userRoles.filter((ur) => ur.job_role_id === role.id).length;
     data.push([role.name, role.active ? "Yes" : "No", userCount]);
   });
 
@@ -368,14 +402,13 @@ function generateRolesData(
   const userRoleMap = new Map();
   userRoles.forEach((ur) => {
     const userId = ur.user_id;
-    const userName =
-      ur.users?.raw_user_meta_data?.name || ur.users?.email || "Unknown";
+    const userName = ur.user_name || "Unknown";
     const roleName = ur.store_job_roles?.name || "Unknown";
 
     if (!userRoleMap.has(userId)) {
       userRoleMap.set(userId, {
         name: userName,
-        email: ur.users?.email || "",
+        email: ur.user_email || "",
         roles: [],
       });
     }

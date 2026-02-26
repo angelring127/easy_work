@@ -40,6 +40,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { t, type Locale } from "@/lib/i18n";
 import {
   format,
@@ -225,6 +226,13 @@ export function WeekGrid({
     null
   );
   const [isCopying, setIsCopying] = useState(false);
+  const [sourceWeekPreviewAssignments, setSourceWeekPreviewAssignments] =
+    useState<ScheduleAssignment[]>([]);
+  const [sourceWeekPreviewLoading, setSourceWeekPreviewLoading] =
+    useState(false);
+  const [sourceWeekPreviewError, setSourceWeekPreviewError] = useState<
+    string | null
+  >(null);
   const [isWeekdayPreferenceModalOpen, setIsWeekdayPreferenceModalOpen] =
     useState(false);
   const [isWeekdayPreferenceLoading, setIsWeekdayPreferenceLoading] =
@@ -241,6 +249,7 @@ export function WeekGrid({
   const [difficultWeekdays, setDifficultWeekdays] = useState<Set<number>>(
     new Set()
   );
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const { toast } = useToast();
   const toMessage = (v: unknown) =>
     typeof v === "string"
@@ -849,6 +858,47 @@ export function WeekGrid({
       onAvailabilityToggle?.(userId, date, isUnavailable);
     }
   };
+
+  // 복사 원본 주 미리보기 데이터 조회
+  useEffect(() => {
+    const fetchSourceWeekPreview = async () => {
+      if (!copyDialogOpen || !selectedSourceWeek || !storeId) {
+        setSourceWeekPreviewAssignments([]);
+        setSourceWeekPreviewError(null);
+        return;
+      }
+
+      setSourceWeekPreviewLoading(true);
+      setSourceWeekPreviewError(null);
+      try {
+        const sourceWeekStart = startOfWeek(selectedSourceWeek, {
+          weekStartsOn: 1,
+        });
+        const sourceWeekEnd = endOfWeek(selectedSourceWeek, { weekStartsOn: 1 });
+        const fromDate = format(sourceWeekStart, "yyyy-MM-dd");
+        const toDate = format(sourceWeekEnd, "yyyy-MM-dd");
+
+        const response = await fetch(
+          `/api/schedule/assignments?store_id=${storeId}&from=${fromDate}&to=${toDate}`
+        );
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "failed_to_load_copy_preview");
+        }
+
+        setSourceWeekPreviewAssignments(result.data || []);
+      } catch (error) {
+        console.error("복사 원본 주 미리보기 조회 오류:", error);
+        setSourceWeekPreviewAssignments([]);
+        setSourceWeekPreviewError(t("schedule.copyPreviewLoadError", locale));
+      } finally {
+        setSourceWeekPreviewLoading(false);
+      }
+    };
+
+    fetchSourceWeekPreview();
+  }, [copyDialogOpen, selectedSourceWeek, storeId, locale]);
 
   if (loading) {
     return (
@@ -3144,6 +3194,213 @@ export function WeekGrid({
                 </Button>
               </div>
             </div>
+
+            {selectedSourceWeek && (
+              <div className="space-y-2">
+                <Label>{t("schedule.copyPreviewTitle", locale)}</Label>
+                <div className="rounded-md border p-2">
+                  {sourceWeekPreviewLoading ? (
+                    <div className="text-sm text-muted-foreground py-4 text-center">
+                      {t("schedule.copyPreviewLoading", locale)}
+                    </div>
+                  ) : sourceWeekPreviewError ? (
+                    <div className="text-sm text-destructive py-4 text-center">
+                      {sourceWeekPreviewError}
+                    </div>
+                  ) : (() => {
+                      const previewWeekStart = startOfWeek(selectedSourceWeek, {
+                        weekStartsOn: 1,
+                      });
+                      const previewWeekEnd = endOfWeek(selectedSourceWeek, {
+                        weekStartsOn: 1,
+                      });
+                      const previewDays = eachDayOfInterval({
+                        start: previewWeekStart,
+                        end: previewWeekEnd,
+                      });
+                      const previewUserMap = new Map<
+                        string,
+                        { id: string; name: string }
+                      >();
+
+                      sourceWeekPreviewAssignments.forEach((a) => {
+                        if (!previewUserMap.has(a.userId)) {
+                          const storeUser = storeUsers.find(
+                            (u) => u.id === a.userId
+                          );
+                          previewUserMap.set(a.userId, {
+                            id: a.userId,
+                            name: a.userName || storeUser?.name || a.userId,
+                          });
+                        }
+                      });
+
+                      const previewUsers = Array.from(previewUserMap.values()).sort(
+                        (a, b) => a.name.localeCompare(b.name)
+                      );
+
+                      if (previewUsers.length === 0) {
+                        return (
+                          <div className="text-sm text-muted-foreground py-4 text-center">
+                            {t("schedule.copyPreviewEmpty", locale)}
+                          </div>
+                        );
+                      }
+
+                      if (isMobile) {
+                        return (
+                          <div className="overflow-x-auto -mx-1">
+                            <div className="min-w-full px-1">
+                              <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] gap-px mb-0.5">
+                                <div className="min-w-0 p-px text-[9px] font-semibold text-muted-foreground bg-muted/50 border rounded-sm">
+                                  {t("schedule.user", locale)}
+                                </div>
+                                {previewDays.map((day) => (
+                                  <div
+                                    key={format(day, "yyyy-MM-dd")}
+                                    className="min-w-0 p-px text-center border rounded-sm bg-muted/50"
+                                  >
+                                    <div className="text-[9px] font-semibold">
+                                      {formatWeekday(day)}
+                                    </div>
+                                    <div className="text-[8px] text-muted-foreground">
+                                      {formatDate(day)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {previewUsers.map((user) => (
+                                <div
+                                  key={user.id}
+                                  className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] gap-px mb-px"
+                                >
+                                  <div className="min-w-0 p-px border rounded-sm bg-muted/50">
+                                    <div className="text-[9px] font-medium leading-tight truncate">
+                                      {formatMobileUserName(user.name)}
+                                    </div>
+                                  </div>
+
+                                  {previewDays.map((day) => {
+                                    const dayStr = format(day, "yyyy-MM-dd");
+                                    const dayAssignments =
+                                      sourceWeekPreviewAssignments.filter(
+                                        (a) =>
+                                          a.userId === user.id &&
+                                          a.date === dayStr
+                                      );
+
+                                    return (
+                                      <div
+                                        key={`${user.id}-${dayStr}`}
+                                        className="min-w-0 p-px border rounded-sm min-h-[48px]"
+                                      >
+                                        {dayAssignments.length > 0 ? (
+                                          <div className="space-y-px">
+                                            {dayAssignments.map((a) => (
+                                              <div
+                                                key={a.id}
+                                                className="p-px rounded-sm bg-blue-100 text-blue-800"
+                                              >
+                                                <div className="text-[8px] font-medium truncate leading-tight">
+                                                  {a.workItemName.slice(0, 3)}
+                                                </div>
+                                                <div className="text-[7px] opacity-80 leading-tight">
+                                                  {formatTime(a.startTime)}-{formatTime(a.endTime)}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="h-full flex items-center justify-center text-[8px] text-muted-foreground opacity-50">
+                                            -
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[720px]">
+                            <div className="grid grid-cols-8 gap-1 mb-1">
+                              <div className="p-1 text-xs font-semibold text-muted-foreground bg-muted/50 border rounded">
+                                {t("schedule.user", locale)}
+                              </div>
+                              {previewDays.map((day) => (
+                                <div
+                                  key={format(day, "yyyy-MM-dd")}
+                                  className="p-1 text-center border rounded bg-muted/50"
+                                >
+                                  <div className="text-xs font-semibold">
+                                    {formatWeekday(day)}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {formatDate(day)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {previewUsers.map((user) => (
+                              <div
+                                key={user.id}
+                                className="grid grid-cols-8 gap-1 mb-1"
+                              >
+                                <div className="p-1 text-xs border rounded bg-muted/30 truncate">
+                                  {user.name}
+                                </div>
+                                {previewDays.map((day) => {
+                                  const dayStr = format(day, "yyyy-MM-dd");
+                                  const dayAssignments =
+                                    sourceWeekPreviewAssignments.filter(
+                                      (a) =>
+                                        a.userId === user.id && a.date === dayStr
+                                    );
+
+                                  return (
+                                    <div
+                                      key={`${user.id}-${dayStr}`}
+                                      className="p-1 border rounded min-h-[48px]"
+                                    >
+                                      {dayAssignments.length > 0 ? (
+                                        <div className="space-y-1">
+                                          {dayAssignments.map((a) => (
+                                            <div
+                                              key={a.id}
+                                              className="text-[10px] leading-tight rounded px-1 py-0.5 bg-blue-100 text-blue-800"
+                                            >
+                                              <div className="truncate">
+                                                {a.workItemName}
+                                              </div>
+                                              <div className="opacity-80">
+                                                {formatTime(a.startTime)}-{formatTime(a.endTime)}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="h-full flex items-center justify-center text-[10px] text-muted-foreground">
+                                          -
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                </div>
+              </div>
+            )}
 
             {/* 전주 스케줄 복사 버튼 */}
             <Button
