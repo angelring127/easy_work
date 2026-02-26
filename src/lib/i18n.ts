@@ -498,11 +498,11 @@ const translations = {
     "user.deactivate": "비활성화",
     "user.reactivate": "재활성화",
     "user.difficultWeekday.updateError":
-      "출근이 어려운 요일 업데이트에 실패했습니다",
+      "출근 불가 요일 업데이트에 실패했습니다",
     "user.difficultWeekday.deleteError":
-      "출근이 어려운 요일 삭제에 실패했습니다",
+      "출근 불가 요일 삭제에 실패했습니다",
     "user.difficultWeekday.insertError":
-      "출근이 어려운 요일 추가에 실패했습니다",
+      "출근 불가 요일 추가에 실패했습니다",
     // 프로필 페이지 관련 번역
     "profile.title": "프로필",
     "profile.myProfile": "내 프로필",
@@ -791,8 +791,8 @@ const translations = {
     "rules.break.paid": "유급",
     "rules.compliance.maxPerMonth": "월 최대 근무(시간)",
     // user preferred weekdays
-    "user.preferredWeekdays": "출근이 어려운 요일",
-    "user.preferredWeekdays.description": "출근이 어려운 요일을 선택하세요",
+    "user.preferredWeekdays": "출근 불가 요일",
+    "user.preferredWeekdays.description": "출근 불가 요일을 선택하세요",
     "user.weekdays.sunday": "일요일",
     "user.weekdays.monday": "월요일",
     "user.weekdays.tuesday": "화요일",
@@ -869,8 +869,8 @@ const translations = {
     // availability calendar
     "availability.title": "휴일 희망 캘린더",
     "availability.markUnavailable": "휴일 희망일 등록",
-    "availability.markAvailable": "출근 가능으로 표시",
-    "availability.removeUnavailable": "출근 불가 해제",
+    "availability.markAvailable": "휴일 희망일 해제",
+    "availability.removeUnavailable": "휴일 희망일 해제",
     "availability.selectAction": "액션 선택",
     "availability.selectUser": "사용자 선택",
     "availability.currentUser": "현재 사용자",
@@ -878,16 +878,16 @@ const translations = {
     "availability.selectUserToRemove": "해제할 사용자 선택",
     "availability.confirmRemove": "해제",
     "availability.reason": "사유 (선택사항)",
-    "availability.reasonPlaceholder": "출근 불가 사유를 입력하세요",
+    "availability.reasonPlaceholder": "휴일 희망 사유를 입력하세요",
     "availability.confirmMarkUnavailable":
-      "이 날짜를 출근 불가로 표시하시겠습니까?",
+      "이 날짜를 휴일 희망일로 등록하시겠습니까?",
     "availability.confirmMarkAvailable":
-      "이 날짜를 출근 가능으로 표시하시겠습니까?",
+      "이 날짜의 휴일 희망일을 해제하시겠습니까?",
     "availability.alreadyAssigned": "이미 배정된 날짜입니다",
     "availability.cannotModifyAfterPublish": "게시 후에는 수정할 수 없습니다",
-    "availability.notificationTitle": "출근 불가 상태 변경",
+    "availability.notificationTitle": "휴일 희망 상태 변경",
     "availability.notificationMessage":
-      "{userName}님이 {date} 출근 불가 상태를 {action}했습니다.",
+      "{userName}님이 {date} 휴일 희망 상태를 {action}했습니다.",
     // export
     "export.title": "스케줄 내보내기",
     "export.format": "파일 형식",
@@ -920,7 +920,7 @@ const translations = {
     "schedule.scheduleAdded": "스케줄이 추가되었습니다",
     "schedule.scheduleAddError": "스케줄 추가 중 오류가 발생했습니다",
     "schedule.unavailableWarning":
-      "경고: 해당 날짜에 사용자가 출근 불가로 표시되어 있습니다.",
+      "경고: 해당 날짜에 사용자가 휴일 희망일로 등록되어 있습니다.",
     "schedule.scheduleDeleted": "스케줄이 삭제되었습니다",
     "schedule.scheduleDeleteError": "스케줄 삭제 중 오류가 발생했습니다",
     "schedule.noScheduleToDelete": "삭제할 스케줄이 없습니다",
@@ -961,12 +961,12 @@ const translations = {
     "availability.success": "상태가 성공적으로 변경되었습니다",
     "availability.detailsTitle": "날짜 상세",
     "availability.noUnavailableDetails":
-      "해당 날짜에 등록된 출근 불가 내역이 없습니다",
+      "해당 날짜에 등록된 휴일 희망 내역이 없습니다",
     "availability.multiDateMode": "다른 날짜도 함께 등록",
     "availability.selectAdditionalDates": "추가 날짜 선택",
     "availability.selectedDates": "선택한 날짜",
     "availability.dateAlreadyUnavailable":
-      "이미 출근 불가로 등록된 날짜입니다",
+      "이미 휴일 희망일로 등록된 날짜입니다",
     "availability.hasTimeRestriction": "시간 제한",
     "availability.timePeriod": "시간대",
     "availability.startTime": "시작 시간",
@@ -1329,9 +1329,12 @@ const translations = {
     "user.normal": "Normal",
     "user.deactivate": "Deactivate",
     "user.reactivate": "Reactivate",
-    "user.difficultWeekday.updateError": "Failed to update difficult work days",
-    "user.difficultWeekday.deleteError": "Failed to delete difficult work days",
-    "user.difficultWeekday.insertError": "Failed to insert difficult work days",
+    "user.difficultWeekday.updateError":
+      "Failed to update unavailable work days",
+    "user.difficultWeekday.deleteError":
+      "Failed to delete unavailable work days",
+    "user.difficultWeekday.insertError":
+      "Failed to insert unavailable work days",
     // Profile page translations
     "profile.title": "Profile",
     "profile.myProfile": "My Profile",
@@ -1703,9 +1706,9 @@ const translations = {
     "rules.break.paid": "Paid",
     "rules.compliance.maxPerMonth": "Max Hours / Month",
     // user preferred weekdays
-    "user.preferredWeekdays": "Difficult Work Days",
+    "user.preferredWeekdays": "Unavailable Work Days",
     "user.preferredWeekdays.description":
-      "Select the days that are difficult to work",
+      "Select the days that are unavailable to work",
     "user.weekdays.sunday": "Sunday",
     "user.weekdays.monday": "Monday",
     "user.weekdays.tuesday": "Tuesday",
@@ -1784,8 +1787,8 @@ const translations = {
     // availability calendar
     "availability.title": "Day Off Preference Calendar",
     "availability.markUnavailable": "Register Day Off Preference",
-    "availability.markAvailable": "Mark as Available",
-    "availability.removeUnavailable": "Remove Unavailable",
+    "availability.markAvailable": "Remove Day Off Preference",
+    "availability.removeUnavailable": "Remove Day Off Preference",
     "availability.selectAction": "Select Action",
     "availability.selectUser": "Select User",
     "availability.currentUser": "Current User",
@@ -1793,14 +1796,16 @@ const translations = {
     "availability.selectUserToRemove": "Select User to Remove",
     "availability.confirmRemove": "Remove",
     "availability.reason": "Reason (Optional)",
-    "availability.reasonPlaceholder": "Enter reason for unavailability",
-    "availability.confirmMarkUnavailable": "Mark this date as unavailable?",
-    "availability.confirmMarkAvailable": "Mark this date as available?",
+    "availability.reasonPlaceholder": "Enter reason for day off preference",
+    "availability.confirmMarkUnavailable":
+      "Register this date as a day off preference?",
+    "availability.confirmMarkAvailable":
+      "Remove day off preference for this date?",
     "availability.alreadyAssigned": "Already assigned for this date",
     "availability.cannotModifyAfterPublish": "Cannot modify after publishing",
-    "availability.notificationTitle": "Availability Status Changed",
+    "availability.notificationTitle": "Day Off Preference Status Changed",
     "availability.notificationMessage":
-      "{userName} has {action} availability for {date}.",
+      "{userName} has {action} day off preference for {date}.",
     // export
     "export.title": "Export Schedule",
     "export.format": "File Format",
@@ -1832,7 +1837,7 @@ const translations = {
     "schedule.scheduleAdded": "Schedule has been added",
     "schedule.scheduleAddError": "Error occurred while adding schedule",
     "schedule.unavailableWarning":
-      "Warning: User is marked as unavailable for this date.",
+      "Warning: User has a day off preference for this date.",
     "schedule.scheduleDeleted": "Schedule has been deleted",
     "schedule.scheduleDeleteError": "Error occurred while deleting schedule",
     "schedule.noScheduleToDelete": "No schedule to delete",
@@ -1874,12 +1879,12 @@ const translations = {
     "availability.success": "Status updated successfully",
     "availability.detailsTitle": "Date Details",
     "availability.noUnavailableDetails":
-      "No unavailable records are registered for this date",
+      "No day off preference records are registered for this date",
     "availability.multiDateMode": "Register additional dates together",
     "availability.selectAdditionalDates": "Select Additional Dates",
     "availability.selectedDates": "Selected Dates",
     "availability.dateAlreadyUnavailable":
-      "This date is already marked as unavailable",
+      "This date is already registered as a day off preference",
     "availability.hasTimeRestriction": "Time Restriction",
     "availability.timePeriod": "Time Period",
     "availability.startTime": "Start Time",
@@ -2413,9 +2418,9 @@ const translations = {
     "user.normal": "一般",
     "user.deactivate": "無効化",
     "user.reactivate": "再有効化",
-    "user.difficultWeekday.updateError": "出勤困難な曜日の更新に失敗しました",
-    "user.difficultWeekday.deleteError": "出勤困難な曜日の削除に失敗しました",
-    "user.difficultWeekday.insertError": "出勤困難な曜日の追加に失敗しました",
+    "user.difficultWeekday.updateError": "出勤不可曜日の更新に失敗しました",
+    "user.difficultWeekday.deleteError": "出勤不可曜日の削除に失敗しました",
+    "user.difficultWeekday.insertError": "出勤不可曜日の追加に失敗しました",
     // プロフィールページ関連の翻訳
     "profile.title": "プロフィール",
     "profile.myProfile": "マイプロフィール",
@@ -2719,8 +2724,8 @@ const translations = {
     "rules.break.paid": "有給",
     "rules.compliance.maxPerMonth": "月最大勤務(時間)",
     // user preferred weekdays
-    "user.preferredWeekdays": "出勤困難な曜日",
-    "user.preferredWeekdays.description": "出勤が困難な曜日を選択してください",
+    "user.preferredWeekdays": "出勤不可曜日",
+    "user.preferredWeekdays.description": "出勤不可曜日を選択してください",
     "user.weekdays.sunday": "日曜日",
     "user.weekdays.monday": "月曜日",
     "user.weekdays.tuesday": "火曜日",
@@ -2783,8 +2788,8 @@ const translations = {
     // availability calendar
     "availability.title": "休日希望カレンダー",
     "availability.markUnavailable": "休日希望日を登録",
-    "availability.markAvailable": "出勤可能としてマーク",
-    "availability.removeUnavailable": "出勤不可解除",
+    "availability.markAvailable": "休日希望日を解除",
+    "availability.removeUnavailable": "休日希望日を解除",
     "availability.selectAction": "アクション選択",
     "availability.selectUser": "ユーザー選択",
     "availability.currentUser": "現在のユーザー",
@@ -2792,16 +2797,16 @@ const translations = {
     "availability.selectUserToRemove": "解除するユーザー選択",
     "availability.confirmRemove": "解除",
     "availability.reason": "理由（任意）",
-    "availability.reasonPlaceholder": "出勤不可の理由を入力してください",
+    "availability.reasonPlaceholder": "休日希望の理由を入力してください",
     "availability.confirmMarkUnavailable":
-      "この日付を出勤不可としてマークしますか？",
+      "この日付を休日希望日として登録しますか？",
     "availability.confirmMarkAvailable":
-      "この日付を出勤可能としてマークしますか？",
+      "この日付の休日希望日を解除しますか？",
     "availability.alreadyAssigned": "この日付は既に割り当てられています",
     "availability.cannotModifyAfterPublish": "公開後は変更できません",
-    "availability.notificationTitle": "出勤可否状態変更",
+    "availability.notificationTitle": "休日希望状態変更",
     "availability.notificationMessage":
-      "{userName}さんが{date}の出勤可否状態を{action}しました。",
+      "{userName}さんが{date}の休日希望状態を{action}しました。",
     // export
     "export.title": "スケジュールエクスポート",
     "export.format": "ファイル形式",
@@ -2834,7 +2839,7 @@ const translations = {
     "schedule.scheduleAdded": "スケジュールが追加されました",
     "schedule.scheduleAddError": "スケジュール追加中にエラーが発生しました",
     "schedule.unavailableWarning":
-      "警告: この日付にユーザーが出勤不可としてマークされています。",
+      "警告: この日付にユーザーが休日希望日として登録されています。",
     "schedule.scheduleDeleted": "スケジュールが削除されました",
     "schedule.scheduleDeleteError": "スケジュール削除中にエラーが発生しました",
     "schedule.noScheduleToDelete": "削除するスケジュールがありません",
@@ -2877,14 +2882,14 @@ const translations = {
     "availability.selectAdditionalDates": "追加日付選択",
     "availability.selectedDates": "選択された日付",
     "availability.dateAlreadyUnavailable":
-      "この日付は既に出勤不可として登録されています",
+      "この日付は既に休日希望日として登録されています",
     "availability.hasTimeRestriction": "時間制限",
     "availability.timePeriod": "時間帯",
     "availability.startTime": "開始時間",
     "availability.endTime": "終了時間",
     "availability.detailsTitle": "日付詳細",
     "availability.noUnavailableDetails":
-      "この日付に登録された出勤不可情報はありません",
+      "この日付に登録された休日希望情報はありません",
     "availability.multiDateRegisterResult":
       "{successCount}件の日付を登録しました{failText}",
     "availability.multiDateRegisterFailSuffix": " ({failCount}件失敗)",

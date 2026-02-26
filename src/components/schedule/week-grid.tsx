@@ -3283,6 +3283,7 @@ export function WeekGrid({
       {/* Copy Week Dialog */}
       <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
         <DialogContent
+          className="w-[95vw] max-w-[1200px] max-h-[90vh] overflow-hidden"
           onInteractOutside={(e) => {
             e.preventDefault();
           }}
@@ -3400,9 +3401,20 @@ export function WeekGrid({
                           const storeUser = storeUsers.find(
                             (u) => u.id === a.userId
                           );
+                          const candidateName =
+                            a.userName?.trim() ||
+                            storeUser?.name?.trim() ||
+                            storeUser?.email?.trim() ||
+                            "";
+                          const displayName =
+                            !candidateName ||
+                            candidateName === "Unknown" ||
+                            candidateName === "Unknown User"
+                              ? a.userId
+                              : candidateName;
                           previewUserMap.set(a.userId, {
                             id: a.userId,
-                            name: a.userName || storeUser?.name || a.userId,
+                            name: displayName,
                           });
                         }
                       });
