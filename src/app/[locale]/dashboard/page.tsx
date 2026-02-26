@@ -128,26 +128,6 @@ export default function DashboardPage() {
     }
   }, [loading, user, router, locale]);
 
-  if (loading || storesLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-lg font-medium text-gray-700">
-            {t("dashboard.loading", currentLocale)}
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            {t("dashboard.wait", currentLocale)}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
   const desktopNavItems = useMemo(() => {
     const items: Array<{
       key: string;
@@ -220,6 +200,26 @@ export default function DashboardPage() {
     await signOut();
     router.push(`/${locale}/login`);
   };
+
+  if (loading || storesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-lg font-medium text-gray-700">
+            {t("dashboard.loading", currentLocale)}
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            {t("dashboard.wait", currentLocale)}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

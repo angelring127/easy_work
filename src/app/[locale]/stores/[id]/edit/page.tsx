@@ -197,26 +197,26 @@ export default function EditStorePage() {
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <Tabs defaultValue={tabParam || "basic"}>
-              <TabsList className="flex flex-wrap gap-2">
-                <TabsTrigger value="basic">
+              <TabsList className="w-full h-auto justify-start items-stretch overflow-x-auto whitespace-nowrap flex-nowrap gap-1 p-1 md:flex-wrap md:overflow-visible">
+                <TabsTrigger value="basic" className="shrink-0">
                   {t("settings.store.basic", currentLocale)}
                 </TabsTrigger>
-                <TabsTrigger value="hours">
+                <TabsTrigger value="hours" className="shrink-0">
                   {t("settings.store.hours", currentLocale)}
                 </TabsTrigger>
-                <TabsTrigger value="workItems">
+                <TabsTrigger value="workItems" className="shrink-0">
                   {t("settings.store.workItems", currentLocale)}
                 </TabsTrigger>
-                <TabsTrigger value="roles">
+                <TabsTrigger value="roles" className="shrink-0">
                   {t("settings.store.roles", currentLocale)}
                 </TabsTrigger>
-                <TabsTrigger value="breakRules">
+                <TabsTrigger value="breakRules" className="shrink-0">
                   {t("settings.store.breakRules", currentLocale)}
                 </TabsTrigger>
-                <TabsTrigger value="policies">
+                <TabsTrigger value="policies" className="shrink-0">
                   {t("settings.store.policies", currentLocale)}
                 </TabsTrigger>
-                <TabsTrigger value="notifications">
+                <TabsTrigger value="notifications" className="shrink-0">
                   {t("settings.store.notifications", currentLocale)}
                 </TabsTrigger>
               </TabsList>
