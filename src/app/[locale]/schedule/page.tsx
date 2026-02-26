@@ -532,6 +532,7 @@ export default function SchedulePage() {
               onGoToPreviousWeek={goToPreviousWeek}
               onGoToCurrentWeek={goToCurrentWeek}
               onGoToNextWeek={goToNextWeek}
+              onSelectWeek={setCurrentWeek}
               isWeekNavigationLoading={loading}
               canManage={canManage}
             />

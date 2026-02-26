@@ -31,6 +31,7 @@ import {
   startOfWeek,
   endOfWeek,
   addDays,
+  addMonths,
   eachDayOfInterval,
   isToday,
   isPast,
@@ -106,6 +107,8 @@ export function UserAvailabilityCalendar({
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set()); // 선택된 날짜들
   const [isSubmittingUnavailable, setIsSubmittingUnavailable] = useState(false);
   const [multiDateCalendarMonth, setMultiDateCalendarMonth] = useState(new Date()); // 다중 날짜 선택 캘린더 월
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [pendingMonthValue, setPendingMonthValue] = useState("");
   const [businessHours, setBusinessHours] = useState<
     Array<{
       id: string;
@@ -655,10 +658,13 @@ export function UserAvailabilityCalendar({
             <Button
               variant="outline"
               size="sm"
-              onClick={goToCurrentMonth}
+              onClick={() => {
+                setPendingMonthValue(format(currentMonth, "yyyy-MM"));
+                setMonthPickerOpen(true);
+              }}
               className="min-h-[40px] touch-manipulation text-xs md:text-sm"
             >
-              {t("availability.currentMonth", locale)}
+              {t("availability.selectMonth", locale)}
             </Button>
             <Button
               variant="outline"
@@ -831,6 +837,58 @@ export function UserAvailabilityCalendar({
             </div>
           </div>
         )}
+
+        <Dialog open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("availability.chooseMonth", locale)}</DialogTitle>
+            </DialogHeader>
+            <Select value={pendingMonthValue} onValueChange={setPendingMonthValue}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("availability.selectMonth", locale)} />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 25 }, (_, i) => {
+                  const offset = i - 12;
+                  const monthDate = addMonths(currentMonth, offset);
+                  const monthStart = startOfMonth(monthDate);
+                  const value = format(monthStart, "yyyy-MM");
+                  return (
+                    <SelectItem key={value} value={value}>
+                      {formatMonthYear(monthStart)}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setMonthPickerOpen(false)}
+              >
+                {t("common.cancel", locale)}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  goToCurrentMonth();
+                  setMonthPickerOpen(false);
+                }}
+              >
+                {t("availability.currentMonth", locale)}
+              </Button>
+              <Button
+                onClick={() => {
+                  const [year, month] = pendingMonthValue.split("-").map(Number);
+                  setCurrentMonth(new Date(year, month - 1, 1));
+                  setMonthPickerOpen(false);
+                }}
+              >
+                {t("common.confirm", locale)}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* 모바일 날짜 상세 다이얼로그 */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>

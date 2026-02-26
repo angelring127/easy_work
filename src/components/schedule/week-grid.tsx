@@ -121,6 +121,7 @@ interface WeekGridProps {
   onGoToPreviousWeek?: () => void;
   onGoToCurrentWeek?: () => void;
   onGoToNextWeek?: () => void;
+  onSelectWeek?: (date: Date) => void;
   isWeekNavigationLoading?: boolean;
   canManage?: boolean;
 }
@@ -140,6 +141,7 @@ export function WeekGrid({
   onGoToPreviousWeek,
   onGoToCurrentWeek,
   onGoToNextWeek,
+  onSelectWeek,
   isWeekNavigationLoading = false,
   canManage = false,
 }: WeekGridProps) {
@@ -237,6 +239,8 @@ export function WeekGrid({
   >(new Map());
   const [isDifficultDaysLoading, setIsDifficultDaysLoading] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
+  const [pendingWeekValue, setPendingWeekValue] = useState("");
   const [copyWarningDialogOpen, setCopyWarningDialogOpen] = useState(false);
   const [selectedSourceWeek, setSelectedSourceWeek] = useState<Date | null>(
     null
@@ -1067,11 +1071,14 @@ export function WeekGrid({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={onGoToCurrentWeek}
+                  onClick={() => {
+                    setPendingWeekValue(format(weekStart, "yyyy-MM-dd"));
+                    setWeekPickerOpen(true);
+                  }}
                   disabled={isWeekNavigationLoading}
                   className="min-h-[44px] touch-manipulation text-xs md:text-sm"
                 >
-                  {t("schedule.currentWeek", locale)}
+                  {t("schedule.selectWeek", locale)}
                 </Button>
                 <Button
                   variant="outline"
@@ -3325,6 +3332,63 @@ export function WeekGrid({
                 {t("common.save", locale)}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Week Select Dialog */}
+      <Dialog open={weekPickerOpen} onOpenChange={setWeekPickerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("schedule.chooseWeek", locale)}</DialogTitle>
+          </DialogHeader>
+          <Select value={pendingWeekValue} onValueChange={setPendingWeekValue}>
+            <SelectTrigger>
+              <SelectValue placeholder={t("schedule.selectWeek", locale)} />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 25 }, (_, i) => {
+                const offset = i - 12;
+                const weekDate = addWeeks(currentWeek, offset);
+                const optionWeekStart = startOfWeek(weekDate, {
+                  weekStartsOn: 1,
+                });
+                const optionWeekEnd = endOfWeek(weekDate, {
+                  weekStartsOn: 1,
+                });
+                const optionValue = format(optionWeekStart, "yyyy-MM-dd");
+
+                return (
+                  <SelectItem key={optionValue} value={optionValue}>
+                    {formatWeekRangeWithMeta(optionWeekStart, optionWeekEnd)}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setWeekPickerOpen(false)}>
+              {t("common.cancel", locale)}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                onGoToCurrentWeek?.();
+                setWeekPickerOpen(false);
+              }}
+            >
+              {t("schedule.currentWeek", locale)}
+            </Button>
+            <Button
+              onClick={() => {
+                if (!onSelectWeek || !pendingWeekValue) return;
+                const [year, month, day] = pendingWeekValue.split("-").map(Number);
+                onSelectWeek(new Date(year, month - 1, day));
+                setWeekPickerOpen(false);
+              }}
+            >
+              {t("common.confirm", locale)}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
