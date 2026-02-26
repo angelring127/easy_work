@@ -3114,7 +3114,11 @@ export function WeekGrid({
 
       {/* Copy Week Dialog */}
       <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
-        <DialogContent>
+        <DialogContent
+          onInteractOutside={(e) => {
+            e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{t("schedule.copyWeek", locale)}</DialogTitle>
           </DialogHeader>

@@ -9,6 +9,7 @@ import {
   Users,
   Clock,
   ArrowLeft,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -495,6 +496,7 @@ export default function SchedulePage() {
                   variant="outline"
                   size="sm"
                   onClick={goToPreviousWeek}
+                  disabled={loading}
                   className="min-h-[44px] min-w-[44px] touch-manipulation"
                 >
                   ←
@@ -503,6 +505,7 @@ export default function SchedulePage() {
                   variant="outline"
                   size="sm"
                   onClick={goToCurrentWeek}
+                  disabled={loading}
                   className="min-h-[44px] touch-manipulation text-xs md:text-sm"
                 >
                   {t("schedule.currentWeek", currentLocale)}
@@ -511,6 +514,7 @@ export default function SchedulePage() {
                   variant="outline"
                   size="sm"
                   onClick={goToNextWeek}
+                  disabled={loading}
                   className="min-h-[44px] min-w-[44px] touch-manipulation"
                 >
                   →
@@ -550,7 +554,10 @@ export default function SchedulePage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="week" className="space-y-2 md:space-y-4 mt-4">
+          <TabsContent
+            value="week"
+            className="space-y-2 md:space-y-4 mt-4 relative"
+          >
             <WeekGrid
               storeId={currentStore.id}
               currentWeek={currentWeek}
@@ -564,9 +571,20 @@ export default function SchedulePage() {
               onScheduleChange={loadScheduleData}
               canManage={canManage}
             />
+            {loading && (
+              <div className="absolute inset-0 bg-background/70 backdrop-blur-[1px] flex items-center justify-center rounded-md z-10">
+                <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{t("common.loading", currentLocale)}</span>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
-          <TabsContent value="month" className="space-y-2 md:space-y-4 mt-4">
+          <TabsContent
+            value="month"
+            className="space-y-2 md:space-y-4 mt-4 relative"
+          >
             <UserAvailabilityCalendar
               storeId={currentStore.id}
               locale={currentLocale}
@@ -583,6 +601,14 @@ export default function SchedulePage() {
                 loadScheduleData();
               }}
             />
+            {loading && (
+              <div className="absolute inset-0 bg-background/70 backdrop-blur-[1px] flex items-center justify-center rounded-md z-10">
+                <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{t("common.loading", currentLocale)}</span>
+                </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
