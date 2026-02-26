@@ -43,10 +43,32 @@ export async function GET(
       .single();
 
     if (error || !storeUser) {
-      return NextResponse.json(
-        { error: "User not found in this store" },
-        { status: 404 }
-      );
+      const { data: roleRow, error: roleError } = await supabase
+        .from("user_store_roles")
+        .select("role, status")
+        .eq("store_id", storeId)
+        .eq("user_id", userId)
+        .eq("status", "ACTIVE")
+        .single();
+
+      if (roleError || !roleRow) {
+        return NextResponse.json(
+          { error: "User not found in this store" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: userId,
+          user_id: userId,
+          name: session.user.user_metadata?.name || session.user.email || "",
+          email: session.user.email || "",
+          role: roleRow.role,
+          status: roleRow.status,
+        },
+      });
     }
 
     const role = (storeUser.user_store_roles as any)?.[0]?.role || null;

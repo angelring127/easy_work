@@ -128,7 +128,7 @@ export default function SchedulePage() {
       loadScheduleData();
       checkPermissions();
     }
-  }, [currentStore?.id, currentWeek]);
+  }, [currentStore?.id, currentWeek, user]);
 
   // Work Items가 없고 관리자 권한이 있으면 모달 표시
   // Work Items가 있으면 모달 닫기
@@ -289,7 +289,7 @@ export default function SchedulePage() {
   };
 
   const checkPermissions = async () => {
-    if (!currentStore?.id || !user) return;
+    if (!currentStore?.id) return;
 
     try {
       const response = await fetch(`/api/stores/${currentStore.id}/users/me`);
@@ -299,8 +299,13 @@ export default function SchedulePage() {
         const userRole = data.data.role;
         const userId = data.data.id;
 
-        setCanManage(userRole === "MASTER" || userRole === "SUB_MANAGER");
-        setCurrentUserRole(userRole);
+        const normalizedRole =
+          userRole === "SUB" ? "SUB_MANAGER" : userRole;
+        const canManageSchedule =
+          normalizedRole === "MASTER" || normalizedRole === "SUB_MANAGER";
+
+        setCanManage(canManageSchedule);
+        setCurrentUserRole(normalizedRole);
         setCurrentUserId(userId);
       } else {
         setCanManage(false);
