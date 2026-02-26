@@ -58,6 +58,8 @@ interface StoreUser {
   name: string;
   email: string;
   roles: string[];
+  status?: string;
+  deleted_at?: string | null;
 }
 
 interface BusinessHour {
@@ -199,33 +201,52 @@ export function ScheduleExporter({
         cell.style = centerAlignStyle;
       });
 
-      // 사용자 데이터 준비
-      const assignmentUserIds = new Set(assignments.map((a) => a.userId));
-      const allUserIds = new Set<string>();
-      assignmentUserIds.forEach((id) => allUserIds.add(id));
-      storeUsers.forEach((user) => {
-        if (!allUserIds.has(user.id)) {
-          allUserIds.add(user.id);
-        }
-      });
+      // 사용자 데이터 준비 (Week Grid와 동일한 순서)
+      const allUserIds = new Set([
+        ...storeUsers.map((u) => u.id),
+        ...assignments.map((a) => a.userId),
+        ...userAvailabilities.map((a) => a.userId),
+      ]);
 
-      const userNameMap = new Map<string, string>();
-      assignments.forEach((a) => {
-        if (!userNameMap.has(a.userId)) userNameMap.set(a.userId, a.userName);
-      });
-      storeUsers.forEach((user) => {
-        if (!userNameMap.has(user.id)) userNameMap.set(user.id, user.name || user.email);
-      });
+      const users = Array.from(allUserIds)
+        .map((userId) => {
+          const storeUser = storeUsers.find((u) => u.id === userId);
+          if (storeUser) {
+            if (storeUser.status === "INACTIVE" || storeUser.deleted_at) {
+              return null;
+            }
+            return {
+              id: userId,
+              name: storeUser.name || "",
+            };
+          }
 
-      const sortedUserIds = Array.from(allUserIds).sort((a, b) => {
-        const nameA = userNameMap.get(a) || "";
-        const nameB = userNameMap.get(b) || "";
-        return nameA.localeCompare(nameB);
-      });
+          const assignment = assignments.find((a) => a.userId === userId);
+          const availability = userAvailabilities.find((a) => a.userId === userId);
+          const userName = assignment?.userName || availability?.userName || "";
+
+          if (!userName || userName === "Unknown User") {
+            return null;
+          }
+
+          return {
+            id: userId,
+            name: userName,
+          };
+        })
+        .filter((user) => user !== null)
+        .sort((a, b) => a.name.localeCompare(b.name)) as Array<{
+        id: string;
+        name: string;
+      }>;
+
+      const sortedUserIds = users.map((user) => user.id);
 
       // 5. User Rows (3 rows per user: name row with start time, start time row, end time row)
       sortedUserIds.forEach((userId) => {
-        const userName = userNameMap.get(userId) || "Unknown User";
+        const gridName = users.find((u) => u.id === userId)?.name?.trim() || "";
+        const userName =
+          !gridName || gridName === "Unknown User" ? userId : gridName;
         
         // Row 1: User Name with Start Time (will be merged across 3 rows)
         const nameRowData: any[] = [userName];

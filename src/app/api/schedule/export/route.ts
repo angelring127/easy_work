@@ -158,7 +158,6 @@ export async function GET(request: NextRequest) {
       .from("user_store_job_roles")
       .select(
         `
-        id,
         user_id,
         job_role_id,
         store_job_roles!inner(
@@ -180,7 +179,7 @@ export async function GET(request: NextRequest) {
     // 사용자 표시명 조회 (store_users 기반)
     const { data: storeUsers, error: storeUsersError } = await supabase
       .from("store_users")
-      .select("id, user_id, name, email")
+      .select("id, user_id, name")
       .eq("store_id", store_id);
 
     if (storeUsersError) {
@@ -205,8 +204,8 @@ export async function GET(request: NextRequest) {
         storeUserById.get(ur.user_id) || storeUserByAuthId.get(ur.user_id);
       return {
         ...ur,
-        user_name: mappedUser?.name || mappedUser?.email || ur.user_id,
-        user_email: mappedUser?.email || "",
+        user_name: mappedUser?.name || ur.user_id,
+        user_email: "",
       };
     });
 
@@ -295,8 +294,14 @@ function generateWeekGridData(
   users.forEach((userId) => {
     const userAssignments = assignments.filter((a) => a.user_id === userId);
     const userInfo = userMap.get(userId);
+    const resolvedName =
+      userInfo?.raw_user_meta_data?.name || userInfo?.email || "";
     const userName =
-      userInfo?.raw_user_meta_data?.name || userInfo?.email || "Unknown User";
+      typeof resolvedName === "string" &&
+      resolvedName.trim().length > 0 &&
+      resolvedName !== "Unknown User"
+        ? resolvedName
+        : userId;
 
     const userRow = [userName];
     dates.forEach((date) => {
@@ -350,7 +355,15 @@ function generateAssignmentsData(
       new Date(assignment.date).toLocaleDateString("en-US", {
         weekday: "long",
       }),
-      userInfo?.raw_user_meta_data?.name || userInfo?.email || "Unknown",
+      (() => {
+        const resolvedName =
+          userInfo?.raw_user_meta_data?.name || userInfo?.email || "";
+        return typeof resolvedName === "string" &&
+          resolvedName.trim().length > 0 &&
+          resolvedName !== "Unknown User"
+          ? resolvedName
+          : assignment.user_id;
+      })(),
       assignment.work_items?.name || "",
       assignment.start_time,
       assignment.end_time,

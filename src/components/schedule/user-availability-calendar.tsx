@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Calendar, AlertCircle, X, Plus } from "lucide-react";
+import { Calendar, AlertCircle, X, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -104,6 +104,7 @@ export function UserAvailabilityCalendar({
   const [shiftBoundaryTimeMin, setShiftBoundaryTimeMin] = useState<number>(720); // 기본값: 12:00
   const [multiDateMode, setMultiDateMode] = useState(false); // 다중 날짜 모드
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set()); // 선택된 날짜들
+  const [isSubmittingUnavailable, setIsSubmittingUnavailable] = useState(false);
   const [multiDateCalendarMonth, setMultiDateCalendarMonth] = useState(new Date()); // 다중 날짜 선택 캘린더 월
   const [businessHours, setBusinessHours] = useState<
     Array<{
@@ -455,7 +456,9 @@ export function UserAvailabilityCalendar({
 
   // 출근 불가 등록 확인
   const handleConfirmUnavailable = async () => {
-    if (!selectedDate) return;
+    if (!selectedDate || isSubmittingUnavailable) return;
+
+    setIsSubmittingUnavailable(true);
 
     const targetUserId =
       canManage && selectedUserId !== "current"
@@ -533,17 +536,18 @@ export function UserAvailabilityCalendar({
         description: toMessage(error),
         variant: "destructive",
       });
+    } finally {
+      setIsSubmittingUnavailable(false);
+      setDialogOpen(false);
+      setSelectedDate(null);
+      setReason("");
+      setHasTimeRestriction(false);
+      setStartTime("");
+      setEndTime("");
+      setTimePeriod("morning");
+      setMultiDateMode(false);
+      setSelectedDates(new Set());
     }
-
-    setDialogOpen(false);
-    setSelectedDate(null);
-    setReason("");
-    setHasTimeRestriction(false);
-    setStartTime("");
-    setEndTime("");
-    setTimePeriod("morning");
-    setMultiDateMode(false);
-    setSelectedDates(new Set());
   };
 
   // 출근 불가 해제 확인
@@ -1139,6 +1143,8 @@ export function UserAvailabilityCalendar({
                                       ${!isCurrentMonth ? "opacity-30" : ""}
                                       ${isPastDay || !isCurrentMonth || isAlreadyUnavailable
                                         ? "bg-muted/50 cursor-not-allowed opacity-50"
+                                        : isSelected
+                                        ? "cursor-pointer"
                                         : "hover:bg-muted/50 cursor-pointer"
                                       }
                                       ${isSelected && isCurrentMonth && !isPastDay && !isAlreadyUnavailable
@@ -1301,12 +1307,21 @@ export function UserAvailabilityCalendar({
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="outline"
+                      disabled={isSubmittingUnavailable}
                       onClick={() => setDialogOpen(false)}
                     >
                       {t("common.cancel", locale)}
                     </Button>
-                    <Button onClick={handleConfirmUnavailable}>
-                      {t("availability.confirmMarkUnavailable", locale)}
+                    <Button
+                      onClick={handleConfirmUnavailable}
+                      disabled={isSubmittingUnavailable}
+                    >
+                      {isSubmittingUnavailable && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      {isSubmittingUnavailable
+                        ? t("common.loading", locale)
+                        : t("schedule.register", locale)}
                     </Button>
                   </div>
                 </>

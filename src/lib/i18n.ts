@@ -867,8 +867,8 @@ const translations = {
     "schedule.copyConfirmDescription":
       "현재 주의 모든 스케줄이 삭제되고, 선택한 주의 스케줄이 복사됩니다.",
     // availability calendar
-    "availability.title": "출근 불가 캘린더",
-    "availability.markUnavailable": "출근 불가로 표시",
+    "availability.title": "휴일 희망 캘린더",
+    "availability.markUnavailable": "휴일 희망일 등록",
     "availability.markAvailable": "출근 가능으로 표시",
     "availability.removeUnavailable": "출근 불가 해제",
     "availability.selectAction": "액션 선택",
@@ -952,7 +952,7 @@ const translations = {
     "schedule.register": "등록",
     "schedule.warning.multiDayMessage":
       "님의 복수 요일 스케줄 등록 시 다음 경고가 있습니다.",
-    "availability.unavailable": "출근 불가",
+    "availability.unavailable": "휴일 희망일",
     "availability.currentMonth": "이번 달",
     "availability.date": "날짜",
     "availability.today": "오늘",
@@ -1782,8 +1782,8 @@ const translations = {
     "schedule.copyConfirmDescription":
       "All schedules in the current week will be deleted and the selected week's schedules will be copied.",
     // availability calendar
-    "availability.title": "Availability Calendar",
-    "availability.markUnavailable": "Mark as Unavailable",
+    "availability.title": "Day Off Preference Calendar",
+    "availability.markUnavailable": "Register Day Off Preference",
     "availability.markAvailable": "Mark as Available",
     "availability.removeUnavailable": "Remove Unavailable",
     "availability.selectAction": "Select Action",
@@ -1865,7 +1865,7 @@ const translations = {
     "schedule.register": "Register",
     "schedule.warning.multiDayMessage":
       " has the following warnings for multi-day schedule registration:",
-    "availability.unavailable": "Unavailable",
+    "availability.unavailable": "Day Off Preference",
     "availability.currentMonth": "Current Month",
     "availability.date": "Date",
     "availability.today": "Today",
@@ -2781,8 +2781,8 @@ const translations = {
     "schedule.monthViewComingSoon": "月表示準備中",
     "schedule.monthViewDescription": "月間カレンダー表示は近日提供予定です。",
     // availability calendar
-    "availability.title": "出勤不可カレンダー",
-    "availability.markUnavailable": "出勤不可としてマーク",
+    "availability.title": "休日希望カレンダー",
+    "availability.markUnavailable": "休日希望日を登録",
     "availability.markAvailable": "出勤可能としてマーク",
     "availability.removeUnavailable": "出勤不可解除",
     "availability.selectAction": "アクション選択",
@@ -2866,7 +2866,7 @@ const translations = {
     "schedule.register": "登録",
     "schedule.warning.multiDayMessage":
       "さんの複数日スケジュール登録時に以下の警告があります。",
-    "availability.unavailable": "出勤不可",
+    "availability.unavailable": "休日希望日",
     "availability.currentMonth": "今月",
     "availability.date": "日付",
     "availability.today": "今日",
