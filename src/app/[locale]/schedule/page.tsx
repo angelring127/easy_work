@@ -517,25 +517,27 @@ export default function SchedulePage() {
             value="week"
             className="space-y-2 md:space-y-4 mt-4 relative"
           >
-            <WeekGrid
-              storeId={currentStore.id}
-              currentWeek={currentWeek}
-              locale={currentLocale}
-              assignments={assignments}
-              userAvailabilities={userAvailabilities}
-              storeUsers={storeUsers}
-              onAssignmentClick={handleAssignmentClick}
-              onUserClick={handleUserClick}
-              onAvailabilityToggle={handleAvailabilityToggle}
-              onScheduleChange={loadScheduleData}
-              onLoadingChange={setWeekGridLoading}
-              onGoToPreviousWeek={goToPreviousWeek}
-              onGoToCurrentWeek={goToCurrentWeek}
-              onGoToNextWeek={goToNextWeek}
-              onSelectWeek={setCurrentWeek}
-              isWeekNavigationLoading={loading}
-              canManage={canManage}
-            />
+            <div id="week-grid-export-target">
+              <WeekGrid
+                storeId={currentStore.id}
+                currentWeek={currentWeek}
+                locale={currentLocale}
+                assignments={assignments}
+                userAvailabilities={userAvailabilities}
+                storeUsers={storeUsers}
+                onAssignmentClick={handleAssignmentClick}
+                onUserClick={handleUserClick}
+                onAvailabilityToggle={handleAvailabilityToggle}
+                onScheduleChange={loadScheduleData}
+                onLoadingChange={setWeekGridLoading}
+                onGoToPreviousWeek={goToPreviousWeek}
+                onGoToCurrentWeek={goToCurrentWeek}
+                onGoToNextWeek={goToNextWeek}
+                onSelectWeek={setCurrentWeek}
+                isWeekNavigationLoading={loading}
+                canManage={canManage}
+              />
+            </div>
             {(loading || weekGridLoading) && (
               <div className="absolute inset-0 bg-background/70 backdrop-blur-[1px] flex items-center justify-center rounded-md z-10">
                 <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">

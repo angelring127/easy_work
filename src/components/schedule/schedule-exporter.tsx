@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileSpreadsheet, FileText, Settings } from "lucide-react";
+import {
+  Download,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  Settings,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -99,11 +105,205 @@ export function ScheduleExporter({
   businessHours = [],
 }: ScheduleExporterProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"xlsx" | "csv">("xlsx");
+  const [exportFormat, setExportFormat] = useState<"xlsx" | "csv" | "png">(
+    "xlsx"
+  );
   const [exportScope, setExportScope] = useState<"all" | "me">("all");
   const [includePrivateInfo, setIncludePrivateInfo] = useState(false);
   const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
+
+  const handleExportWeekGridImage = async () => {
+    if (!currentWeek) return;
+
+    try {
+      setExporting(true);
+
+      const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
+      const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+      const dateLocale = dateLocales[locale] || enUS;
+      const shiftBoundaryTimeMin = 720;
+
+      const allUserIds = new Set([
+        ...storeUsers.map((u) => u.id),
+        ...assignments.map((a) => a.userId),
+        ...userAvailabilities.map((a) => a.userId),
+      ]);
+
+      const users = Array.from(allUserIds)
+        .map((userId) => {
+          const storeUser = storeUsers.find((u) => u.id === userId);
+          if (storeUser) {
+            if (storeUser.status === "INACTIVE" || storeUser.deleted_at) return null;
+            return { id: userId, name: storeUser.name || "" };
+          }
+
+          const assignment = assignments.find((a) => a.userId === userId);
+          const availability = userAvailabilities.find((a) => a.userId === userId);
+          const userName = assignment?.userName || availability?.userName || "";
+          if (!userName || userName === "Unknown User") return null;
+          return { id: userId, name: userName };
+        })
+        .filter((user) => user !== null)
+        .sort((a, b) => a.name.localeCompare(b.name)) as Array<{
+        id: string;
+        name: string;
+      }>;
+
+      const leftColWidth = 150;
+      const dayColWidth = 120;
+      const rowHeight = 26;
+      const headerRows = 4;
+      const width = leftColWidth + weekDays.length * dayColWidth;
+      const height = (headerRows + users.length * 3) * rowHeight;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Canvas context unavailable");
+      }
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      const drawCell = (
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        text = "",
+        bold = false
+      ) => {
+        ctx.strokeStyle = "#d4d4d8";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, w, h);
+
+        if (!text) return;
+        ctx.fillStyle = "#111827";
+        ctx.font = `${bold ? "600" : "400"} 12px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, x + w / 2, y + h / 2);
+      };
+
+      drawCell(0, 0, leftColWidth, rowHeight * 2, storeName || "Schedule", true);
+      weekDays.forEach((day, idx) => {
+        const x = leftColWidth + idx * dayColWidth;
+        drawCell(x, 0, dayColWidth, rowHeight, format(day, "d", { locale: dateLocale }), true);
+        drawCell(
+          x,
+          rowHeight,
+          dayColWidth,
+          rowHeight,
+          format(day, "EEE", { locale: dateLocale }).toUpperCase(),
+          true
+        );
+      });
+
+      drawCell(0, rowHeight * 2, leftColWidth, rowHeight, "AM", true);
+      drawCell(0, rowHeight * 3, leftColWidth, rowHeight, "PM", true);
+
+      weekDays.forEach((day, idx) => {
+        const dayStr = format(day, "yyyy-MM-dd");
+        const x = leftColWidth + idx * dayColWidth;
+        const dayAssignments = assignments.filter(
+          (a) => a.date === dayStr && a.status === "ASSIGNED"
+        );
+
+        const amCount = dayAssignments.reduce((count, a) => {
+          const [hh, mm] = a.startTime.split(":").map(Number);
+          return hh * 60 + mm < shiftBoundaryTimeMin ? count + 1 : count;
+        }, 0);
+        const pmCount = dayAssignments.reduce((count, a) => {
+          const [hh, mm] = a.endTime.split(":").map(Number);
+          return hh * 60 + mm > shiftBoundaryTimeMin ? count + 1 : count;
+        }, 0);
+
+        drawCell(x, rowHeight * 2, dayColWidth, rowHeight, String(amCount));
+        drawCell(x, rowHeight * 3, dayColWidth, rowHeight, String(pmCount));
+      });
+
+      users.forEach((user, userIndex) => {
+        const baseY = (headerRows + userIndex * 3) * rowHeight;
+        drawCell(0, baseY, leftColWidth, rowHeight * 3, user.name || user.id, true);
+
+        weekDays.forEach((day, dayIndex) => {
+          const dayStr = format(day, "yyyy-MM-dd");
+          const dayOfWeek = day.getDay();
+          const x = leftColWidth + dayIndex * dayColWidth;
+
+          const userAssignment = assignments.find(
+            (a) => a.userId === user.id && a.date === dayStr && a.status === "ASSIGNED"
+          );
+          const availability = userAvailabilities.find(
+            (ua) => ua.userId === user.id && ua.date === dayStr
+          );
+
+          if (availability && !userAssignment) {
+            drawCell(x, baseY, dayColWidth, rowHeight * 3, "X", true);
+            return;
+          }
+
+          drawCell(x, baseY, dayColWidth, rowHeight, userAssignment?.startTime?.substring(0, 5) || "");
+          drawCell(x, baseY + rowHeight, dayColWidth, rowHeight, "");
+
+          let endText = "";
+          if (userAssignment) {
+            const closeMin = businessHours.find((h) => h.weekday === dayOfWeek)?.close_min || 0;
+            const [endH, endM] = userAssignment.endTime.split(":").map(Number);
+            const endMin = endH * 60 + endM;
+            const effectiveCloseMin = closeMin === 0 ? 1440 : closeMin;
+            const effectiveEndMin = endMin === 0 ? 1440 : endMin;
+            endText =
+              effectiveEndMin >= effectiveCloseMin && effectiveCloseMin > 0
+                ? "close"
+                : userAssignment.endTime.substring(0, 5);
+          }
+          drawCell(x, baseY + rowHeight * 2, dayColWidth, rowHeight, endText);
+        });
+      });
+
+      const pngBlob = await new Promise<Blob | null>((resolve, reject) => {
+        try {
+          canvas.toBlob(resolve, "image/png");
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      if (!pngBlob) {
+        throw new Error("Image conversion failed");
+      }
+
+      const fileName = `${storeName ? storeName.replace(/\s+/g, "_") + "_" : ""}schedule_${format(weekStart, "yyyy-MM-dd")}_to_${format(weekEnd, "yyyy-MM-dd")}.png`;
+
+      const pngUrl = window.URL.createObjectURL(pngBlob);
+      const a = document.createElement("a");
+      a.href = pngUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(pngUrl);
+
+      toast({
+        title: t("export.success", locale),
+        description: t("export.fileDownloaded", locale),
+      });
+    } catch (error) {
+      console.error("Week Grid image export 오류:", error);
+      toast({
+        title: t("export.error", locale),
+        description: t("export.error", locale),
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // 현재 Week Grid를 Excel로 export (이미지 포맷 적용)
   const handleExportWeekGrid = async () => {
@@ -406,6 +606,18 @@ export function ScheduleExporter({
 
     setExporting(true);
     try {
+      if (exportFormat === "png") {
+        await handleExportWeekGridImage();
+        setDialogOpen(false);
+        return;
+      }
+
+      if (exportFormat === "xlsx" && currentWeek && assignments.length > 0) {
+        await handleExportWeekGrid();
+        setDialogOpen(false);
+        return;
+      }
+
       const params = new URLSearchParams({
         store_id: storeId,
         from,
@@ -515,7 +727,7 @@ export function ScheduleExporter({
               <Label htmlFor="format">{t("export.format", locale)}</Label>
               <Select
                 value={exportFormat}
-                onValueChange={(value: "xlsx" | "csv") =>
+                onValueChange={(value: "xlsx" | "csv" | "png") =>
                   setExportFormat(value)
                 }
               >
@@ -533,6 +745,12 @@ export function ScheduleExporter({
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4" />
                       {t("export.csv", locale)}
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="png">
+                    <div className="flex items-center gap-2">
+                      <FileImage className="h-4 w-4" />
+                      {t("export.png", locale)}
                     </div>
                   </SelectItem>
                 </SelectContent>
