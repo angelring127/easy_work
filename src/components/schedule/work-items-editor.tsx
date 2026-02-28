@@ -21,7 +21,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Minus, Edit, Trash2, Save, X, Clock, Users } from "lucide-react";
+import {
+  Plus,
+  Minus,
+  Edit,
+  Trash2,
+  Save,
+  X,
+  Clock,
+  Users,
+  Loader2,
+} from "lucide-react";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 
@@ -58,6 +68,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [deletingItem, setDeletingItem] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [form, setForm] = useState({
@@ -193,6 +204,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
   // 24시간 형식을 AM/PM으로 변환
   const convertFrom24Hour = (hour: number) => {
     if (hour === 0) return { hour: 12, amPm: "am" as const };
+    if (hour === 24) return { hour: 12, amPm: "am" as const };
     if (hour === 12) return { hour: 12, amPm: "pm" as const };
     if (hour > 12) return { hour: hour - 12, amPm: "pm" as const };
     return { hour, amPm: "am" as const };
@@ -232,10 +244,11 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
   };
 
   const updateRoleRequirement = (jobRoleId: string, minCount: number) => {
+    const safeMinCount = Math.max(0, Math.min(99, minCount));
     setForm((prev) => ({
       ...prev,
       roleRequirements: prev.roleRequirements.map((r) =>
-        r.jobRoleId === jobRoleId ? { ...r, minCount: minCount } : r
+        r.jobRoleId === jobRoleId ? { ...r, minCount: safeMinCount } : r
       ),
     }));
   };
@@ -268,6 +281,14 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     if (endMin <= startMin) {
       endMin += 24 * 60; // 다음날로 설정
     }
+    if (endMin > 1440) {
+      toast({
+        title: t("common.error", locale),
+        description: t("workItems.endTimeLimit", locale),
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (form.unpaidBreakMin > endMin - startMin) {
       toast({
@@ -280,8 +301,17 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
 
     // 최대 인원을 직무별 합계로 설정
     const calculatedMaxHeadcount = Math.max(totalRequiredHeadcount, 1);
+    if (calculatedMaxHeadcount > 99) {
+      toast({
+        title: t("common.error", locale),
+        description: t("workItems.maxHeadcountLimit", locale),
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
+      setSubmitting(true);
       if (editingItem) {
         // 수정 모드
         const updateData = {
@@ -320,11 +350,18 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
 
             console.log("직무 요구사항 업데이트 데이터:", roleUpdateData);
 
-            await fetch("/api/work-item-required-roles", {
+            const roleUpdateResponse = await fetch("/api/work-item-required-roles", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(roleUpdateData),
             });
+
+            if (!roleUpdateResponse.ok) {
+              const roleErrorData = await roleUpdateResponse.json();
+              throw new Error(
+                roleErrorData.error || t("workItemRoles.saveFailed", locale)
+              );
+            }
           }
 
           toast({
@@ -335,7 +372,11 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
         } else {
           const errorData = await response.json();
           console.error("근무항목 수정 실패:", errorData);
-          throw new Error(errorData.error || "Failed to update work item");
+          const errorMessage =
+            typeof errorData?.error === "string"
+              ? errorData.error
+              : t("workItems.updateFailed", locale);
+          throw new Error(errorMessage);
         }
       } else {
         // 생성 모드
@@ -366,11 +407,18 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
 
             console.log("직무 요구사항 생성 데이터:", roleCreateData);
 
-            await fetch("/api/work-item-required-roles", {
+            const roleCreateResponse = await fetch("/api/work-item-required-roles", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(roleCreateData),
             });
+
+            if (!roleCreateResponse.ok) {
+              const roleErrorData = await roleCreateResponse.json();
+              throw new Error(
+                roleErrorData.error || t("workItemRoles.saveFailed", locale)
+              );
+            }
           }
 
           toast({
@@ -379,7 +427,12 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
           await loadData();
           handleCancel();
         } else {
-          throw new Error("Failed to create work item");
+          const errorData = await response.json();
+          const errorMessage =
+            typeof errorData?.error === "string"
+              ? errorData.error
+              : t("workItems.createFailed", locale);
+          throw new Error(errorMessage);
         }
       }
     } catch (error) {
@@ -388,6 +441,8 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
         description: String(error),
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -681,6 +736,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                             size="sm"
                             variant="outline"
                             onClick={() => addRoleRequirement(role.id)}
+                            disabled={submitting}
                           >
                             <Plus className="w-3 h-3" />
                           </Button>
@@ -714,7 +770,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                                   Math.max(0, req.minCount - 1)
                                 )
                               }
-                              disabled={req.minCount <= 0}
+                              disabled={req.minCount <= 0 || submitting}
                             >
                               <Minus className="w-3 h-3" />
                             </Button>
@@ -727,6 +783,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                                   req.minCount + 1
                                 )
                               }
+                              disabled={submitting}
                             >
                               <Plus className="w-3 h-3" />
                             </Button>
@@ -736,6 +793,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
                               onClick={() =>
                                 removeRoleRequirement(req.jobRoleId)
                               }
+                              disabled={submitting}
                             >
                               <X className="w-3 h-3" />
                             </Button>
@@ -755,13 +813,22 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
 
             {/* 액션 버튼 */}
             <div className="flex gap-2">
-              <Button onClick={handleSubmit}>
-                <Save className="w-4 h-4 mr-2" />
-                {editingItem
-                  ? t("common.save", locale)
-                  : t("common.create", locale)}
+              <Button onClick={handleSubmit} disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t("common.loading", locale)}
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    {editingItem
+                      ? t("common.save", locale)
+                      : t("common.create", locale)}
+                  </>
+                )}
               </Button>
-              <Button variant="outline" onClick={handleCancel}>
+              <Button variant="outline" onClick={handleCancel} disabled={submitting}>
                 <X className="w-4 h-4 mr-2" />
                 {t("common.cancel", locale)}
               </Button>

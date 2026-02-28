@@ -229,6 +229,7 @@ const translations = {
     "workItemRoles.removeRole": "직무 제거",
     "workItemRoles.minCount": "최소 인원",
     "workItemRoles.saveSuccess": "직무 요구 사항이 저장되었습니다",
+    "workItemRoles.saveFailed": "직무 요구 사항 저장에 실패했습니다",
     "workItemRoles.minCountMin": "최소 인원은 0 이상이어야 합니다",
     "workItemRoles.minCountMax": "최소 인원은 99 이하여야 합니다",
     "workItemRoles.requirementsSet": "요구 사항 설정됨",
@@ -789,6 +790,10 @@ const translations = {
     "workItems.breakTooLong": "휴식 시간은 근무 시간보다 길 수 없습니다",
     "workItems.calculatedMaxHeadcount": "계산된 최대 인원",
     "workItems.autoCalculated": "직무별 합계로 자동 계산",
+    "workItems.maxHeadcountLimit": "직무별 최소 인원 합계는 99를 초과할 수 없습니다",
+    "workItems.endTimeLimit": "종료 시간은 자정(24:00) 이내로 설정해주세요",
+    "workItems.updateFailed": "근무항목 수정에 실패했습니다",
+    "workItems.createFailed": "근무항목 생성에 실패했습니다",
     "workItems.timeInfo":
       "오전 10시 ~ 오전 12시와 같이 설정하면 자동으로 다음날까지 계산됩니다",
     // targets 탭
@@ -1725,6 +1730,11 @@ const translations = {
     "workItems.breakTooLong": "Break time cannot be longer than work time",
     "workItems.calculatedMaxHeadcount": "Calculated Max Headcount",
     "workItems.autoCalculated": "Auto-calculated from job requirements",
+    "workItems.maxHeadcountLimit":
+      "Total required headcount by roles cannot exceed 99",
+    "workItems.endTimeLimit": "End time must be within 24:00",
+    "workItems.updateFailed": "Failed to update work item",
+    "workItems.createFailed": "Failed to create work item",
     "workItems.timeInfo":
       "Setting like 10 AM ~ 12 AM will automatically calculate to the next day",
     // targets tab
@@ -1942,6 +1952,7 @@ const translations = {
     "workItemRoles.removeRole": "Remove Role",
     "workItemRoles.minCount": "Min Count",
     "workItemRoles.saveSuccess": "Role requirements saved successfully",
+    "workItemRoles.saveFailed": "Failed to save role requirements",
     "workItemRoles.minCountMin": "Min count must be 0 or greater",
     "workItemRoles.minCountMax": "Min count must be 99 or less",
     "workItemRoles.requirementsSet": "Requirements Set",
@@ -2764,6 +2775,11 @@ const translations = {
     "workItems.breakTooLong": "休憩時間は勤務時間より長くすることはできません",
     "workItems.calculatedMaxHeadcount": "計算された最大人数",
     "workItems.autoCalculated": "職務別合計で自動計算",
+    "workItems.maxHeadcountLimit":
+      "職務ごとの最小人数合計は99を超えることはできません",
+    "workItems.endTimeLimit": "終了時間は24:00以内に設定してください",
+    "workItems.updateFailed": "勤務項目の更新に失敗しました",
+    "workItems.createFailed": "勤務項目の作成に失敗しました",
     "workItems.timeInfo":
       "午前10時〜午前12時のように設定すると、自動的に翌日まで計算されます",
     // targets
@@ -2985,6 +3001,7 @@ const translations = {
     "workItemRoles.removeRole": "役割削除",
     "workItemRoles.minCount": "最小人数",
     "workItemRoles.saveSuccess": "役割要件が正常に保存されました",
+    "workItemRoles.saveFailed": "役割要件の保存に失敗しました",
     "workItemRoles.minCountMin": "最小人数は0以上である必要があります",
     "workItemRoles.minCountMax": "最小人数は99以下である必要があります",
     "workItemRoles.requirementsSet": "要件設定済み",
