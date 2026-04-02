@@ -6,6 +6,7 @@ import {
   t,
   type Locale,
 } from "@/lib/i18n";
+import { extractPlatformAdminRole } from "@/lib/auth/platform-admin";
 import { createSignInSchema } from "@/lib/validations/auth";
 
 function resolveLocale(request: NextRequest, localeParam?: string): Locale {
@@ -90,6 +91,10 @@ export async function POST(request: NextRequest) {
           id: data.user?.id,
           email: data.user?.email,
           emailConfirmed: data.user?.email_confirmed_at != null,
+          role: (data.user?.user_metadata?.role as string | undefined) || undefined,
+          platformAdminRole: extractPlatformAdminRole(
+            (data.user?.user_metadata || {}) as Record<string, unknown>
+          ),
         },
         session: {
           accessToken: data.session?.access_token,

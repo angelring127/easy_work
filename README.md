@@ -47,6 +47,52 @@ SUPABASE_JWT_SECRET=your_jwt_secret
 http://localhost:3000/api/test/supabase
 ```
 
+## 관리자 계정 프로비저닝
+
+관리자 계정은 공개 회원가입이 아니라 내부 프로비저닝 스크립트로 생성하거나 갱신합니다.
+
+### 1. 환경변수 준비
+
+`.env.local`에 아래 값을 추가하세요:
+
+```bash
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=ChangeMe123!
+```
+
+- 대부분의 경우 `ADMIN_EMAIL`, `ADMIN_PASSWORD`만 설정하면 됩니다.
+- 기본값:
+  - `ADMIN_PLATFORM_ROLE`: `SYSTEM_ADMIN`
+  - `ADMIN_USER_ROLE`: `MASTER`
+  - `ADMIN_NAME`: `System Admin`
+
+고급 옵션이 필요할 때만 아래 값을 추가로 지정하세요:
+
+```bash
+ADMIN_NAME=System Admin
+ADMIN_PLATFORM_ROLE=SYSTEM_ADMIN
+ADMIN_USER_ROLE=MASTER
+```
+
+- `ADMIN_PLATFORM_ROLE`: `SYSTEM_ADMIN`, `OPS_ANALYST`, `SUPPORT_AGENT`, `READ_ONLY_AUDITOR`
+- `ADMIN_USER_ROLE`: `MASTER`, `SUB_MANAGER`, `PART_TIMER`
+
+### 2. 관리자 계정 생성 또는 갱신
+
+```bash
+npm run provision:admin
+```
+
+이 스크립트는 같은 이메일 계정이 이미 있으면 비밀번호와 메타데이터를 갱신하고, 없으면 새로 생성합니다.
+
+### 3. 관리자 로그인
+
+관리자 전용 로그인 페이지는 다음 경로입니다:
+
+```bash
+http://localhost:3000/ko/admin/login
+```
+
 ## 기본 포함 라이브러리
 
 - [Next.js](https://nextjs.org)

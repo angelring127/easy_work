@@ -11,8 +11,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { locales, localeNames, setLocaleCookie } from "@/lib/i18n-config";
+import { cn } from "@/lib/utils";
 
-export function LanguageSwitcher() {
+interface LanguageSwitcherProps {
+  triggerClassName?: string;
+  contentClassName?: string;
+  itemClassName?: string;
+}
+
+export function LanguageSwitcher({
+  triggerClassName,
+  contentClassName,
+  itemClassName,
+}: LanguageSwitcherProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -40,7 +51,7 @@ export function LanguageSwitcher() {
         <Button
           variant="outline"
           size="sm"
-          className="gap-2"
+          className={cn("gap-2", triggerClassName)}
           disabled={isPending}
         >
           <Globe className="h-4 w-4" />
@@ -50,12 +61,15 @@ export function LanguageSwitcher() {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className={contentClassName}>
         {locales.map((locale) => (
           <DropdownMenuItem
             key={locale}
             onClick={() => handleLocaleChange(locale)}
-            className={currentLocale === locale ? "bg-accent" : ""}
+            className={cn(
+              currentLocale === locale ? "bg-accent" : "",
+              itemClassName
+            )}
             disabled={isPending}
           >
             {localeNames[locale]}

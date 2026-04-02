@@ -5,6 +5,18 @@ import { locales, defaultLocale, isValidLocale, type Locale } from "@/lib/i18n-c
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  const resolveLoginPath = (locale: string, pathWithoutLocale: string) => {
+    if (
+      pathWithoutLocale === "/admin" ||
+      pathWithoutLocale === "/admin/login" ||
+      pathWithoutLocale.startsWith("/admin/")
+    ) {
+      return `/${locale}/admin/login`;
+    }
+
+    return `/${locale}/login`;
+  };
+
   // 정적 파일과 API 루트는 스킵
   if (
     pathname.startsWith("/_next") ||
@@ -74,6 +86,7 @@ export async function proxy(request: NextRequest) {
     "/",
     "/login",
     "/signup",
+    "/admin/login",
     "/auth",
     "/invites/error",
     "/invites/verify-email",
@@ -102,7 +115,10 @@ export async function proxy(request: NextRequest) {
 
     // 세션 오류가 있거나 세션이 없는 경우
     if (error || !session) {
-      const loginUrl = new URL(`/${currentLocale}/login`, request.url);
+      const loginUrl = new URL(
+        resolveLoginPath(currentLocale, pathWithoutLocale),
+        request.url
+      );
       loginUrl.searchParams.set("redirectTo", pathWithoutLocale);
       return NextResponse.redirect(loginUrl);
     }
@@ -114,7 +130,10 @@ export async function proxy(request: NextRequest) {
 
       if (now >= expiresAt) {
         // 세션 만료 시 로그인 페이지로 리다이렉트
-        const loginUrl = new URL(`/${currentLocale}/login`, request.url);
+        const loginUrl = new URL(
+          resolveLoginPath(currentLocale, pathWithoutLocale),
+          request.url
+        );
         loginUrl.searchParams.set("redirectTo", pathWithoutLocale);
         loginUrl.searchParams.set("sessionExpired", "true");
         return NextResponse.redirect(loginUrl);
@@ -142,7 +161,10 @@ export async function proxy(request: NextRequest) {
     console.error("미들웨어 인증 체크 오류:", error);
 
     // 오류 발생 시 로그인 페이지로 리다이렉트
-    const loginUrl = new URL(`/${currentLocale}/login`, request.url);
+    const loginUrl = new URL(
+      resolveLoginPath(currentLocale, pathWithoutLocale),
+      request.url
+    );
     loginUrl.searchParams.set("redirectTo", pathWithoutLocale);
     return NextResponse.redirect(loginUrl);
   }

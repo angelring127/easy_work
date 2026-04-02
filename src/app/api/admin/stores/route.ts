@@ -1,33 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withPlatformAdminAuth } from "@/lib/auth/middleware";
-import { getAdminUsers, normalizeRangeQuery } from "@/lib/admin/service";
+import { getAdminStores, normalizeRangeQuery } from "@/lib/admin/service";
 
-async function handleGetUsers(
+async function handleGetStores(
   request: NextRequest,
   context: { user: any }
 ): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
-
     const period = searchParams.get("period");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    const range = normalizeRangeQuery(period, from, to);
     const page = Number(searchParams.get("page") || 1);
     const limit = Number(searchParams.get("limit") || 20);
     const q = searchParams.get("q") || "";
     const status = searchParams.get("status") || "ALL";
-    const platformRole = searchParams.get("platformRole") || "";
 
-    const data = await getAdminUsers({
+    const range = normalizeRangeQuery(period, from, to);
+    const data = await getAdminStores({
       from: range.from,
       to: range.to,
       page,
       limit,
       q,
       status,
-      platformRole,
     });
 
     return NextResponse.json({
@@ -40,15 +37,15 @@ async function handleGetUsers(
       period: range,
     });
   } catch (error) {
-    console.error("Admin users API error:", error);
+    console.error("Admin stores API error:", error);
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to fetch admin users",
+        error: "Failed to fetch admin stores",
       },
       { status: 500 }
     );
   }
 }
 
-export const GET = withPlatformAdminAuth(handleGetUsers);
+export const GET = withPlatformAdminAuth(handleGetStores);

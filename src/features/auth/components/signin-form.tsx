@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { t, type Locale } from "@/lib/i18n";
 import { defaultLocale } from "@/lib/i18n-config";
+import { cn } from "@/lib/utils";
 
 import {
   createSignInSchema,
@@ -29,8 +30,16 @@ import {
 } from "@/lib/validations/auth";
 
 interface SignInFormProps {
-  onSuccess?: (data: AuthApiResponse) => void;
+  onSuccess?: (
+    data: AuthApiResponse
+  ) => boolean | void | Promise<boolean | void>;
   onError?: (error: string) => void;
+  formClassName?: string;
+  labelClassName?: string;
+  inputClassName?: string;
+  messageClassName?: string;
+  submitButtonClassName?: string;
+  passwordToggleClassName?: string;
 }
 
 // 로그인 API 호출 함수
@@ -60,7 +69,16 @@ async function signInUser(
   return result;
 }
 
-export function SignInForm({ onSuccess, onError }: SignInFormProps) {
+export function SignInForm({
+  onSuccess,
+  onError,
+  formClassName,
+  labelClassName,
+  inputClassName,
+  messageClassName,
+  submitButtonClassName,
+  passwordToggleClassName,
+}: SignInFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const { refreshSession } = useAuth();
@@ -79,16 +97,18 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
   const signInMutation = useMutation({
     mutationFn: (data: SignInFormData) => signInUser(data, locale),
     onSuccess: async (data) => {
+      // AuthContext 상태 새로고침
+      await refreshSession();
+
+      const shouldContinue = (await onSuccess?.(data)) ?? true;
+      if (!shouldContinue) {
+        return;
+      }
+
       toast({
         title: t("auth.login.success", locale),
         description: data.message || t("auth.login.successDescription", locale),
       });
-
-      // AuthContext 상태 새로고침
-      await refreshSession();
-
-      // 성공 콜백 호출
-      onSuccess?.(data);
     },
     onError: (error: Error) => {
       const errorMessage =
@@ -108,23 +128,29 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className={cn("space-y-6", formClassName)}
+      >
         {/* 이메일 필드 */}
         <FormField
           control={form.control}
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t("auth.login.email", locale)}</FormLabel>
+              <FormLabel className={labelClassName}>
+                {t("auth.login.email", locale)}
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder={t("auth.login.emailPlaceholder", locale)}
                   type="email"
                   autoComplete="email"
+                  className={inputClassName}
                   {...field}
                 />
               </FormControl>
-              <FormMessage />
+              <FormMessage className={messageClassName} />
             </FormItem>
           )}
         />
@@ -135,20 +161,26 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t("auth.login.password", locale)}</FormLabel>
+              <FormLabel className={labelClassName}>
+                {t("auth.login.password", locale)}
+              </FormLabel>
               <FormControl>
                 <div className="relative">
                   <Input
                     placeholder={t("auth.login.passwordPlaceholder", locale)}
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
+                    className={inputClassName}
                     {...field}
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    className={cn(
+                      "absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent",
+                      passwordToggleClassName
+                    )}
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={
                       showPassword
@@ -164,7 +196,7 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
                   </Button>
                 </div>
               </FormControl>
-              <FormMessage />
+              <FormMessage className={messageClassName} />
             </FormItem>
           )}
         />
@@ -172,7 +204,7 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
         {/* 제출 버튼 */}
         <Button
           type="submit"
-          className="w-full"
+          className={cn("w-full", submitButtonClassName)}
           disabled={signInMutation.isPending}
         >
           {signInMutation.isPending ? (

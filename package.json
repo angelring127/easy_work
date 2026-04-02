@@ -12,6 +12,7 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "playwright show-report",
+    "provision:admin": "tsx scripts/provision-admin.ts",
     "seed:test-users": "tsx e2e/setup/seed-users.ts",
     "cleanup:test-data": "tsx e2e/setup/cleanup.ts"
   },

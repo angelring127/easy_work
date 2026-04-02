@@ -53,6 +53,8 @@ export interface AuthApiResponse {
     user?: {
       id: string;
       email: string;
+      role?: string;
+      platformAdminRole?: string | null;
     };
     needsEmailConfirmation?: boolean;
   };

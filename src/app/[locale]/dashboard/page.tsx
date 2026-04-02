@@ -32,6 +32,7 @@ import {
   Loader2,
   MessageSquare,
   Settings,
+  ShieldCheck,
   Store,
   UserPlus,
 } from "lucide-react";
@@ -184,6 +185,15 @@ export default function DashboardPage() {
       disabled: !(canViewAnalytics || isManager),
     });
 
+    if (user?.platform_admin_role) {
+      items.push({
+        key: "systemAdmin",
+        label: t("dashboard.systemAdmin", currentLocale),
+        icon: ShieldCheck,
+        onClick: () => router.push(`/${locale}/admin`),
+      });
+    }
+
     return items;
   }, [
     canManageUsers,
@@ -193,6 +203,7 @@ export default function DashboardPage() {
     isManager,
     locale,
     router,
+    user,
     userRole,
   ]);
 

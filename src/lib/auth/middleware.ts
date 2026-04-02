@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { UserRole, Permission, type UserProfile } from "@/types/auth";
+import {
+  UserRole,
+  Permission,
+  PlatformAdminRole,
+  type UserProfile,
+} from "@/types/auth";
 import { hasPermission, checkUserPermission } from "@/lib/auth/permissions";
+import {
+  canReadAdminConsole,
+  canWriteAdminConsole,
+  extractPlatformAdminRole,
+} from "@/lib/auth/platform-admin";
 
 /**
  * API 라우트 권한 확인 결과
@@ -19,6 +29,7 @@ export interface AuthCheckResult {
 export interface AuthMiddlewareOptions {
   requiredPermissions?: Permission[];
   requiredRole?: UserRole;
+  requiredPlatformAdminRoles?: PlatformAdminRole[];
   allowUnauthenticated?: boolean;
 }
 
@@ -68,6 +79,9 @@ export async function checkAuth(
       email: user.email || "",
       name: user.user_metadata?.name || user.email?.split("@")[0] || "",
       role: (user.user_metadata?.role as UserRole) || UserRole.PART_TIMER,
+      platform_admin_role: extractPlatformAdminRole(
+        (user.user_metadata || {}) as Record<string, unknown>
+      ),
       created_at: user.created_at,
       updated_at: user.updated_at || user.created_at,
     };
@@ -93,6 +107,20 @@ export async function checkAuth(
             statusCode: 403,
           };
         }
+      }
+    }
+
+    if (
+      options.requiredPlatformAdminRoles &&
+      options.requiredPlatformAdminRoles.length > 0
+    ) {
+      const role = userProfile.platform_admin_role || null;
+      if (!role || !options.requiredPlatformAdminRoles.includes(role)) {
+        return {
+          success: false,
+          error: "Platform admin privileges required",
+          statusCode: 403,
+        };
       }
     }
 
@@ -149,6 +177,44 @@ export async function requireMaster(
   return checkAuth(request, {
     requiredRole: UserRole.MASTER,
   });
+}
+
+export async function requirePlatformAdmin(
+  request: NextRequest
+): Promise<AuthCheckResult> {
+  const result = await checkAuth(request);
+  if (!result.success || !result.user) {
+    return result;
+  }
+
+  if (!canReadAdminConsole(result.user.platform_admin_role)) {
+    return {
+      success: false,
+      error: "Platform admin privileges required",
+      statusCode: 403,
+    };
+  }
+
+  return result;
+}
+
+export async function requirePlatformAdminWrite(
+  request: NextRequest
+): Promise<AuthCheckResult> {
+  const result = await checkAuth(request);
+  if (!result.success || !result.user) {
+    return result;
+  }
+
+  if (!canWriteAdminConsole(result.user.platform_admin_role)) {
+    return {
+      success: false,
+      error: "Write permission denied",
+      statusCode: 403,
+    };
+  }
+
+  return result;
 }
 
 /**
@@ -232,6 +298,38 @@ export function withMasterAuth(
   return async (request: NextRequest): Promise<NextResponse> => {
     const authResult = await requireMaster(request);
 
+    if (!authResult.success) {
+      return createAuthErrorResponse(authResult);
+    }
+
+    return handler(request, { user: authResult.user! });
+  };
+}
+
+export function withPlatformAdminAuth(
+  handler: (
+    request: NextRequest,
+    context: { user: UserProfile }
+  ) => Promise<NextResponse>
+) {
+  return async (request: NextRequest): Promise<NextResponse> => {
+    const authResult = await requirePlatformAdmin(request);
+    if (!authResult.success) {
+      return createAuthErrorResponse(authResult);
+    }
+
+    return handler(request, { user: authResult.user! });
+  };
+}
+
+export function withPlatformAdminWriteAuth(
+  handler: (
+    request: NextRequest,
+    context: { user: UserProfile }
+  ) => Promise<NextResponse>
+) {
+  return async (request: NextRequest): Promise<NextResponse> => {
+    const authResult = await requirePlatformAdminWrite(request);
     if (!authResult.success) {
       return createAuthErrorResponse(authResult);
     }

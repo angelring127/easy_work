@@ -13,6 +13,16 @@ export enum UserRole {
 }
 
 /**
+ * 플랫폼 관리자 역할 (시스템 전체 운영 권한)
+ */
+export enum PlatformAdminRole {
+  SYSTEM_ADMIN = "SYSTEM_ADMIN",
+  OPS_ANALYST = "OPS_ANALYST",
+  SUPPORT_AGENT = "SUPPORT_AGENT",
+  READ_ONLY_AUDITOR = "READ_ONLY_AUDITOR",
+}
+
+/**
  * 권한 레벨 (Permission Levels)
  */
 export enum Permission {
@@ -108,6 +118,7 @@ export interface UserProfile {
   email: string;
   name?: string;
   role: UserRole;
+  platform_admin_role?: PlatformAdminRole | null;
   created_at: string;
   updated_at: string;
 }

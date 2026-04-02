@@ -1,5 +1,9 @@
-import { createClient } from '@/lib/supabase/client';
-import { User, Session } from '@supabase/supabase-js';
+import { createClient } from "@/lib/supabase/client";
+import {
+  clearLocalSupabaseSession,
+  isInvalidRefreshTokenError,
+} from "@/lib/auth/session-error";
+import { User, Session } from "@supabase/supabase-js";
 
 export interface SessionState {
   user: User | null;
@@ -27,11 +31,23 @@ export class SessionManager {
   // 세션 상태 확인
   async getSessionState(): Promise<SessionState> {
     const supabase = createClient();
-    
+
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
-      
+
       if (error) {
+        if (isInvalidRefreshTokenError(error)) {
+          await clearLocalSupabaseSession(supabase);
+          this.hasSeenAuthenticatedSession = false;
+
+          return {
+            user: null,
+            session: null,
+            isExpired: false,
+            expiresAt: null
+          };
+        }
+
         return {
           user: null,
           session: null,
@@ -63,7 +79,19 @@ export class SessionManager {
         expiresAt
       };
     } catch (error) {
-      console.error('세션 상태 확인 오류:', error);
+      if (isInvalidRefreshTokenError(error)) {
+        await clearLocalSupabaseSession(supabase);
+        this.hasSeenAuthenticatedSession = false;
+
+        return {
+          user: null,
+          session: null,
+          isExpired: false,
+          expiresAt: null
+        };
+      }
+
+      console.error("세션 상태 확인 오류:", error);
       return {
         user: null,
         session: null,
@@ -76,7 +104,7 @@ export class SessionManager {
   // 세션 갱신 필요 여부 확인
   async shouldRefreshSession(): Promise<boolean> {
     const { session, isExpired, expiresAt } = await this.getSessionState();
-    
+
     if (!session || isExpired) {
       return false; // 세션이 없거나 이미 만료됨
     }
@@ -87,7 +115,7 @@ export class SessionManager {
 
     const now = Date.now();
     const timeUntilExpiry = expiresAt - now;
-    
+
     // 만료 5분 전이면 갱신 필요
     return timeUntilExpiry <= this.REFRESH_THRESHOLD;
   }
@@ -95,22 +123,34 @@ export class SessionManager {
   // 자동 세션 갱신
   async refreshSession(): Promise<boolean> {
     const supabase = createClient();
-    
+
     try {
       const { data, error } = await supabase.auth.refreshSession();
-      
+
       if (error || !data.session) {
-        console.error('세션 갱신 실패:', error);
+        if (isInvalidRefreshTokenError(error)) {
+          await clearLocalSupabaseSession(supabase);
+          this.hasSeenAuthenticatedSession = false;
+          return false;
+        }
+
+        console.error("세션 갱신 실패:", error);
         return false;
       }
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('세션 갱신 성공:', data.session.user?.email);
+      if (process.env.NODE_ENV === "development") {
+        console.log("세션 갱신 성공:", data.session.user?.email);
       }
-      
+
       return true;
     } catch (error) {
-      console.error('세션 갱신 중 오류:', error);
+      if (isInvalidRefreshTokenError(error)) {
+        await clearLocalSupabaseSession(supabase);
+        this.hasSeenAuthenticatedSession = false;
+        return false;
+      }
+
+      console.error("세션 갱신 중 오류:", error);
       return false;
     }
   }
@@ -124,10 +164,10 @@ export class SessionManager {
     this.checkInterval = setInterval(async () => {
       try {
         const { isExpired } = await this.getSessionState();
-        
+
         if (isExpired) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('세션 만료 감지');
+          if (process.env.NODE_ENV === "development") {
+            console.log("세션 만료 감지");
           }
           onExpired?.();
           this.stopPeriodicCheck();
@@ -140,20 +180,20 @@ export class SessionManager {
           if (refreshed) {
             onRefreshed?.();
           } else {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('세션 갱신 실패 - 만료 처리');
+            if (process.env.NODE_ENV === "development") {
+              console.log("세션 갱신 실패 - 만료 처리");
             }
             onExpired?.();
             this.stopPeriodicCheck();
           }
         }
       } catch (error) {
-        console.error('주기적 세션 체크 오류:', error);
+        console.error("주기적 세션 체크 오류:", error);
       }
     }, this.CHECK_INTERVAL);
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('주기적 세션 체크 시작');
+    if (process.env.NODE_ENV === "development") {
+      console.log("주기적 세션 체크 시작");
     }
   }
 
@@ -163,9 +203,9 @@ export class SessionManager {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
       this.hasSeenAuthenticatedSession = false;
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('주기적 세션 체크 중지');
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("주기적 세션 체크 중지");
       }
     }
   }
@@ -173,17 +213,17 @@ export class SessionManager {
   // 즉시 로그아웃
   async forceLogout(): Promise<void> {
     const supabase = createClient();
-    
+
     try {
-      await supabase.auth.signOut();
+      await clearLocalSupabaseSession(supabase);
       this.stopPeriodicCheck();
-      
+
       // 페이지 리다이렉트
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
       }
     } catch (error) {
-      console.error('강제 로그아웃 오류:', error);
+      console.error("강제 로그아웃 오류:", error);
     }
   }
 

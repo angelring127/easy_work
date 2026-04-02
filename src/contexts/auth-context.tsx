@@ -10,7 +10,15 @@ import {
 import { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { sessionManager } from "@/lib/auth/session-manager";
+import {
+  clearLocalSupabaseSession,
+  isInvalidRefreshTokenError,
+} from "@/lib/auth/session-error";
 import { UserRole, type UserProfile } from "@/types/auth";
+import {
+  canReadAdminConsole,
+  extractPlatformAdminRole,
+} from "@/lib/auth/platform-admin";
 import { defaultLocale } from "@/lib/i18n-config";
 
 interface AuthContextType {
@@ -28,6 +36,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getLocaleFromPathname(pathname: string): string {
+  return pathname.split("/")[1] || defaultLocale;
+}
+
+function getLoginRedirectPath(pathname: string): string {
+  const currentLocale = getLocaleFromPathname(pathname);
+  if (pathname.includes("/admin")) {
+    return `/${currentLocale}/admin/login`;
+  }
+
+  return `/${currentLocale}/login`;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [rawUser, setRawUser] = useState<User | null>(null);
@@ -37,7 +58,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isSessionValid, setIsSessionValid] = useState(false);
   const [isProcessingInvite, setIsProcessingInvite] = useState(false);
 
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
+
+  const resetAuthState = useCallback(() => {
+    setUser(null);
+    setRawUser(null);
+    setSession(null);
+    setSessionExpired(false);
+    setIsSessionValid(false);
+  }, []);
+
+  const clearInvalidSession = useCallback(async () => {
+    sessionManager.stopPeriodicCheck();
+    await clearLocalSupabaseSession(supabase);
+    resetAuthState();
+  }, [resetAuthState, supabase]);
 
   // Supabase User를 UserProfile로 변환하는 헬퍼 함수
   const createUserProfile = useCallback(
@@ -56,6 +91,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           supabaseUser.email?.split("@")[0] ||
           "",
         role,
+        platform_admin_role: extractPlatformAdminRole(
+          (supabaseUser.user_metadata || {}) as Record<string, unknown>
+        ),
         created_at: supabaseUser.created_at,
         updated_at: supabaseUser.updated_at || supabaseUser.created_at,
       };
@@ -71,10 +109,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const { data, error } = await supabase.auth.getSession();
       if (error) {
+        if (isInvalidRefreshTokenError(error)) {
+          await clearInvalidSession();
+          return;
+        }
+
         console.error("세션 새로고침 오류:", error);
-        setUser(null);
-        setRawUser(null);
-        setSession(null);
+        resetAuthState();
       } else {
         if (process.env.NODE_ENV === "development") {
           console.log(
@@ -88,12 +129,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(data.session);
       }
     } catch (error) {
+      if (isInvalidRefreshTokenError(error)) {
+        await clearInvalidSession();
+        return;
+      }
+
       console.error("세션 새로고침 중 예외 발생:", error);
-      setUser(null);
-      setRawUser(null);
-      setSession(null);
+      resetAuthState();
     }
-  }, [supabase.auth, createUserProfile]);
+  }, [clearInvalidSession, createUserProfile, resetAuthState, supabase]);
 
   // 로그아웃
   const signOut = async () => {
@@ -114,26 +158,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 상태 초기화
-      setUser(null);
-      setRawUser(null);
-      setSession(null);
-      setSessionExpired(false);
-      setIsSessionValid(false);
+      resetAuthState();
 
       // 로그아웃 후 로그인 페이지로 리다이렉트
-      window.location.href = "/login";
+      window.location.href = getLoginRedirectPath(window.location.pathname);
     } catch (error) {
       console.error("로그아웃 중 예외 발생:", error);
 
       // 오류 발생 시에도 클라이언트 측 로그아웃 실행
       try {
-        await supabase.auth.signOut();
-        setUser(null);
-        setRawUser(null);
-        setSession(null);
-        setSessionExpired(false);
-        setIsSessionValid(false);
-        window.location.href = "/login";
+        await clearLocalSupabaseSession(supabase);
+        resetAuthState();
+        window.location.href = getLoginRedirectPath(window.location.pathname);
       } catch (fallbackError) {
         console.error("fallback 로그아웃 오류:", fallbackError);
       }
@@ -149,10 +185,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         const { data, error } = await supabase.auth.getSession();
         if (error) {
+          if (isInvalidRefreshTokenError(error)) {
+            await clearInvalidSession();
+            return;
+          }
+
           console.error("초기 세션 가져오기 오류:", error);
-          setUser(null);
-          setRawUser(null);
-          setSession(null);
+          resetAuthState();
         } else {
           if (process.env.NODE_ENV === "development") {
             console.log(
@@ -166,10 +205,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(data.session);
         }
       } catch (error) {
+        if (isInvalidRefreshTokenError(error)) {
+          await clearInvalidSession();
+          return;
+        }
+
         console.error("초기 세션 가져오기 중 예외 발생:", error);
-        setUser(null);
-        setRawUser(null);
-        setSession(null);
+        resetAuthState();
       } finally {
         setLoading(false);
         if (process.env.NODE_ENV === "development") {
@@ -188,9 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (process.env.NODE_ENV === "development") {
           console.log("AuthContext: 세션 만료 감지");
         }
-        setUser(null);
-        setRawUser(null);
-        setSession(null);
+        resetAuthState();
       }
     };
 
@@ -203,15 +243,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionManager.startPeriodicCheck(
       // 세션 만료 시 콜백
       () => {
+        resetAuthState();
         setSessionExpired(true);
-        setIsSessionValid(false);
-        setUser(null);
-        setRawUser(null);
-        setSession(null);
 
         // 로그인 페이지로 리다이렉트 (다국어 지원)
-        const currentLocale = window.location.pathname.split("/")[1] || defaultLocale;
-        window.location.href = `/${currentLocale}/login`;
+        window.location.href = getLoginRedirectPath(window.location.pathname);
       },
       // 세션 갱신 시 콜백
       () => {
@@ -234,8 +270,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       const rawUserData = session?.user ?? null;
+      const nextUserProfile = createUserProfile(rawUserData);
       setRawUser(rawUserData);
-      setUser(createUserProfile(rawUserData));
+      setUser(nextUserProfile);
       setSession(session);
       // onAuthStateChange에서는 로딩 상태를 변경하지 않음
       // 초기 로딩만 getInitialSession에서 관리
@@ -245,8 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentPath = window.location.pathname;
 
         // 다국어 경로에서 현재 locale 추출
-        const pathSegments = currentPath.split("/");
-        const currentLocale = pathSegments[1] || defaultLocale;
+        const currentLocale = getLocaleFromPathname(currentPath);
 
         // 콜백 페이지에서 온 경우 대시보드로 리다이렉트
         if (currentPath.includes("/auth/callback")) {
@@ -254,6 +290,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log("AuthContext: 콜백에서 대시보드로 리다이렉트");
           }
           window.location.href = `/${currentLocale}/dashboard`;
+        }
+        // 관리자 로그인 페이지에서 온 경우 권한에 따라 분기
+        else if (currentPath.includes("/admin/login")) {
+          if (canReadAdminConsole(nextUserProfile?.platform_admin_role)) {
+            window.location.href = `/${currentLocale}/admin`;
+          }
         }
         // 로그인/회원가입 페이지에서 온 경우에도 대시보드로 리다이렉트
         else if (
@@ -290,7 +332,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
       sessionManager.cleanup();
     };
-  }, [supabase.auth, createUserProfile]);
+  }, [clearInvalidSession, createUserProfile, isProcessingInvite, resetAuthState, supabase]);
 
   const value = {
     user,
