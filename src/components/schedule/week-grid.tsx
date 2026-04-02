@@ -555,12 +555,9 @@ export function WeekGrid({
     userId: string,
     date: string
   ): UserAvailability | null => {
-    return (
-      userAvailabilities.find(
-        (a) =>
-          a.userId === userId && isSameDay(new Date(a.date), new Date(date))
-      ) || null
-    );
+    return userAvailabilities.find(
+      (a) => a.userId === userId && a.date === date
+    ) || null;
   };
 
   // 시간 포맷팅
@@ -572,9 +569,21 @@ export function WeekGrid({
     return name.length > 8 ? `${name.slice(0, 8)}…` : name;
   };
 
-  const getLocalWeekday = (date: string): number => {
+  const getDateKey = (date: Date): string => {
+    return format(date, "yyyy-MM-dd");
+  };
+
+  const isCountedAssignment = (status: ScheduleAssignment["status"]): boolean => {
+    return status === "ASSIGNED" || status === "CONFIRMED";
+  };
+
+  const parseLocalDate = (date: string): Date => {
     const [year, month, day] = date.split("-").map(Number);
-    return new Date(year, month - 1, day).getDay();
+    return new Date(year, month - 1, day);
+  };
+
+  const getLocalWeekday = (date: string): number => {
+    return parseLocalDate(date).getDay();
   };
 
   const weekdayOptions = [
@@ -604,6 +613,36 @@ export function WeekGrid({
     return `${hours.toString().padStart(2, "0")}:${mins
       .toString()
       .padStart(2, "0")}`;
+  };
+
+  const parseTimeToMinutes = (time: string): number => {
+    return (
+      parseInt(time.split(":")[0]) * 60 + parseInt(time.split(":")[1])
+    );
+  };
+
+  const calculatePaidMinutes = (
+    startTime: string,
+    endTime: string,
+    unpaidBreakMin = 0
+  ): number => {
+    const startMin = parseTimeToMinutes(startTime);
+    let endMin = parseTimeToMinutes(endTime);
+
+    if (endMin <= startMin) {
+      endMin += 24 * 60;
+    }
+
+    const workMinutes = endMin - startMin;
+
+    // Historical work items may contain an invalid break that equals/exceeds
+    // the full shift length. In that case, fall back to gross minutes so the
+    // scheduled shift still contributes to weekly totals instead of showing 0h.
+    if (unpaidBreakMin >= workMinutes) {
+      return workMinutes;
+    }
+
+    return workMinutes - unpaidBreakMin;
   };
 
   // 날짜 포맷팅
@@ -636,9 +675,9 @@ export function WeekGrid({
   const getShiftCounts = (
     date: Date
   ): { morning: number; afternoon: number } => {
-    const dayStr = date.toISOString().split("T")[0];
+    const dayStr = getDateKey(date);
     const dayAssignments = filteredAssignments.filter(
-      (a) => a.date === dayStr && a.status === "ASSIGNED"
+      (a) => a.date === dayStr && isCountedAssignment(a.status)
     );
 
     let morningCount = 0;
@@ -679,51 +718,25 @@ export function WeekGrid({
   ): number => {
     // filteredAssignments는 이미 현재 주 범위로 필터링됨
     const userAssignments = filteredAssignments.filter(
-      (a) => a.userId === userId && a.status === "ASSIGNED"
+      (a) => a.userId === userId && isCountedAssignment(a.status)
     );
 
     let totalMinutes = 0;
     userAssignments.forEach((assignment) => {
-      const startMin =
-        parseInt(assignment.startTime.split(":")[0]) * 60 +
-        parseInt(assignment.startTime.split(":")[1]);
-      let endMin =
-        parseInt(assignment.endTime.split(":")[0]) * 60 +
-        parseInt(assignment.endTime.split(":")[1]);
-
-      // 자정을 넘어가는 경우 처리 (예: 10:00 - 24:00)
-      if (endMin <= startMin) {
-        endMin += 24 * 60; // 24시간(1440분) 추가
-      }
-
-      // 근무 시간 계산
-      const workMinutes = endMin - startMin;
-
-      // Unpaid Break 시간 제외
-      const unpaidBreakMin = assignment.unpaidBreakMin || 0;
-      const paidMinutes = workMinutes - unpaidBreakMin;
-
-      totalMinutes += paidMinutes;
+      totalMinutes += calculatePaidMinutes(
+        assignment.startTime,
+        assignment.endTime,
+        assignment.unpaidBreakMin || 0
+      );
     });
 
     // 새 스케줄 포함 계산
     if (includeNewAssignment) {
-      const startMin =
-        parseInt(includeNewAssignment.startTime.split(":")[0]) * 60 +
-        parseInt(includeNewAssignment.startTime.split(":")[1]);
-      let endMin =
-        parseInt(includeNewAssignment.endTime.split(":")[0]) * 60 +
-        parseInt(includeNewAssignment.endTime.split(":")[1]);
-
-      if (endMin <= startMin) {
-        endMin += 24 * 60;
-      }
-
-      const workMinutes = endMin - startMin;
-      const unpaidBreakMin = includeNewAssignment.unpaidBreakMin || 0;
-      const paidMinutes = workMinutes - unpaidBreakMin;
-
-      totalMinutes += paidMinutes;
+      totalMinutes += calculatePaidMinutes(
+        includeNewAssignment.startTime,
+        includeNewAssignment.endTime,
+        includeNewAssignment.unpaidBreakMin || 0
+      );
     }
 
     return Math.round((totalMinutes / 60) * 10) / 10; // 소수점 첫째자리까지
@@ -1205,14 +1218,12 @@ export function WeekGrid({
 
                   {/* 각 날짜별 셀 */}
                   {weekDays.map((day, dayIndex) => {
-                    const dayStr = day.toISOString().split("T")[0];
+                    const dayStr = getDateKey(day);
                     const dayOfWeek = day.getDay();
 
                     // 해당 사용자의 해당 날짜 모든 배정 조회
                     const dayAssignments = filteredAssignments.filter(
-                      (a) =>
-                        a.userId === user.id &&
-                        isSameDay(new Date(a.date), new Date(dayStr))
+                      (a) => a.userId === user.id && a.date === dayStr
                     );
 
                     const availability = getAvailabilityForUserDate(
@@ -1449,7 +1460,7 @@ export function WeekGrid({
               {modalCell && (
                 <>
                   {modalCell.userName} -{" "}
-                  {format(new Date(modalCell.date), "MM/dd (EEE)", {
+                  {format(parseLocalDate(modalCell.date), "MM/dd (EEE)", {
                     locale: dateLocales[locale],
                   })}
                 </>
@@ -1541,7 +1552,7 @@ export function WeekGrid({
                   (a) =>
                     a.userId === modalCell.userId &&
                     a.date === modalCell.date &&
-                    a.status === "ASSIGNED"
+                    isCountedAssignment(a.status)
                 );
 
                 if (existingAssignment) {
@@ -1642,7 +1653,7 @@ export function WeekGrid({
                         (a) =>
                           a.userId === modalCell.userId &&
                           a.date === modalCell.date &&
-                          a.status === "ASSIGNED"
+                          isCountedAssignment(a.status)
                       );
 
                       try {
@@ -1679,23 +1690,17 @@ export function WeekGrid({
                               const userData = userResult.data;
 
                               // 새 스케줄 시간 계산
-                              const startMin =
-                                parseInt(startTime.split(":")[0]) * 60 +
-                                parseInt(startTime.split(":")[1]);
-                              let endMin =
-                                parseInt(endTime.split(":")[0]) * 60 +
-                                parseInt(endTime.split(":")[1]);
-
-                              if (endMin <= startMin) {
-                                endMin += 24 * 60;
-                              }
-
-                              const workMinutes = endMin - startMin;
                               const unpaidBreakMin =
                                 selectedItem?.unpaid_break_min || 0;
                               const newHours =
                                 Math.round(
-                                  ((workMinutes - unpaidBreakMin) / 60) * 10
+                                  (calculatePaidMinutes(
+                                    startTime,
+                                    endTime,
+                                    unpaidBreakMin
+                                  ) /
+                                    60) *
+                                    10
                                 ) / 10;
                               const totalHours = getUserTotalHours(
                                 modalCell.userId,
@@ -1707,7 +1712,7 @@ export function WeekGrid({
                               );
 
                               // 1. Difficult Work Days 확인
-                              const scheduleDate = new Date(modalCell.date);
+                              const scheduleDate = parseLocalDate(modalCell.date);
                               const scheduleWeekday = scheduleDate.getDay(); // 0=일요일, 6=토요일
                               const preferredWeekdays =
                                 userData.preferredWeekdays || [];
@@ -2051,7 +2056,7 @@ export function WeekGrid({
                         (a) =>
                           a.userId === modalCell.userId &&
                           a.date === modalCell.date &&
-                          a.status === "ASSIGNED"
+                          isCountedAssignment(a.status)
                       ) && (
                         <>
                           <SelectItem value="TRANSFER_SCHEDULE">
@@ -2088,7 +2093,7 @@ export function WeekGrid({
                           (a) =>
                             a.userId === modalCell.userId &&
                             a.date === modalCell.date &&
-                            a.status === "ASSIGNED"
+                            isCountedAssignment(a.status)
                         );
 
                         if (!existingAssignment) {
@@ -2115,7 +2120,7 @@ export function WeekGrid({
                               targetUserData.name;
 
                             // 1. Difficult Work Days 확인
-                            const scheduleDate = new Date(modalCell.date);
+                            const scheduleDate = parseLocalDate(modalCell.date);
                             const scheduleWeekday = scheduleDate.getDay(); // 0=일요일, 6=토요일
                             const preferredWeekdays =
                               targetUserData.preferredWeekdays || [];
@@ -2162,33 +2167,17 @@ export function WeekGrid({
                               const currentHours = getUserTotalHours(value);
 
                               // 기존 스케줄 시간 계산
-                              const startMin =
-                                parseInt(
-                                  existingAssignment.startTime.split(":")[0]
-                                ) *
-                                  60 +
-                                parseInt(
-                                  existingAssignment.startTime.split(":")[1]
-                                );
-                              let endMin =
-                                parseInt(
-                                  existingAssignment.endTime.split(":")[0]
-                                ) *
-                                  60 +
-                                parseInt(
-                                  existingAssignment.endTime.split(":")[1]
-                                );
-
-                              if (endMin <= startMin) {
-                                endMin += 24 * 60;
-                              }
-
-                              const workMinutes = endMin - startMin;
                               const unpaidBreakMin =
                                 existingAssignment.unpaidBreakMin || 0;
                               const newHours =
                                 Math.round(
-                                  ((workMinutes - unpaidBreakMin) / 60) * 10
+                                  (calculatePaidMinutes(
+                                    existingAssignment.startTime,
+                                    existingAssignment.endTime,
+                                    unpaidBreakMin
+                                  ) /
+                                    60) *
+                                    10
                                 ) / 10;
                               const totalHours = getUserTotalHours(value, {
                                 startTime: existingAssignment.startTime,
@@ -2356,13 +2345,9 @@ export function WeekGrid({
                             <Alert key={index} variant="destructive">
                               <AlertCircle className="h-4 w-4" />
                               <AlertTitle>
-                                {format(
-                                  new Date(dayWarning.date),
-                                  "MM/dd (EEE)",
-                                  {
-                                    locale: dateLocales[locale],
-                                  }
-                                )}
+                                {format(parseLocalDate(dayWarning.date), "MM/dd (EEE)", {
+                                  locale: dateLocales[locale],
+                                })}
                               </AlertTitle>
                               <AlertDescription className="space-y-1 mt-2">
                                 {dayWarning.warnings.map((warning, wIndex) => (
@@ -2567,7 +2552,7 @@ export function WeekGrid({
                         <span>{t("availability.date", locale)}:</span>
                         <span className="font-medium">
                           {warningData.date
-                            ? new Date(warningData.date).toLocaleDateString()
+                            ? parseLocalDate(warningData.date).toLocaleDateString()
                             : ""}
                         </span>
                       </div>
@@ -2846,7 +2831,7 @@ export function WeekGrid({
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {weekDays.map((day, index) => {
-                    const dayStr = day.toISOString().split("T")[0];
+                    const dayStr = getDateKey(day);
                     const dayOfWeek = day.getDay();
                     const dayBusinessHour = businessHours.find(
                       (h) => h.weekday === dayOfWeek
@@ -2869,7 +2854,7 @@ export function WeekGrid({
                       (a) =>
                         a.userId === multiDayModalUser?.userId &&
                         a.date === dayStr &&
-                        a.status === "ASSIGNED"
+                        isCountedAssignment(a.status)
                     );
 
                     return (
@@ -3008,7 +2993,7 @@ export function WeekGrid({
                       }
 
                       // DIFFICULT_DAY 체크
-                      const scheduleDate = new Date(dateStr);
+                      const scheduleDate = parseLocalDate(dateStr);
                       const scheduleWeekday = scheduleDate.getDay();
                       const preferredWeekdays =
                         userData.preferredWeekdays || [];
@@ -3102,23 +3087,18 @@ export function WeekGrid({
                     const desiredHours = userData.desiredWeeklyHours || 40;
 
                     if (selectedDaysArray.length > 0) {
-                      const startMin =
-                        parseInt(startTime.split(":")[0]) * 60 +
-                        parseInt(startTime.split(":")[1]);
-                      let endMin =
-                        parseInt(endTime.split(":")[0]) * 60 +
-                        parseInt(endTime.split(":")[1]);
-
-                      if (endMin <= startMin) {
-                        endMin += 24 * 60;
-                      }
-
-                      const workMinutes = endMin - startMin;
                       const unpaidBreakMin =
                         selectedItem?.unpaid_break_min || 0;
                       const newHoursPerDay =
-                        Math.round(((workMinutes - unpaidBreakMin) / 60) * 10) /
-                        10;
+                        Math.round(
+                          (calculatePaidMinutes(
+                            startTime,
+                            endTime,
+                            unpaidBreakMin
+                          ) /
+                            60) *
+                            10
+                        ) / 10;
 
                       // 현재 등록되어 있는 스케줄 시간 포함
                       const currentHours = getUserTotalHours(

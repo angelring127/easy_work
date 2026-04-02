@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
+const formatMinutesToTime = (minutes: number): string => {
+  const safeMinutes = Math.max(0, minutes);
+  const hours = Math.floor(safeMinutes / 60);
+  const mins = safeMinutes % 60;
+  return `${hours.toString().padStart(2, "0")}:${mins
+    .toString()
+    .padStart(2, "0")}`;
+};
+
 // 스케줄 배정 조회 스키마
 // NOTE: GET 파라미터는 느슨하게 처리 (유효하지 않으면 이후에서 가드)
 
@@ -115,17 +124,25 @@ export async function GET(request: NextRequest) {
         const storeUser = assignment.store_users;
         const userName = storeUser?.name || "Unknown User";
         const userRoles = storeUser?.role ? [storeUser.role] : [];
+        const workItemStartMin = assignment.work_items?.start_min;
+        const workItemEndMin = assignment.work_items?.end_min;
         
         return {
           id: assignment.id,
           storeId: assignment.store_id,
-          userId: assignment.user_id,
+          userId: storeUser?.id || assignment.user_id,
           userName: userName,
           workItemId: assignment.work_item_id,
           workItemName: assignment.work_items?.name,
           date: assignment.date,
-          startTime: assignment.start_time,
-          endTime: assignment.end_time,
+          startTime:
+            typeof workItemStartMin === "number"
+              ? formatMinutesToTime(workItemStartMin)
+              : assignment.start_time,
+          endTime:
+            typeof workItemEndMin === "number"
+              ? formatMinutesToTime(workItemEndMin)
+              : assignment.end_time,
           status: assignment.status,
           notes: assignment.notes,
           createdAt: assignment.created_at,

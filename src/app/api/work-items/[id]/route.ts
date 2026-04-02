@@ -102,7 +102,7 @@ export async function PATCH(
     p.unpaidBreakMin !== undefined &&
     p.startMin !== undefined &&
     p.endMin !== undefined &&
-    p.unpaidBreakMin > p.endMin - p.startMin
+    p.unpaidBreakMin >= p.endMin - p.startMin
   ) {
     return NextResponse.json(
       { success: false, error: "Break too long" },

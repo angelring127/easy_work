@@ -259,6 +259,16 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
     0
   );
 
+  const previewStartHour24 = convertTo24Hour(form.startHour, form.startAmPm);
+  const previewEndHour24 = convertTo24Hour(form.endHour, form.endAmPm);
+  const previewStartMin = previewStartHour24 * 60 + form.startMinute;
+  let previewEndMin = previewEndHour24 * 60 + form.endMinute;
+  if (previewEndMin <= previewStartMin) {
+    previewEndMin += 24 * 60;
+  }
+  const previewDurationHours =
+    Math.round(((previewEndMin - previewStartMin) / 60) * 10) / 10;
+
   const handleSubmit = async () => {
     if (!form.name.trim()) {
       toast({
@@ -290,7 +300,7 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
       return;
     }
 
-    if (form.unpaidBreakMin > endMin - startMin) {
+    if (form.unpaidBreakMin >= endMin - startMin) {
       toast({
         title: t("common.error", locale),
         description: t("workItems.breakTooLong", locale),
@@ -712,6 +722,19 @@ export function WorkItemsEditor({ storeId, locale }: WorkItemsEditorProps) {
               </div>
               <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
                 <p>{t("workItems.timeInfo", locale)}</p>
+                <div className="mt-2 space-y-1 text-xs md:text-sm">
+                  <div>
+                    {t("workItems.startTime", locale)}:{" "}
+                    {formatTime(previewStartMin)}
+                  </div>
+                  <div>
+                    {t("workItems.endTime", locale)}: {formatTime(previewEndMin)}
+                  </div>
+                  <div>
+                    {t("schedule.warning.totalHours", locale)}:{" "}
+                    {previewDurationHours}h
+                  </div>
+                </div>
               </div>
             </div>
 

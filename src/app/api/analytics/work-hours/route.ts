@@ -37,6 +37,9 @@ const calcPaidMinutes = (row: AssignmentRow): number => {
   }
   const gross = endMin - startMin;
   const unpaidBreakMin = row.work_items?.unpaid_break_min || 0;
+  if (unpaidBreakMin >= gross) {
+    return gross;
+  }
   return Math.max(0, gross - unpaidBreakMin);
 };
 

@@ -14,13 +14,12 @@ export const WorkItemSchema = z
     path: ["endMin"],
     message: "End must be greater than Start",
   })
-  .refine((v) => v.unpaidBreakMin <= v.endMin - v.startMin, {
+  .refine((v) => v.unpaidBreakMin < v.endMin - v.startMin, {
     path: ["unpaidBreakMin"],
     message: "Break too long",
   });
 
 export type WorkItemInput = z.infer<typeof WorkItemSchema>;
-
 
 
 
