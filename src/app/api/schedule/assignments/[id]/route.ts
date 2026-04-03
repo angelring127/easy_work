@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import {
+  getCrossStoreConflicts,
+  getManagedStores,
+} from "@/lib/server/cross-store";
+import { buildCrossStoreIdentityKey } from "@/lib/schedule/cross-store-identity";
 
 // 스케줄 배정 수정 스키마
 const UpdateAssignmentSchema = z.object({
@@ -42,6 +47,8 @@ export async function PATCH(
   }
 
   try {
+    const adminClient = await createPureClient();
+
     // 기존 배정 조회 (고유 제약 조건 확인을 위해 모든 필드 조회)
     const { data: existingAssignment, error: fetchError } = await supabase
       .from("schedule_assignments")
@@ -289,6 +296,46 @@ export async function PATCH(
     const checkDate = existingAssignment.date; // date는 수정 불가
     const checkStartTime = updateData.start_time || existingAssignment.start_time;
     const checkEndTime = updateData.end_time || existingAssignment.end_time;
+    const targetStoreUserId = parsed.data.user_id || finalUserId;
+
+    const { data: targetStoreUser } = await supabase
+      .from("store_users")
+      .select("id, user_id, name, is_guest, is_active")
+      .eq("id", targetStoreUserId)
+      .eq("store_id", existingAssignment.store_id)
+      .maybeSingle();
+
+    const managedStores = await getManagedStores(adminClient, user.user.id);
+    const targetIdentityKey = buildCrossStoreIdentityKey({
+      authUserId: targetStoreUser?.user_id,
+      isGuest: targetStoreUser?.is_guest,
+      name: targetStoreUser?.name,
+    });
+    const crossStoreConflicts = await getCrossStoreConflicts(adminClient, {
+      currentStoreId: existingAssignment.store_id,
+      managedStores,
+      identityKey: targetIdentityKey,
+      date: checkDate,
+      startTime: checkStartTime,
+      endTime: checkEndTime,
+    });
+
+    if (crossStoreConflicts.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Cross-store schedule conflict",
+          conflicts: crossStoreConflicts.map((conflict) => ({
+            storeId: conflict.storeId,
+            storeName: conflict.storeName,
+            date: conflict.date,
+            startTime: conflict.startTime,
+            endTime: conflict.endTime,
+          })),
+        },
+        { status: 409 }
+      );
+    }
 
     // 기존 스케줄과 동일한 값인지 확인
     const isSameValues = 

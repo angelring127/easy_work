@@ -687,3 +687,13 @@ export interface InvitationResponse {
     totalPages: number;
   };
 }
+
+export interface CrossStoreAssignment {
+  authUserId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  storeId: string;
+  storeName: string;
+  shortCode: string;
+}

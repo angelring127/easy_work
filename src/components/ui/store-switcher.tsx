@@ -14,7 +14,7 @@ import { useStore } from "@/contexts/store-context";
 import { Store as StoreType } from "@/lib/supabase/types";
 import { t, type Locale } from "@/lib/i18n";
 import { defaultLocale } from "@/lib/i18n-config";
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 
 interface StoreSwitcherProps {
   className?: string;
@@ -22,6 +22,9 @@ interface StoreSwitcherProps {
 
 export function StoreSwitcher({ className }: StoreSwitcherProps) {
   const { locale } = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const currentLocale = (locale as Locale) || defaultLocale;
   const { currentStore, accessibleStores, selectStore, isLoading } = useStore();
   const [isOpen, setIsOpen] = useState(false);
@@ -53,6 +56,21 @@ export function StoreSwitcher({ className }: StoreSwitcherProps) {
   const handleStoreSelect = (store: StoreType) => {
     selectStore(store);
     setIsOpen(false);
+
+    const pathSegments = pathname.split("/").filter(Boolean);
+    const storesIndex = pathSegments.indexOf("stores");
+    const hasStoreScopedRoute =
+      storesIndex >= 0 &&
+      pathSegments.length > storesIndex + 1 &&
+      pathSegments[storesIndex + 1] !== "create";
+
+    if (hasStoreScopedRoute) {
+      const nextSegments = [...pathSegments];
+      nextSegments[storesIndex + 1] = store.id;
+      const nextPath = `/${nextSegments.join("/")}`;
+      const nextQuery = searchParams.toString();
+      router.push(nextQuery ? `${nextPath}?${nextQuery}` : nextPath);
+    }
   };
 
   return (

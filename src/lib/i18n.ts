@@ -639,10 +639,29 @@ const translations = {
       "이미 등록된 이메일입니다. 잠시 후 다시 시도해주세요.",
     "invite.resendEmailError": "이메일 재발송 중 오류가 발생했습니다",
     "invite.emailRequired": "이메일을 입력해주세요",
-    "invite.expiresIn": "만료 기간",
+    "invite.namePlaceholder": "홍길동",
+    "invite.guestNoEmailDescription":
+      "게스트 사용자는 이메일 없이 등록됩니다.",
+    "invite.expiresIn": "초대 링크 만료",
     "invite.list": "초대 목록",
     "invite.registerWithoutEmail": "이메일 없이 등록 (게스트 사용자)",
     "invite.refresh": "새로고침",
+    "invite.mode.email": "이메일 초대",
+    "invite.mode.guest": "게스트 등록",
+    "invite.mode.import": "다른 지점 유저",
+    "invite.importSourceStore": "가져올 지점",
+    "invite.importCandidates": "가져오기 대상 유저",
+    "invite.importSourceRole": "기존 지점 역할",
+    "invite.importEmpty": "가져올 수 있는 유저가 없습니다",
+    "invite.importLoadError": "다른 지점 유저 목록을 불러오지 못했습니다",
+    "invite.importSelectionRequired": "가져올 유저를 선택해주세요",
+    "invite.importSubmit": "현재 지점에 등록",
+    "invite.importSuccess": "다른 지점 유저 등록이 완료되었습니다",
+    "invite.importError": "다른 지점 유저 등록에 실패했습니다",
+    "invite.importNoSourceStores": "가져올 수 있는 다른 관리 지점이 없습니다",
+    "invite.importResultImported": "등록",
+    "invite.importResultAlreadyExists": "이미 등록됨",
+    "invite.importResultSkipped": "건너뜀",
     "user.temporaryAssignedDescription":
       "임시 근무가 성공적으로 배치되었습니다",
     "user.temporaryAssignError": "임시 근무 배치 실패",
@@ -1006,6 +1025,9 @@ const translations = {
     "schedule.warning.unavailable": "출근 불가 경고",
     "schedule.warning.unavailableMessage":
       "님은 해당 날짜에 출근 불가로 표시되어 있습니다.",
+    "schedule.warning.crossStoreConflict": "다른 지점 근무 충돌",
+    "schedule.warning.crossStoreConflictMessage":
+      "다른 지점 스케줄과 시간이 겹쳐 현재 지점에 배정할 수 없습니다.",
     "schedule.warning.transferDesiredHours":
       "스케줄 이전 - 희망 주 근무 시간 초과 경고",
     "schedule.warning.transferDesiredHoursMessage":
@@ -1046,6 +1068,12 @@ const translations = {
     "schedule.copyConfirm": "스케줄을 복사하시겠습니까?",
     "schedule.copyConfirmDescription":
       "현재 주의 모든 스케줄이 삭제되고, 선택한 주의 스케줄이 복사됩니다.",
+    "schedule.noWorkItemsTitle": "근무 항목 설정이 필요합니다",
+    "schedule.noWorkItemsDescription":
+      "스케줄을 등록하려면 먼저 근무 항목을 설정해야 합니다.",
+    "schedule.noWorkItemsMessage":
+      "지점 설정에서 근무 항목을 추가한 뒤 다시 스케줄을 등록해 주세요.",
+    "schedule.goToWorkItems": "근무 항목 설정으로 이동",
     // availability calendar
     "availability.title": "휴일 희망 캘린더",
     "availability.markUnavailable": "휴일 희망일 등록",
@@ -1088,6 +1116,11 @@ const translations = {
     "export.scopeMeOnly": "관리자만 전체 내보내기가 가능합니다",
     "export.period": "기간",
     "export.exporting": "내보내는 중...",
+    "export.noDataToExport": "내보낼 데이터가 없습니다",
+    "export.storeIdRequired": "매장 ID가 필요합니다",
+    "export.defaultScheduleTitle": "스케줄",
+    "export.weeklySheetTitle": "주간 스케줄",
+    "export.crossStoreLegend": "다른 지점 근무 범례",
     // week grid
     "schedule.user": "사용자",
     "schedule.clickToAssign": "클릭하여 배정",
@@ -1133,6 +1166,8 @@ const translations = {
     "schedule.register": "등록",
     "schedule.warning.multiDayMessage":
       "님의 복수 요일 스케줄 등록 시 다음 경고가 있습니다.",
+    "schedule.crossStoreBadge": "타지점",
+    "schedule.crossStoreTooltipTitle": "다른 지점 근무",
     "availability.unavailable": "휴일 희망일",
     "availability.currentMonth": "이번 달",
     "availability.selectMonth": "월 선택",
@@ -1917,10 +1952,30 @@ const translations = {
     "invite.resendEmailError":
       "An error occurred while resending the invitation email",
     "invite.emailRequired": "Please enter email",
-    "invite.expiresIn": "Expires In",
+    "invite.namePlaceholder": "John Doe",
+    "invite.guestNoEmailDescription":
+      "Guest users can be registered without an email address.",
+    "invite.expiresIn": "Invitation Link Expires",
     "invite.list": "Invitation List",
     "invite.registerWithoutEmail": "Register without email (Guest user)",
     "invite.refresh": "Refresh",
+    "invite.mode.email": "Email Invite",
+    "invite.mode.guest": "Guest Registration",
+    "invite.mode.import": "Other Store Users",
+    "invite.importSourceStore": "Source Store",
+    "invite.importCandidates": "Import Candidates",
+    "invite.importSourceRole": "Source Store Role",
+    "invite.importEmpty": "There are no users available to import",
+    "invite.importLoadError": "Failed to load users from another store",
+    "invite.importSelectionRequired": "Please select at least one user to import",
+    "invite.importSubmit": "Add to Current Store",
+    "invite.importSuccess": "Users from another store were added successfully",
+    "invite.importError": "Failed to add users from another store",
+    "invite.importNoSourceStores":
+      "There are no other managed stores available for import",
+    "invite.importResultImported": "Imported",
+    "invite.importResultAlreadyExists": "Already exists",
+    "invite.importResultSkipped": "Skipped",
     "dashboard.passwordChangeRequired": "Password Change Required",
     "dashboard.passwordChangeDescription":
       "Please change your default password for security.",
@@ -2108,6 +2163,9 @@ const translations = {
     "schedule.warning.unavailable": "Unavailable Warning",
     "schedule.warning.unavailableMessage":
       "is marked as unavailable for this date.",
+    "schedule.warning.crossStoreConflict": "Cross-store Schedule Conflict",
+    "schedule.warning.crossStoreConflictMessage":
+      "This shift overlaps with an assignment in another store and cannot be added.",
     "schedule.warning.transferDesiredHours":
       "Transfer Schedule - Exceed Desired Hours Warning",
     "schedule.warning.transferDesiredHoursMessage":
@@ -2149,6 +2207,12 @@ const translations = {
     "schedule.copyConfirm": "Do you want to copy the schedule?",
     "schedule.copyConfirmDescription":
       "All schedules in the current week will be deleted and the selected week's schedules will be copied.",
+    "schedule.noWorkItemsTitle": "Work items need to be set up",
+    "schedule.noWorkItemsDescription":
+      "You need to configure work items before creating a schedule.",
+    "schedule.noWorkItemsMessage":
+      "Add work items in store settings, then return to create the schedule.",
+    "schedule.goToWorkItems": "Go to Work Item Settings",
     // availability calendar
     "availability.title": "Day Off Preference Calendar",
     "availability.markUnavailable": "Register Day Off Preference",
@@ -2190,6 +2254,11 @@ const translations = {
     "export.scopeMeOnly": "Only administrators can export all schedules",
     "export.period": "Period",
     "export.exporting": "Exporting...",
+    "export.noDataToExport": "There is no data to export",
+    "export.storeIdRequired": "Store ID is required",
+    "export.defaultScheduleTitle": "Schedule",
+    "export.weeklySheetTitle": "Weekly Schedule",
+    "export.crossStoreLegend": "Cross-store Work Legend",
     // week grid
     "schedule.user": "User",
     "schedule.clickToAssign": "Click to assign",
@@ -2236,6 +2305,8 @@ const translations = {
     "schedule.register": "Register",
     "schedule.warning.multiDayMessage":
       " has the following warnings for multi-day schedule registration:",
+    "schedule.crossStoreBadge": "Other",
+    "schedule.crossStoreTooltipTitle": "Working in another store",
     "availability.unavailable": "Day Off Preference",
     "availability.currentMonth": "Current Month",
     "availability.selectMonth": "Select Month",
@@ -2773,10 +2844,29 @@ const translations = {
       "このメールアドレスは既に登録されています。しばらくしてから再試行してください。",
     "invite.resendEmailError": "メール再送信中にエラーが発生しました",
     "invite.emailRequired": "メールアドレスを入力してください",
-    "invite.expiresIn": "有効期限",
+    "invite.namePlaceholder": "山田太郎",
+    "invite.guestNoEmailDescription":
+      "ゲストユーザーはメールアドレスなしで登録できます。",
+    "invite.expiresIn": "招待リンク有効期限",
     "invite.list": "招待リスト",
     "invite.registerWithoutEmail": "メールなしで登録 (ゲストユーザー)",
     "invite.refresh": "更新",
+    "invite.mode.email": "メール招待",
+    "invite.mode.guest": "ゲスト登録",
+    "invite.mode.import": "他店舗ユーザー",
+    "invite.importSourceStore": "取り込む店舗",
+    "invite.importCandidates": "取り込み対象ユーザー",
+    "invite.importSourceRole": "元店舗の役割",
+    "invite.importEmpty": "取り込めるユーザーがいません",
+    "invite.importLoadError": "他店舗ユーザー一覧の読み込みに失敗しました",
+    "invite.importSelectionRequired": "取り込むユーザーを選択してください",
+    "invite.importSubmit": "現在の店舗に登録",
+    "invite.importSuccess": "他店舗ユーザーの登録が完了しました",
+    "invite.importError": "他店舗ユーザーの登録に失敗しました",
+    "invite.importNoSourceStores": "取り込み可能な他の管理店舗がありません",
+    "invite.importResultImported": "登録",
+    "invite.importResultAlreadyExists": "既に登録済み",
+    "invite.importResultSkipped": "スキップ",
     // ロール管理関連
     "role.change.success": "ロールが正常に変更されました",
     "role.change.description": "ユーザーのロールが更新されました",
@@ -3309,6 +3399,9 @@ const translations = {
     "schedule.warning.unavailable": "出勤不可警告",
     "schedule.warning.unavailableMessage":
       "さんはこの日付に出勤不可としてマークされています。",
+    "schedule.warning.crossStoreConflict": "他店舗勤務の競合",
+    "schedule.warning.crossStoreConflictMessage":
+      "他店舗の勤務時間と重複しているため、この店舗には登録できません。",
     "schedule.warning.transferDesiredHours":
       "スケジュール移転 - 希望週勤務時間超過警告",
     "schedule.warning.transferDesiredHoursMessage":
@@ -3375,6 +3468,11 @@ const translations = {
     "export.scopeMeOnly": "管理者のみ全スケジュールのエクスポートが可能です",
     "export.period": "期間",
     "export.exporting": "エクスポート中...",
+    "export.noDataToExport": "エクスポートするデータがありません",
+    "export.storeIdRequired": "店舗IDが必要です",
+    "export.defaultScheduleTitle": "スケジュール",
+    "export.weeklySheetTitle": "週間スケジュール",
+    "export.crossStoreLegend": "他店舗勤務の凡例",
     // week grid
     "schedule.user": "ユーザー",
     "schedule.clickToAssign": "クリックして割り当て",
@@ -3420,6 +3518,8 @@ const translations = {
     "schedule.register": "登録",
     "schedule.warning.multiDayMessage":
       "さんの複数日スケジュール登録時に以下の警告があります。",
+    "schedule.crossStoreBadge": "他店",
+    "schedule.crossStoreTooltipTitle": "他店舗勤務",
     "availability.unavailable": "休日希望日",
     "availability.currentMonth": "今月",
     "availability.selectMonth": "月を選択",

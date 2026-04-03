@@ -47,6 +47,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { t, type Locale } from "@/lib/i18n";
+import { CrossStoreAssignment } from "@/lib/supabase/types";
 import {
   format,
   startOfWeek,
@@ -111,9 +112,11 @@ interface WeekGridProps {
     name: string;
     email: string;
     roles: string[];
+    authUserId?: string | null;
     status?: string;
     deleted_at?: string | null;
   }>;
+  crossStoreAssignments?: CrossStoreAssignment[];
   onAssignmentClick?: (assignment: ScheduleAssignment) => void;
   onUserClick?: (userId: string, date: string) => void;
   onAvailabilityToggle?: (
@@ -138,6 +141,7 @@ export function WeekGrid({
   assignments,
   userAvailabilities,
   storeUsers = [],
+  crossStoreAssignments = [],
   onAssignmentClick,
   onUserClick,
   onAvailabilityToggle,
@@ -194,8 +198,10 @@ export function WeekGrid({
       | "TRANSFER_DESIRED_HOURS"
       | "TRANSFER_DIFFICULT_DAY"
       | "UNAVAILABLE"
-      | "MULTI_DAY";
+      | "MULTI_DAY"
+      | "CROSS_STORE_CONFLICT";
     userName: string;
+    blocking?: boolean;
     // DESIRED_HOURS, TRANSFER_DESIRED_HOURS용
     currentHours?: number;
     desiredHours?: number;
@@ -211,11 +217,17 @@ export function WeekGrid({
     // UNAVAILABLE용
     date?: string;
     reason?: string;
+    conflicts?: CrossStoreAssignment[];
     // MULTI_DAY용
     multiDayWarnings?: Array<{
       date: string;
       warnings: Array<{
-        type: "DESIRED_HOURS" | "DIFFICULT_DAY" | "MAX_STAFF" | "UNAVAILABLE";
+        type:
+          | "DESIRED_HOURS"
+          | "DIFFICULT_DAY"
+          | "MAX_STAFF"
+          | "UNAVAILABLE"
+          | "CROSS_STORE_CONFLICT";
         data: any;
       }>;
     }>;
@@ -235,7 +247,12 @@ export function WeekGrid({
     Array<{
       date: string;
       warnings: Array<{
-        type: "DESIRED_HOURS" | "DIFFICULT_DAY" | "MAX_STAFF" | "UNAVAILABLE";
+        type:
+          | "DESIRED_HOURS"
+          | "DIFFICULT_DAY"
+          | "MAX_STAFF"
+          | "UNAVAILABLE"
+          | "CROSS_STORE_CONFLICT";
         data: any;
       }>;
     }>
@@ -459,6 +476,7 @@ export function WeekGrid({
           id: userId,
           name: storeUser.name,
           roles: storeUser.roles,
+          authUserId: storeUser.authUserId || null,
         };
       }
 
@@ -476,16 +494,18 @@ export function WeekGrid({
         id: userId,
         name: userName,
         roles: assignment?.userRoles || [],
+        authUserId: null,
       };
     })
     .filter((user) => user !== null)
-    .sort((a, b) => {
+  .sort((a, b) => {
       // 이름순 정렬 (export와 동일한 순서)
       return a.name.localeCompare(b.name);
     }) as Array<{
     id: string;
     name: string;
     roles: string[];
+    authUserId: string | null;
   }>;
 
   const userIdsKey = useMemo(
@@ -635,6 +655,55 @@ export function WeekGrid({
   const parseTimeToMinutes = (time: string): number => {
     return (
       parseInt(time.split(":")[0]) * 60 + parseInt(time.split(":")[1])
+    );
+  };
+
+  const normalizeRange = (startTime: string, endTime: string) => {
+    const startMin = parseTimeToMinutes(startTime);
+    let endMin = parseTimeToMinutes(endTime);
+
+    if (endMin <= startMin) {
+      endMin += 24 * 60;
+    }
+
+    return { startMin, endMin };
+  };
+
+  const hasTimeOverlap = (
+    startA: string,
+    endA: string,
+    startB: string,
+    endB: string
+  ) => {
+    const rangeA = normalizeRange(startA, endA);
+    const rangeB = normalizeRange(startB, endB);
+
+    return rangeA.startMin < rangeB.endMin && rangeB.startMin < rangeA.endMin;
+  };
+
+  const getCrossStoreAssignmentsForUserDate = (
+    authUserId: string | null | undefined,
+    date: string
+  ) => {
+    if (!authUserId) {
+      return [];
+    }
+
+    return crossStoreAssignments.filter(
+      (assignment) =>
+        assignment.authUserId === authUserId && assignment.date === date
+    );
+  };
+
+  const getCrossStoreConflictsForUserDate = (
+    authUserId: string | null | undefined,
+    date: string,
+    startTime: string,
+    endTime: string
+  ) => {
+    return getCrossStoreAssignmentsForUserDate(authUserId, date).filter(
+      (assignment) =>
+        hasTimeOverlap(startTime, endTime, assignment.startTime, assignment.endTime)
     );
   };
 
@@ -1280,6 +1349,11 @@ export function WeekGrid({
                       user.id,
                       dayStr
                     );
+                    const crossStoreDayAssignments =
+                      getCrossStoreAssignmentsForUserDate(
+                        user.authUserId,
+                        dayStr
+                      );
                     const isUnavailable = availability !== null;
 
                     // 해당 요일의 영업 시간 확인
@@ -1357,6 +1431,37 @@ export function WeekGrid({
                                       {availability.reason}
                                     </div>
                                   )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {crossStoreDayAssignments.length > 0 && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-px rounded-sm border border-sky-200 bg-sky-50 p-px text-sky-700 md:p-1">
+                                  <span className="text-[7px] font-semibold md:text-xs">
+                                    {t("schedule.crossStoreBadge", locale)}:
+                                  </span>
+                                  <span className="text-[8px] font-medium md:text-xs">
+                                    {crossStoreDayAssignments
+                                      .map((assignment) => assignment.shortCode)
+                                      .join("/")}
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="space-y-1 text-sm">
+                                  <div className="font-medium">
+                                    {t("schedule.crossStoreTooltipTitle", locale)}
+                                  </div>
+                                  {crossStoreDayAssignments.map((assignment, index) => (
+                                    <div key={`${assignment.storeId}-${index}`}>
+                                      {assignment.storeName} (
+                                      {formatTime(assignment.startTime)} -{" "}
+                                      {formatTime(assignment.endTime)})
+                                    </div>
+                                  ))}
                                 </div>
                               </TooltipContent>
                             </Tooltip>
@@ -1736,6 +1841,30 @@ export function WeekGrid({
                           start_time: startTime,
                           end_time: endTime,
                         };
+                        const modalUser = users.find(
+                          (user) => user.id === modalCell.userId
+                        );
+                        const crossStoreConflicts =
+                          getCrossStoreConflictsForUserDate(
+                            modalUser?.authUserId,
+                            modalCell.date,
+                            startTime,
+                            endTime
+                          );
+
+                        if (crossStoreConflicts.length > 0) {
+                          setWarningData({
+                            type: "CROSS_STORE_CONFLICT",
+                            userName: modalCell.userName,
+                            date: modalCell.date,
+                            conflicts: crossStoreConflicts,
+                            blocking: true,
+                          });
+                          setPendingScheduleData(null);
+                          setShowWarningDialog(true);
+                          setIsModalLoading(false);
+                          return;
+                        }
 
                         // 경고 확인 (새 스케줄 추가 시에만)
                         if (!existingAssignment) {
@@ -2050,6 +2179,21 @@ export function WeekGrid({
                           // unavailable 에러인 경우 경고 모달로 처리
                           try {
                             const errorJson = JSON.parse(errorText);
+                            if (
+                              errorJson.error === "Cross-store schedule conflict"
+                            ) {
+                              setWarningData({
+                                type: "CROSS_STORE_CONFLICT",
+                                userName: modalCell?.userName || "",
+                                date: modalCell?.date || "",
+                                conflicts: errorJson.conflicts || [],
+                                blocking: true,
+                              });
+                              setPendingScheduleData(null);
+                              setShowWarningDialog(true);
+                              setIsModalLoading(false);
+                              return;
+                            }
                             if (
                               errorJson.error ===
                               "User is unavailable for this date"
@@ -2380,6 +2524,8 @@ export function WeekGrid({
                     t("schedule.warning.transferDifficultDay", locale)}
                   {warningData.type === "UNAVAILABLE" &&
                     t("schedule.warning.unavailable", locale)}
+                  {warningData.type === "CROSS_STORE_CONFLICT" &&
+                    t("schedule.warning.crossStoreConflict", locale)}
                   {warningData.type === "MULTI_DAY" &&
                     t("schedule.multiDaySchedule", locale)}
                 </>
@@ -2466,6 +2612,31 @@ export function WeekGrid({
                                               locale
                                             )}
                                         )
+                                      </div>
+                                    )}
+                                    {warning.type === "CROSS_STORE_CONFLICT" && (
+                                      <div>
+                                        {t(
+                                          "schedule.warning.crossStoreConflictMessage",
+                                          locale
+                                        )}
+                                        <div className="mt-1 space-y-1">
+                                          {(warning.data.conflicts || []).map(
+                                            (
+                                              conflict: CrossStoreAssignment,
+                                              conflictIndex: number
+                                            ) => (
+                                              <div
+                                                key={conflictIndex}
+                                                className="text-xs"
+                                              >
+                                                {conflict.storeName} (
+                                                {formatTime(conflict.startTime)} -{" "}
+                                                {formatTime(conflict.endTime)})
+                                              </div>
+                                            )
+                                          )}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -2627,6 +2798,26 @@ export function WeekGrid({
                     </div>
                   </div>
                 )}
+                {warningData.type === "CROSS_STORE_CONFLICT" && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2">
+                      <strong>{warningData.userName}</strong>{" "}
+                      {t("schedule.warning.crossStoreConflictMessage", locale)}
+                    </p>
+                    <div className="space-y-2">
+                      {(warningData.conflicts || []).map((conflict, index) => (
+                        <Alert key={`${conflict.storeId}-${index}`} variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle>{conflict.storeName}</AlertTitle>
+                          <AlertDescription>
+                            {formatTime(conflict.startTime)} -{" "}
+                            {formatTime(conflict.endTime)}
+                          </AlertDescription>
+                        </Alert>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-2 justify-end">
                   <Button
                     variant="outline"
@@ -2639,16 +2830,17 @@ export function WeekGrid({
                   >
                     {t("common.cancel", locale)}
                   </Button>
-                  <Button
-                    variant="default"
-                    onClick={async () => {
-                      if (!pendingScheduleData) return;
+                  {!warningData?.blocking && (
+                    <Button
+                      variant="default"
+                      onClick={async () => {
+                        if (!pendingScheduleData) return;
 
-                      setShowWarningDialog(false);
-                      setIsModalLoading(true);
+                        setShowWarningDialog(false);
+                        setIsModalLoading(true);
 
-                      try {
-                        let response;
+                        try {
+                          let response;
 
                         if (pendingScheduleData.requestData.multiDay) {
                           // 복수 요일 일괄 등록
@@ -2793,18 +2985,19 @@ export function WeekGrid({
                             }`
                           );
                         }
-                      } catch (error) {
-                        console.error("스케줄 처리 오류:", error);
-                        alert(t("schedule.scheduleAddError", locale));
-                      } finally {
-                        setIsModalLoading(false);
-                        setWarningData(null);
-                        setPendingScheduleData(null);
-                      }
-                    }}
-                  >
-                    {t("common.confirm", locale)}
-                  </Button>
+                        } catch (error) {
+                          console.error("스케줄 처리 오류:", error);
+                          alert(t("schedule.scheduleAddError", locale));
+                        } finally {
+                          setIsModalLoading(false);
+                          setWarningData(null);
+                          setPendingScheduleData(null);
+                        }
+                      }}
+                    >
+                      {t("common.confirm", locale)}
+                    </Button>
+                  )}
                 </div>
               </>
             )}
@@ -3038,6 +3231,9 @@ export function WeekGrid({
                     // 각 요일별 경고 수집
                     const warnings: typeof multiDayWarnings = [];
                     const selectedDaysArray = Array.from(selectedDays);
+                    const modalUser = users.find(
+                      (user) => user.id === multiDayModalUser.userId
+                    );
 
                     for (const dateStr of selectedDaysArray) {
                       const dayWarnings: Array<{
@@ -3045,7 +3241,8 @@ export function WeekGrid({
                           | "DESIRED_HOURS"
                           | "DIFFICULT_DAY"
                           | "MAX_STAFF"
-                          | "UNAVAILABLE";
+                          | "UNAVAILABLE"
+                          | "CROSS_STORE_CONFLICT";
                         data: any;
                       }> = [];
 
@@ -3059,6 +3256,22 @@ export function WeekGrid({
                           type: "UNAVAILABLE",
                           data: {
                             reason: availability.reason,
+                          },
+                        });
+                      }
+
+                      const crossStoreConflicts =
+                        getCrossStoreConflictsForUserDate(
+                          modalUser?.authUserId,
+                          dateStr,
+                          startTime,
+                          endTime
+                        );
+                      if (crossStoreConflicts.length > 0) {
+                        dayWarnings.push({
+                          type: "CROSS_STORE_CONFLICT",
+                          data: {
+                            conflicts: crossStoreConflicts,
                           },
                         });
                       }
@@ -3217,23 +3430,33 @@ export function WeekGrid({
 
                     // 경고가 있으면 확인 모달 표시
                     if (warnings.length > 0) {
+                      const hasBlockingConflict = warnings.some((warning) =>
+                        warning.warnings.some(
+                          (item) => item.type === "CROSS_STORE_CONFLICT"
+                        )
+                      );
                       setWarningData({
                         type: "MULTI_DAY",
                         userName: multiDayModalUser.userName,
                         multiDayWarnings: warnings,
+                        blocking: hasBlockingConflict,
                       });
-                      setPendingScheduleData({
-                        requestData: {
-                          multiDay: true,
-                          store_id: storeId,
-                          user_id: multiDayModalUser.userId,
-                          work_item_id: selectedWorkItem,
-                          start_time: startTime,
-                          end_time: endTime,
-                          selectedDays: selectedDaysArray,
-                        },
-                        existingAssignment: undefined,
-                      });
+                      if (!hasBlockingConflict) {
+                        setPendingScheduleData({
+                          requestData: {
+                            multiDay: true,
+                            store_id: storeId,
+                            user_id: multiDayModalUser.userId,
+                            work_item_id: selectedWorkItem,
+                            start_time: startTime,
+                            end_time: endTime,
+                            selectedDays: selectedDaysArray,
+                          },
+                          existingAssignment: undefined,
+                        });
+                      } else {
+                        setPendingScheduleData(null);
+                      }
                       setShowWarningDialog(true);
                       setIsModalLoading(false);
                       return;
