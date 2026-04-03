@@ -9,13 +9,13 @@ import { usePermissions, useAdminAccess } from "@/hooks/use-permissions";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { StoreSwitcher } from "@/components/ui/store-switcher";
 import { RoleBadge } from "@/components/auth/role-badge";
+import { UserWorkPreferencesEditor } from "@/components/users/user-work-preferences-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,23 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { t } from "@/lib/i18n";
 import { Locale } from "@/lib/i18n-config";
-import {
-  User,
-  LogOut,
-  Loader2,
-  ArrowLeft,
-  Save,
-  Trash2,
-  UserPlus,
-} from "lucide-react";
-
-interface UserDetailPageProps {
-  params: Promise<{
-    locale: string;
-    id: string;
-    userId: string;
-  }>;
-}
+import { User, LogOut, Loader2, ArrowLeft, Save, Trash2, UserPlus } from "lucide-react";
 
 interface UserDetail {
   id: string;
@@ -71,15 +55,7 @@ interface UserDetail {
   avatarUrl: string | null;
 }
 
-interface StoreJobRole {
-  id: string;
-  name: string;
-  code: string;
-  description: string;
-  active: boolean;
-}
-
-export default function UserDetailPage({ params }: UserDetailPageProps) {
+export default function UserDetailPage() {
   const resolvedParams = useParams();
   const locale = resolvedParams.locale as Locale;
   const storeId = resolvedParams.id as string;
@@ -88,21 +64,9 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
-  const {
-    currentStore,
-    accessibleStores,
-    isLoading: storesLoading,
-  } = useStore();
+  const { currentStore, isLoading: storesLoading } = useStore();
   const { userRole } = usePermissions();
-  const { canManageUsers, isManager } = useAdminAccess();
-
-  // 폼 상태
-  const [formData, setFormData] = useState({
-    jobRoleIds: [] as string[],
-    resignationDate: "",
-    desiredWeeklyHours: "",
-    preferredWeekdays: [] as Array<{ weekday: number; isPreferred: boolean }>,
-  });
+  const { canManageUsers } = useAdminAccess();
 
   // 이름 입력 상태
   const [userName, setUserName] = useState("");
@@ -163,35 +127,9 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
     enabled: !!storeId && !!userId,
   });
 
-  // 매장 직무 역할 목록 조회
-  const { data: availableJobRoles, isLoading: jobRolesLoading } = useQuery({
-    queryKey: ["store-job-roles", storeId],
-    queryFn: async () => {
-      const response = await fetch(`/api/store-job-roles?store_id=${storeId}`);
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-
-      return result.data as StoreJobRole[];
-    },
-    enabled: !!storeId,
-  });
-
-  // 사용자 상세 정보가 로드되면 폼 데이터 초기화
+  // 사용자 상세 정보가 로드되면 이름 상태 초기화
   useEffect(() => {
     if (userDetail) {
-      setFormData({
-        jobRoleIds: userDetail.jobRoles.map((jr) => jr.store_job_roles.id),
-        resignationDate: userDetail.resignationDate || "",
-        desiredWeeklyHours: userDetail.desiredWeeklyHours?.toString() || "",
-        preferredWeekdays: userDetail.preferredWeekdays.map((pw) => ({
-          weekday: pw.weekday,
-          isPreferred: pw.is_preferred,
-        })),
-      });
-      // 이름 상태도 초기화
       setUserName(userDetail.name || "");
     }
   }, [userDetail]);
@@ -336,91 +274,6 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
       });
     },
   });
-
-  const handleFormChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleJobRoleChange = (jobRoleId: string, checked: boolean) => {
-    setFormData((prev) => ({
-      ...prev,
-      jobRoleIds: checked
-        ? [...prev.jobRoleIds, jobRoleId]
-        : prev.jobRoleIds.filter((id) => id !== jobRoleId),
-    }));
-  };
-
-  const handlePreferredWeekdayChange = (
-    weekday: number,
-    isPreferred: boolean
-  ) => {
-    setFormData((prev) => {
-      const existingIndex = prev.preferredWeekdays.findIndex(
-        (pw) => pw.weekday === weekday
-      );
-
-      if (existingIndex >= 0) {
-        // 기존 항목 업데이트
-        const updated = [...prev.preferredWeekdays];
-        updated[existingIndex] = { weekday, isPreferred };
-        return { ...prev, preferredWeekdays: updated };
-      } else {
-        // 새 항목 추가
-        return {
-          ...prev,
-          preferredWeekdays: [
-            ...prev.preferredWeekdays,
-            { weekday, isPreferred },
-          ],
-        };
-      }
-    });
-  };
-
-  const handleSave = () => {
-    const updateData: any = {};
-
-    if (
-      formData.jobRoleIds !==
-      userDetail?.jobRoles.map((jr) => jr.store_job_roles.id)
-    ) {
-      updateData.jobRoleIds = formData.jobRoleIds;
-    }
-
-    if (formData.resignationDate !== (userDetail?.resignationDate || "")) {
-      updateData.resignationDate = formData.resignationDate || null;
-    }
-
-    if (
-      formData.desiredWeeklyHours !==
-      (userDetail?.desiredWeeklyHours?.toString() || "")
-    ) {
-      updateData.desiredWeeklyHours = formData.desiredWeeklyHours
-        ? parseInt(formData.desiredWeeklyHours)
-        : null;
-    }
-
-    // 출근이 어려운 요일 변경 확인 (빈 배열도 업데이트 가능)
-    const currentWeekdays = userDetail?.preferredWeekdays || [];
-    const hasWeekdayChanges =
-      formData.preferredWeekdays.length !== currentWeekdays.length ||
-      formData.preferredWeekdays.some((pw) => {
-        const current = currentWeekdays.find((cw) => cw.weekday === pw.weekday);
-        return !current || current.is_preferred !== pw.isPreferred;
-      }) ||
-      currentWeekdays.some((cw) => {
-        const form = formData.preferredWeekdays.find((pw) => pw.weekday === cw.weekday);
-        return !form;
-      });
-
-    if (hasWeekdayChanges) {
-      updateData.preferredWeekdays = formData.preferredWeekdays;
-    }
-
-    if (Object.keys(updateData).length > 0) {
-      updateProfileMutation.mutate(updateData);
-    }
-  };
 
   const handlePromoteToSubManager = () => {
     setConfirmDialog({
@@ -748,185 +601,12 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
 
               {/* 편집 가능한 정보 */}
               <div className="lg:col-span-2 space-y-6">
-                {/* 직무 역할 */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("user.jobRoles", locale)}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {jobRolesLoading ? (
-                      <div className="text-center py-4">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {availableJobRoles
-                          ?.filter((role) => role.active)
-                          .map((role) => (
-                            <div
-                              key={role.id}
-                              className="flex items-center space-x-2"
-                            >
-                              <Checkbox
-                                id={role.id}
-                                checked={formData.jobRoleIds.includes(role.id)}
-                                onCheckedChange={(checked) =>
-                                  handleJobRoleChange(
-                                    role.id,
-                                    checked as boolean
-                                  )
-                                }
-                              />
-                              <Label htmlFor={role.id} className="flex-1">
-                                <div>
-                                  <div className="font-medium">{role.name}</div>
-                                  {role.description && (
-                                    <div className="text-sm text-muted-foreground">
-                                      {role.description}
-                                    </div>
-                                  )}
-                                </div>
-                              </Label>
-                            </div>
-                          ))}
-                        {availableJobRoles?.filter((role) => role.active)
-                          .length === 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            설정된 직무 역할이 없습니다.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* 근무 선호도 */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("user.workPreferences", locale)}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <Label htmlFor="resignationDate">
-                        {t("user.resignationDate", locale)}
-                      </Label>
-                      <Input
-                        id="resignationDate"
-                        type="date"
-                        value={formData.resignationDate}
-                        onChange={(e) =>
-                          handleFormChange("resignationDate", e.target.value)
-                        }
-                        className="mt-1"
-                      />
-                      {formData.resignationDate && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            handleFormChange("resignationDate", "")
-                          }
-                          className="mt-2"
-                        >
-                          {t("user.removeResignationDate", locale)}
-                        </Button>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="desiredWeeklyHours">
-                        {t("user.desiredWeeklyHours", locale)}
-                      </Label>
-                      <Input
-                        id="desiredWeeklyHours"
-                        type="number"
-                        min="0"
-                        max="168"
-                        placeholder={t(
-                          "user.desiredWeeklyHoursPlaceholder",
-                          locale
-                        )}
-                        value={formData.desiredWeeklyHours}
-                        onChange={(e) =>
-                          handleFormChange("desiredWeeklyHours", e.target.value)
-                        }
-                        className="mt-1"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* 희망 근무 요일 */}
-                <Card>
-                    <CardHeader>
-                      <CardTitle>{t("user.preferredWeekdays", locale)}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {t("user.preferredWeekdays.description", locale)}
-                      </p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {[
-                        {
-                          weekday: 0,
-                          label: t("user.weekdays.sunday", locale),
-                        },
-                        {
-                          weekday: 1,
-                          label: t("user.weekdays.monday", locale),
-                        },
-                        {
-                          weekday: 2,
-                          label: t("user.weekdays.tuesday", locale),
-                        },
-                        {
-                          weekday: 3,
-                          label: t("user.weekdays.wednesday", locale),
-                        },
-                        {
-                          weekday: 4,
-                          label: t("user.weekdays.thursday", locale),
-                        },
-                        {
-                          weekday: 5,
-                          label: t("user.weekdays.friday", locale),
-                        },
-                        {
-                          weekday: 6,
-                          label: t("user.weekdays.saturday", locale),
-                        },
-                      ].map(({ weekday, label }) => {
-                        const isChecked = formData.preferredWeekdays.some(
-                          (pw) => pw.weekday === weekday && pw.isPreferred
-                        );
-
-                        return (
-                          <div
-                            key={weekday}
-                            className="flex items-center space-x-2"
-                          >
-                            <Checkbox
-                              id={`weekday-${weekday}`}
-                              checked={isChecked}
-                              onCheckedChange={(checked) =>
-                                handlePreferredWeekdayChange(
-                                  weekday,
-                                  checked as boolean
-                                )
-                              }
-                            />
-                            <Label
-                              htmlFor={`weekday-${weekday}`}
-                              className="text-sm"
-                            >
-                              {label}
-                            </Label>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                <UserWorkPreferencesEditor
+                  storeId={storeId}
+                  userId={userId}
+                  locale={locale}
+                  mode="page"
+                />
 
                 {/* 관리자 액션 */}
                 <Card>
@@ -971,19 +651,6 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                   </CardContent>
                 </Card>
 
-                {/* 저장 버튼 */}
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleSave}
-                    disabled={updateProfileMutation.isPending}
-                    className="flex items-center gap-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    {updateProfileMutation.isPending
-                      ? t("dashboard.loading", locale)
-                      : t("user.updateProfile", locale)}
-                  </Button>
-                </div>
               </div>
             </div>
 

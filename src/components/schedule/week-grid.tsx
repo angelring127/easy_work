@@ -5,6 +5,7 @@ import {
   Calendar,
   Clock,
   Users,
+  User,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -16,6 +17,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RoleBadge } from "@/components/auth/role-badge";
 import { AssignmentSheet } from "@/components/schedule/assignment-sheet";
+import {
+  UserWorkPreferencesEditor,
+  type UserWorkPreferencesSaveSummary,
+} from "@/components/users/user-work-preferences-editor";
 import {
   Tooltip,
   TooltipContent,
@@ -220,6 +225,7 @@ export function WeekGrid({
     existingAssignment: ScheduleAssignment | undefined;
   } | null>(null);
   const [isMultiDayModalOpen, setIsMultiDayModalOpen] = useState(false);
+  const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false);
   const [multiDayModalUser, setMultiDayModalUser] = useState<{
     userId: string;
     userName: string;
@@ -235,6 +241,9 @@ export function WeekGrid({
     }>
   >([]);
   const [userDifficultDays, setUserDifficultDays] = useState<
+    Map<string, Set<number>>
+  >(new Map());
+  const [userPreferredDays, setUserPreferredDays] = useState<
     Map<string, Set<number>>
   >(new Map());
   const [isDifficultDaysLoading, setIsDifficultDaysLoading] = useState(false);
@@ -492,6 +501,7 @@ export function WeekGrid({
       if (!storeId || users.length === 0) {
         if (!isCancelled) {
           setUserDifficultDays(new Map());
+          setUserPreferredDays(new Map());
           setIsDifficultDaysLoading(false);
         }
         return;
@@ -501,6 +511,7 @@ export function WeekGrid({
         setIsDifficultDaysLoading(true);
       }
       const difficultDaysMap = new Map<string, Set<number>>();
+      const preferredDaysMap = new Map<string, Set<number>>();
 
       await Promise.all(
         users.map(async (user) => {
@@ -512,10 +523,13 @@ export function WeekGrid({
 
             if (result.success && result.data?.preferredWeekdays) {
               const difficultDays = new Set<number>();
+              const preferredDays = new Set<number>();
               result.data.preferredWeekdays.forEach(
                 (pw: { weekday: number; is_preferred: boolean }) => {
                   if (pw.is_preferred) {
                     difficultDays.add(pw.weekday);
+                  } else {
+                    preferredDays.add(pw.weekday);
                   }
                 }
               );
@@ -524,8 +538,10 @@ export function WeekGrid({
               const resolvedUserId =
                 typeof result.data.id === "string" ? result.data.id : null;
               difficultDaysMap.set(user.id, difficultDays);
+              preferredDaysMap.set(user.id, preferredDays);
               if (resolvedUserId && resolvedUserId !== user.id) {
                 difficultDaysMap.set(resolvedUserId, difficultDays);
+                preferredDaysMap.set(resolvedUserId, preferredDays);
               }
             }
           } catch (error) {
@@ -539,6 +555,7 @@ export function WeekGrid({
 
       if (!isCancelled) {
         setUserDifficultDays(difficultDaysMap);
+        setUserPreferredDays(preferredDaysMap);
         setIsDifficultDaysLoading(false);
       }
     };
@@ -819,11 +836,39 @@ export function WeekGrid({
   const handleUserNameClick = (userId: string) => {
     const user = users.find((u) => u.id === userId);
     if (user && canManage) {
+      setIsUserDetailModalOpen(false);
       setMultiDayModalUser({ userId, userName: user.name });
       setSelectedDays(new Set());
       setMultiDayWarnings([]);
       setIsMultiDayModalOpen(true);
     }
+  };
+
+  const syncUserWeekdayPreferenceMaps = ({
+    userId,
+    preferredWeekdays,
+  }: Pick<UserWorkPreferencesSaveSummary, "userId" | "preferredWeekdays">) => {
+    const nextDifficult = new Set<number>();
+    const nextPreferred = new Set<number>();
+
+    preferredWeekdays.forEach((item) => {
+      if (item.is_preferred) {
+        nextDifficult.add(item.weekday);
+      } else {
+        nextPreferred.add(item.weekday);
+      }
+    });
+
+    setUserDifficultDays((prev) => {
+      const next = new Map(prev);
+      next.set(userId, nextDifficult);
+      return next;
+    });
+    setUserPreferredDays((prev) => {
+      const next = new Map(prev);
+      next.set(userId, nextPreferred);
+      return next;
+    });
   };
 
   const openWeekdayPreferenceModal = async () => {
@@ -947,6 +992,11 @@ export function WeekGrid({
       setUserDifficultDays((prev) => {
         const next = new Map(prev);
         next.set(weekdayPreferenceUser.userId, new Set(difficultWeekdays));
+        return next;
+      });
+      setUserPreferredDays((prev) => {
+        const next = new Map(prev);
+        next.set(weekdayPreferenceUser.userId, new Set(preferredWeekdays));
         return next;
       });
 
@@ -1251,6 +1301,9 @@ export function WeekGrid({
                     const userDifficultDaysSet = userDifficultDays.get(user.id);
                     const isDifficultDay =
                       userDifficultDaysSet?.has(dayOfWeek) || false;
+                    const userPreferredDaysSet = userPreferredDays.get(user.id);
+                    const isPreferredDay =
+                      userPreferredDaysSet?.has(dayOfWeek) || false;
 
                     return (
                       <div
@@ -1268,6 +1321,13 @@ export function WeekGrid({
                           ${
                             isDifficultDay && !isUnavailable
                               ? "bg-yellow-50 border-yellow-200"
+                              : ""
+                          }
+                          ${
+                            isPreferredDay &&
+                            !isUnavailable &&
+                            !isDifficultDay
+                              ? "bg-emerald-50 border-emerald-200"
                               : ""
                           }
                         `}
@@ -2758,6 +2818,7 @@ export function WeekGrid({
         onOpenChange={(open) => {
           setIsMultiDayModalOpen(open);
           if (!open) {
+            setIsUserDetailModalOpen(false);
             setSelectedDays(new Set());
             setMultiDayWarnings([]);
             setSelectedWorkItem("");
@@ -2776,7 +2837,17 @@ export function WeekGrid({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsUserDetailModalOpen(true)}
+                disabled={isModalLoading || !multiDayModalUser}
+              >
+                <User className="h-4 w-4 mr-2" />
+                {t("user.detail", locale)}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -3225,6 +3296,35 @@ export function WeekGrid({
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isUserDetailModalOpen}
+        onOpenChange={(open) => setIsUserDetailModalOpen(open)}
+      >
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {multiDayModalUser && (
+                <>
+                  {multiDayModalUser.userName} - {t("user.detail", locale)}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {multiDayModalUser && (
+            <UserWorkPreferencesEditor
+              storeId={storeId}
+              userId={multiDayModalUser.userId}
+              locale={locale}
+              mode="modal"
+              onClose={() => setIsUserDetailModalOpen(false)}
+              onSaved={(summary) => {
+                syncUserWeekdayPreferenceMaps(summary);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

@@ -91,6 +91,45 @@ interface ScheduleExporterProps {
   businessHours?: BusinessHour[]; // 영업 시간 정보
 }
 
+const END_TIME_SECOND_ROW_WINDOW_MIN = 120;
+
+const parseTimeToMinutes = (time: string) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+const resolveScheduleRows = (
+  startTime: string,
+  endTime: string,
+  boundaryMin: number,
+  closeMin: number
+) => {
+  const startMin = parseTimeToMinutes(startTime);
+  const endMin = parseTimeToMinutes(endTime);
+  const effectiveCloseMin = closeMin === 0 ? 1440 : closeMin;
+  const effectiveEndMin = endMin === 0 ? 1440 : endMin;
+  const endText =
+    effectiveEndMin >= effectiveCloseMin && effectiveCloseMin > 0
+      ? "close"
+      : endTime.substring(0, 5);
+
+  const firstRowText = startMin < boundaryMin ? startTime.substring(0, 5) : "";
+  const secondRowStartText =
+    startMin >= boundaryMin ? startTime.substring(0, 5) : "";
+  const shouldPlaceEndOnSecondRow =
+    startMin < boundaryMin &&
+    Math.abs(effectiveEndMin - boundaryMin) <= END_TIME_SECOND_ROW_WINDOW_MIN;
+  const secondRowText = shouldPlaceEndOnSecondRow ? endText : secondRowStartText;
+  const thirdRowText =
+    startMin >= boundaryMin || !shouldPlaceEndOnSecondRow ? endText : "";
+
+  return {
+    firstRowText,
+    secondRowText,
+    thirdRowText,
+  };
+};
+
 export function ScheduleExporter({
   storeId,
   from,
@@ -113,6 +152,26 @@ export function ScheduleExporter({
   const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
 
+  const loadShiftBoundaryTimeMin = async () => {
+    try {
+      const response = await fetch(`/api/stores/${storeId}`);
+
+      if (!response.ok) {
+        return 720;
+      }
+
+      const result = await response.json();
+      if (!result.success || !result.data) {
+        return 720;
+      }
+
+      return result.data.shift_boundary_time_min ?? 720;
+    } catch (error) {
+      console.error("Shift boundary time 조회 오류:", error);
+      return 720;
+    }
+  };
+
   const handleExportWeekGridImage = async () => {
     if (!currentWeek) return;
 
@@ -123,8 +182,7 @@ export function ScheduleExporter({
       const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
       const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
       const dateLocale = dateLocales[locale] || enUS;
-      const shiftBoundaryTimeMin = 720;
-
+      const shiftBoundaryTimeMin = await loadShiftBoundaryTimeMin();
       const allUserIds = new Set([
         ...storeUsers.map((u) => u.id),
         ...assignments.map((a) => a.userId),
@@ -324,6 +382,7 @@ export function ScheduleExporter({
       const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
       const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
       const dateLocale = dateLocales[locale] || enUS;
+      const shiftBoundaryTimeMin = await loadShiftBoundaryTimeMin();
 
       // ExcelJS 워크북 생성
       const workbook = new ExcelJS.Workbook();
@@ -357,7 +416,6 @@ export function ScheduleExporter({
       dateRow.getCell(1).font = { bold: true };
 
       // 3. AM Counts Row
-      const shiftBoundaryTimeMin = 720; // 12:00 PM
       const amRow = worksheet.addRow([
         "AM",
         ...weekDays.map((day) => {
@@ -367,9 +425,7 @@ export function ScheduleExporter({
           );
           let count = 0;
           dayAssignments.forEach((a) => {
-            const startMin =
-              parseInt(a.startTime.split(":")[0]) * 60 +
-              parseInt(a.startTime.split(":")[1]);
+            const startMin = parseTimeToMinutes(a.startTime);
             if (startMin < shiftBoundaryTimeMin) count++;
           });
           return count.toString();
@@ -389,9 +445,7 @@ export function ScheduleExporter({
           );
           let count = 0;
           dayAssignments.forEach((a) => {
-            const endMin =
-              parseInt(a.endTime.split(":")[0]) * 60 +
-              parseInt(a.endTime.split(":")[1]);
+            const endMin = parseTimeToMinutes(a.endTime);
             if (endMin > shiftBoundaryTimeMin) count++;
           });
           return count.toString();
@@ -448,11 +502,11 @@ export function ScheduleExporter({
         const userName =
           !gridName || gridName === "Unknown User" ? userId : gridName;
         
-        // Row 1: User Name with Start Time (will be merged across 3 rows)
+        // Row 1: morning / early start time
         const nameRowData: any[] = [userName];
-        // Row 2: Start Time Row (empty for display consistency)
+        // Row 2: afternoon / boundary-adjacent end time
         const startRowData: any[] = [""];
-        // Row 3: End Time Row
+        // Row 3: remaining end time
         const endRowData: any[] = [""];
 
         weekDays.forEach((day) => {
@@ -474,25 +528,15 @@ export function ScheduleExporter({
           const closeMin = dayBusinessHour?.close_min || 0;
           
           if (userAssignment) {
-            // Working - Start time goes to first row (nameRowData)
-            const startTime = userAssignment.startTime.substring(0, 5); // HH:mm
-            nameRowData.push(startTime);
-            startRowData.push("");
-            
-            // Check if end time is close time
-            const endMin = 
-              parseInt(userAssignment.endTime.split(":")[0]) * 60 + 
-              parseInt(userAssignment.endTime.split(":")[1]);
-            
-            const effectiveCloseMin = closeMin === 0 ? 1440 : closeMin;
-            const effectiveEndMin = endMin === 0 ? 1440 : endMin;
-
-            if (effectiveEndMin >= effectiveCloseMin && effectiveCloseMin > 0) {
-               endRowData.push("close");
-            } else {
-               const endTime = userAssignment.endTime.substring(0, 5); // HH:mm
-               endRowData.push(endTime);
-            }
+            const rowTexts = resolveScheduleRows(
+              userAssignment.startTime,
+              userAssignment.endTime,
+              shiftBoundaryTimeMin,
+              closeMin
+            );
+            nameRowData.push(rowTexts.firstRowText);
+            startRowData.push(rowTexts.secondRowText);
+            endRowData.push(rowTexts.thirdRowText);
           } else if (availability) {
             // Unavailable - Merge "X" across 3 rows (only if no assignment)
             nameRowData.push("X");
