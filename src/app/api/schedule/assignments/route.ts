@@ -136,13 +136,15 @@ export async function GET(request: NextRequest) {
           workItemName: assignment.work_items?.name,
           date: assignment.date,
           startTime:
-            typeof workItemStartMin === "number"
+            assignment.start_time ||
+            (typeof workItemStartMin === "number"
               ? formatMinutesToTime(workItemStartMin)
-              : assignment.start_time,
+              : ""),
           endTime:
-            typeof workItemEndMin === "number"
+            assignment.end_time ||
+            (typeof workItemEndMin === "number"
               ? formatMinutesToTime(workItemEndMin)
-              : assignment.end_time,
+              : ""),
           status: assignment.status,
           notes: assignment.notes,
           createdAt: assignment.created_at,
