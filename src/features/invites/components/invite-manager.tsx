@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,7 +40,7 @@ export function InviteManager({ className }: InviteManagerProps) {
   /**
    * 사용자의 매장 목록 로드
    */
-  const loadUserStores = async () => {
+  const loadUserStores = useCallback(async () => {
     if (!user) return;
 
     setIsLoadingStores(true);
@@ -63,15 +63,13 @@ export function InviteManager({ className }: InviteManagerProps) {
       ];
 
       setStores(mockStores);
-      if (mockStores.length > 0 && !selectedStoreId) {
-        setSelectedStoreId(mockStores[0].id);
-      }
+      setSelectedStoreId((current) => current || mockStores[0]?.id || "");
     } catch (error) {
       console.error("매장 목록 로드 오류:", error);
     } finally {
       setIsLoadingStores(false);
     }
-  };
+  }, [user]);
 
   /**
    * 초대 성공 후 콜백
@@ -95,7 +93,7 @@ export function InviteManager({ className }: InviteManagerProps) {
     if (canInviteUsers) {
       loadUserStores();
     }
-  }, [user, canInviteUsers]);
+  }, [canInviteUsers, loadUserStores]);
 
   // 권한이 없는 경우
   if (!canInviteUsers) {
@@ -209,7 +207,6 @@ export function InviteManager({ className }: InviteManagerProps) {
     </Card>
   );
 }
-
 
 
 

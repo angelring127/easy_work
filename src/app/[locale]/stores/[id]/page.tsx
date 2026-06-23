@@ -1,7 +1,7 @@
 "use client";
 import { defaultLocale } from "@/lib/i18n-config";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useStore } from "@/contexts/store-context";
@@ -70,13 +70,7 @@ export default function StoreDetailPage() {
   }, [loading, user, router, locale]);
 
   // 매장 데이터 로드
-  useEffect(() => {
-    if (user && storeId) {
-      loadStoreData();
-    }
-  }, [user, storeId]);
-
-  const loadStoreData = async () => {
+  const loadStoreData = useCallback(async () => {
     try {
       const response = await fetch(`/api/stores/${storeId}`);
       if (response.ok) {
@@ -101,7 +95,13 @@ export default function StoreDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentLocale, locale, router, storeId, toast]);
+
+  useEffect(() => {
+    if (user && storeId) {
+      loadStoreData();
+    }
+  }, [loadStoreData, storeId, user]);
 
   const handleSignOut = async () => {
     await signOut();

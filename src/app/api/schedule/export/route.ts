@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createPureClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 // 엑셀 내보내기 스키마
 const ExportSchema = z.object({
@@ -209,17 +209,12 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // 엑셀 워크북 생성
-    const workbook = XLSX.utils.book_new();
-
     // 1. Week Grid 시트
     const weekGridData = generateWeekGridData(
       filteredAssignments,
       userMap,
       include_private_info
     );
-    const weekGridSheet = XLSX.utils.aoa_to_sheet(weekGridData);
-    XLSX.utils.book_append_sheet(workbook, weekGridSheet, "Week Grid");
 
     // 2. Assignments 시트
     const assignmentsData = generateAssignmentsData(
@@ -227,8 +222,6 @@ export async function GET(request: NextRequest) {
       userMap,
       include_private_info
     );
-    const assignmentsSheet = XLSX.utils.aoa_to_sheet(assignmentsData);
-    XLSX.utils.book_append_sheet(workbook, assignmentsSheet, "Assignments");
 
     // 3. Roles 시트
     const rolesData = generateRolesData(
@@ -236,8 +229,6 @@ export async function GET(request: NextRequest) {
       normalizedUserRoles,
       include_private_info
     );
-    const rolesSheet = XLSX.utils.aoa_to_sheet(rolesData);
-    XLSX.utils.book_append_sheet(workbook, rolesSheet, "Roles");
 
     // 파일 생성
     const fileName = `workeasy_${store.name.replace(
@@ -246,7 +237,12 @@ export async function GET(request: NextRequest) {
     )}_${from}_to_${to}.${format}`;
 
     if (format === "xlsx") {
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const workbook = new ExcelJS.Workbook();
+      appendWorksheet(workbook, "Week Grid", weekGridData);
+      appendWorksheet(workbook, "Assignments", assignmentsData);
+      appendWorksheet(workbook, "Roles", rolesData);
+
+      const buffer = await workbook.xlsx.writeBuffer();
       return new NextResponse(buffer, {
         headers: {
           "Content-Type":
@@ -256,7 +252,7 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // CSV는 첫 번째 시트만
-      const csv = XLSX.utils.sheet_to_csv(weekGridSheet);
+      const csv = toCsv(weekGridData);
       return new NextResponse(csv, {
         headers: {
           "Content-Type": "text/csv",
@@ -271,6 +267,29 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function appendWorksheet(
+  workbook: ExcelJS.Workbook,
+  name: string,
+  rows: unknown[][]
+) {
+  const worksheet = workbook.addWorksheet(name);
+  worksheet.addRows(rows);
+}
+
+function toCsv(rows: unknown[][]) {
+  return rows
+    .map((row) =>
+      row
+        .map((cell) => {
+          const value = cell == null ? "" : String(cell);
+          const escaped = value.replace(/"/g, '""');
+          return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+        })
+        .join(",")
+    )
+    .join("\n");
 }
 
 // Week Grid 데이터 생성

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -73,7 +73,7 @@ export function WorkItemRoleManager({
   const canEdit = userRole === "MASTER" || userRole === "SUB_MANAGER";
 
   // 사용 가능한 역할 로드
-  const loadAvailableRoles = async () => {
+  const loadAvailableRoles = useCallback(async () => {
     try {
       const response = await fetch(`/api/store-job-roles?store_id=${storeId}`);
       const result = await response.json();
@@ -98,10 +98,29 @@ export function WorkItemRoleManager({
     } finally {
       setLoading(false);
     }
-  };
+  }, [locale, storeId, toast]);
+
+  // 역할 커버리지 계산 (간단한 버전)
+  const calculateRoleCoverage = useCallback(
+    (reqs: WorkItemRoleRequirement[]) => {
+      const coverage: RoleCoverage[] = reqs.map((req) => {
+        const role = availableRoles.find((r) => r.id === req.jobRoleId);
+        return {
+          jobRoleId: req.jobRoleId,
+          jobRoleName: role?.name || "Unknown",
+          jobRoleCode: role?.code || null,
+          requiredCount: req.minCount,
+          currentCount: 0, // 실제 스케줄 데이터가 있을 때 계산
+          isSufficient: false,
+        };
+      });
+      setRoleCoverage(coverage);
+    },
+    [availableRoles]
+  );
 
   // 기존 역할 요구 사항 로드
-  const loadExistingRequirements = async () => {
+  const loadExistingRequirements = useCallback(async () => {
     try {
       const response = await fetch(
         `/api/work-item-required-roles?work_item_id=${workItemId}`
@@ -123,28 +142,12 @@ export function WorkItemRoleManager({
     } catch (error) {
       console.error("역할 요구 사항 로드 오류:", error);
     }
-  };
-
-  // 역할 커버리지 계산 (간단한 버전)
-  const calculateRoleCoverage = (reqs: WorkItemRoleRequirement[]) => {
-    const coverage: RoleCoverage[] = reqs.map((req) => {
-      const role = availableRoles.find((r) => r.id === req.jobRoleId);
-      return {
-        jobRoleId: req.jobRoleId,
-        jobRoleName: role?.name || "Unknown",
-        jobRoleCode: role?.code || null,
-        requiredCount: req.minCount,
-        currentCount: 0, // 실제 스케줄 데이터가 있을 때 계산
-        isSufficient: false,
-      };
-    });
-    setRoleCoverage(coverage);
-  };
+  }, [calculateRoleCoverage, mode, workItemId]);
 
   useEffect(() => {
     loadAvailableRoles();
     loadExistingRequirements();
-  }, [workItemId, storeId]);
+  }, [loadAvailableRoles, loadExistingRequirements]);
 
   const addRequirement = () => {
     if (availableRoles.length === 0) return;

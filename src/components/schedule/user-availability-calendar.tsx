@@ -41,6 +41,17 @@ import { ko, enUS, ja } from "date-fns/locale";
 // 日付フォーマット용 로케일 매핑
 const dateLocales = { ko, en: enUS, ja };
 
+const toMessage = (v: unknown) =>
+  typeof v === "string"
+    ? v
+    : (() => {
+        try {
+          return JSON.stringify(v);
+        } catch {
+          return String(v);
+        }
+      })();
+
 interface UserAvailability {
   id: string;
   storeId: string;
@@ -120,16 +131,6 @@ export function UserAvailabilityCalendar({
   >([]);
   const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
-  const toMessage = (v: unknown) =>
-    typeof v === "string"
-      ? v
-      : (() => {
-          try {
-            return JSON.stringify(v);
-          } catch {
-            return String(v);
-          }
-        })();
 
   // 월의 날짜 범위 계산 (월요일 시작 주 포함)
   const monthStart = startOfMonth(currentMonth);
@@ -142,6 +143,8 @@ export function UserAvailabilityCalendar({
     start: calendarStart,
     end: calendarEnd,
   });
+  const monthStartDate = format(monthStart, "yyyy-MM-dd");
+  const monthEndDate = format(monthEnd, "yyyy-MM-dd");
 
   // 매장 정보 및 영업 시간 조회
   useEffect(() => {
@@ -237,20 +240,15 @@ export function UserAvailabilityCalendar({
     return () => mediaQuery.removeEventListener("change", updateMobileState);
   }, []);
 
-  // 출근 불가 데이터 로드
-  useEffect(() => {
-    loadAvailabilities();
-  }, [storeId, currentMonth, canManage, userId]);
-
-  const loadAvailabilities = async () => {
+  const loadAvailabilities = useCallback(async () => {
     if (!storeId) return;
 
     setLoading(true);
     try {
       const params = new URLSearchParams({
         store_id: storeId,
-        from: monthStart.toISOString().split("T")[0],
-        to: monthEnd.toISOString().split("T")[0],
+        from: monthStartDate,
+        to: monthEndDate,
       });
 
       // 관리자가 아닌 경우 또는 관리자지만 특정 유저를 선택한 경우만 user_id 필터 적용
@@ -286,7 +284,12 @@ export function UserAvailabilityCalendar({
     } finally {
       setLoading(false);
     }
-  };
+  }, [canManage, locale, monthEndDate, monthStartDate, storeId, toast, userId]);
+
+  // 출근 불가 데이터 로드
+  useEffect(() => {
+    loadAvailabilities();
+  }, [loadAvailabilities]);
 
   // 특정 날짜의 출근 불가 상태 확인 (단일 유저)
   const getAvailabilityForDate = (date: Date): UserAvailability | null => {

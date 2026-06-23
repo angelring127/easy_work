@@ -140,7 +140,7 @@ function SignInContent() {
       clearTimeout(timeoutId2);
       clearTimeout(timeoutId3);
     };
-  }, [currentLocale, router, toast]);
+  }, [currentLocale, router, setProcessingInvite, toast]);
 
   // 인증 상태 체크 및 리다이렉트
   useEffect(() => {

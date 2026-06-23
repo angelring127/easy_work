@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -46,7 +46,7 @@ export function RolesEditor({ storeId, locale }: RolesEditorProps) {
   const { toast } = useToast();
 
   // 역할 목록 로드
-  const loadRoles = async () => {
+  const loadRoles = useCallback(async () => {
     try {
       const response = await fetch(`/api/store-job-roles?store_id=${storeId}`);
       const result = await response.json();
@@ -69,11 +69,11 @@ export function RolesEditor({ storeId, locale }: RolesEditorProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [locale, storeId, toast]);
 
   useEffect(() => {
     loadRoles();
-  }, [storeId]);
+  }, [loadRoles]);
 
   const resetForm = () => {
     console.log("resetForm 호출됨 - 현재 상태:", { creating, editingRole });

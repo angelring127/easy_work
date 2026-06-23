@@ -10,13 +10,14 @@ export async function GET(
     const supabase = await createClient();
 
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     const { data: storeUser, error } = await supabase
       .from("store_users")
@@ -63,8 +64,8 @@ export async function GET(
         data: {
           id: userId,
           user_id: userId,
-          name: session.user.user_metadata?.name || session.user.email || "",
-          email: session.user.email || "",
+          name: user.user_metadata?.name || user.email || "",
+          email: user.email || "",
           role: roleRow.role,
           status: roleRow.status,
         },

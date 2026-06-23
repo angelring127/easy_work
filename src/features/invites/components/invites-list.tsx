@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,7 @@ export function InvitesList({
   /**
    * 초대 목록 로드
    */
-  const loadInvites = async () => {
+  const loadInvites = useCallback(async () => {
     setIsLoading(true);
 
     try {
@@ -101,7 +101,7 @@ export function InvitesList({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [locale, storeId, toast]);
 
   /**
    * 초대 취소
@@ -225,7 +225,7 @@ export function InvitesList({
     if (storeId) {
       loadInvites();
     }
-  }, [storeId]);
+  }, [loadInvites, storeId]);
 
   return (
     <Card className={className}>

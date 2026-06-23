@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { t, type Locale } from "@/lib/i18n";
 import { defaultLocale } from "@/lib/i18n-config";
 import { useParams } from "next/navigation";
+import { useRole } from "@/hooks/use-permissions";
 
 interface RoleBadgeProps {
   role: UserRole;
@@ -70,7 +71,7 @@ export function RoleBadge({
  * 현재 사용자의 역할을 표시하는 컴포넌트
  */
 export function CurrentUserRoleBadge({ className }: { className?: string }) {
-  const { role: userRole } = usePermissions();
+  const { role: userRole } = useRole();
 
   if (!userRole) {
     return null;
@@ -78,35 +79,6 @@ export function CurrentUserRoleBadge({ className }: { className?: string }) {
 
   return <RoleBadge role={userRole} className={className} />;
 }
-
-// 권한 훅 임포트 (순환 참조 방지를 위해 지연 임포트)
-function usePermissions() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { useRole } = require("@/hooks/use-permissions");
-  return useRole();
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

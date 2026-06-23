@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Calendar,
@@ -130,52 +130,7 @@ export default function SchedulePage() {
     setViewMode("week");
   }, []);
 
-  // データロード
-  useEffect(() => {
-    if (currentStore?.id) {
-      loadScheduleData();
-      checkPermissions();
-    }
-  }, [currentStore?.id, currentWeek, user]);
-
-  // Work Items가 없고 관리자 권한이 있으면 모달 표시
-  // Work Items가 있으면 모달 닫기
-  useEffect(() => {
-    if (workItems.length === 0 && canManage && currentStore?.id && !loading) {
-      setShowWorkItemsModal(true);
-    } else if (workItems.length > 0) {
-      // Work Items가 있으면 모달 닫기
-      setShowWorkItemsModal(false);
-    }
-  }, [workItems.length, canManage, currentStore?.id, loading]);
-
-  // 페이지 포커스 시 work items 다시 확인
-  useEffect(() => {
-    const handleFocus = () => {
-      if (currentStore?.id && canManage) {
-        // work items 다시 확인
-        fetch(`/api/work-items?store_id=${currentStore.id}`)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.success) {
-              const items = data.data || [];
-              setWorkItems(items);
-              if (items.length > 0) {
-                setShowWorkItemsModal(false);
-              }
-            }
-          })
-          .catch((error) => {
-            console.error("Work items 확인 오류:", error);
-          });
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [currentStore?.id, canManage]);
-
-  const loadScheduleData = async () => {
+  const loadScheduleData = useCallback(async () => {
     if (!currentStore?.id) return;
 
     setLoading(true);
@@ -294,9 +249,9 @@ export default function SchedulePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentStore?.id, currentUserId, currentUserRole, currentWeek]);
 
-  const checkPermissions = async () => {
+  const checkPermissions = useCallback(async () => {
     if (!currentStore?.id) return;
 
     try {
@@ -326,7 +281,52 @@ export default function SchedulePage() {
       setCurrentUserRole(null);
       setCurrentUserId(null);
     }
-  };
+  }, [currentStore?.id]);
+
+  // データロード
+  useEffect(() => {
+    if (currentStore?.id) {
+      loadScheduleData();
+      checkPermissions();
+    }
+  }, [checkPermissions, currentStore?.id, currentWeek, loadScheduleData, user]);
+
+  // Work Items가 없고 관리자 권한이 있으면 모달 표시
+  // Work Items가 있으면 모달 닫기
+  useEffect(() => {
+    if (workItems.length === 0 && canManage && currentStore?.id && !loading) {
+      setShowWorkItemsModal(true);
+    } else if (workItems.length > 0) {
+      // Work Items가 있으면 모달 닫기
+      setShowWorkItemsModal(false);
+    }
+  }, [workItems.length, canManage, currentStore?.id, loading]);
+
+  // 페이지 포커스 시 work items 다시 확인
+  useEffect(() => {
+    const handleFocus = () => {
+      if (currentStore?.id && canManage) {
+        // work items 다시 확인
+        fetch(`/api/work-items?store_id=${currentStore.id}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              const items = data.data || [];
+              setWorkItems(items);
+              if (items.length > 0) {
+                setShowWorkItemsModal(false);
+              }
+            }
+          })
+          .catch((error) => {
+            console.error("Work items 확인 오류:", error);
+          });
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [currentStore?.id, canManage]);
 
   // 週移動
   const goToPreviousWeek = () => {

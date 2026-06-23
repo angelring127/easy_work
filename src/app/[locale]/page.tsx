@@ -150,7 +150,7 @@ export default function HomePage() {
       clearTimeout(timeoutId2);
       clearTimeout(timeoutId3);
     };
-  }, [currentLocale, router]);
+  }, [currentLocale, router, setProcessingInvite, toast]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">

@@ -4,6 +4,13 @@ import { InvitationPage } from '../../pages/invitation.page';
 import { generateGuestName } from '../../utils/test-data-factory';
 import { getAdminClient } from '../../utils/database';
 
+const expectTextToContainAny = (actual: string, expected: string[]) => {
+  const normalizedActual = actual.toLowerCase();
+  expect(
+    expected.some((text) => normalizedActual.includes(text.toLowerCase()))
+  ).toBeTruthy();
+};
+
 test.describe('Guest User Invitations', () => {
   test('Can create guest user without email', async ({ masterPage, testStore }) => {
     const invitationPage = new InvitationPage(masterPage);
@@ -25,7 +32,7 @@ test.describe('Guest User Invitations', () => {
     await invitationPage.waitForSuccess();
 
     const successText = await invitationPage.getSuccessToastText();
-    expect(successText).toContain('게스트' || 'guest' || 'success');
+    expectTextToContainAny(successText, ['게스트', 'guest', 'success']);
 
     await masterPage.waitForTimeout(2000);
   });

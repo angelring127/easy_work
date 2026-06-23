@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -64,7 +64,7 @@ export function JobRolesManager({ storeId, locale }: JobRolesManagerProps) {
 
   const { toast } = useToast();
 
-  const loadRoles = async () => {
+  const loadRoles = useCallback(async () => {
     try {
       const response = await fetch(`/api/store-job-roles?store_id=${storeId}`);
       const result = await response.json();
@@ -87,11 +87,11 @@ export function JobRolesManager({ storeId, locale }: JobRolesManagerProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [locale, storeId, toast]);
 
   useEffect(() => {
     loadRoles();
-  }, [storeId]);
+  }, [loadRoles]);
 
   const resetForm = () => {
     setForm({

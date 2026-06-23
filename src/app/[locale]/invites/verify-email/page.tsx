@@ -326,7 +326,7 @@ export default function VerifyEmailPage() {
     };
 
     checkVerification();
-  }, [currentLocale, router, toast, token]);
+  }, [currentLocale, refreshStores, router, toast, token]);
 
   const handleContinueToSetup = () => {
     // 패스워드 설정 폼 표시

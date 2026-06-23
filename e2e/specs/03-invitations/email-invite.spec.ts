@@ -4,6 +4,13 @@ import { InvitationPage } from '../../pages/invitation.page';
 import { generateInvitationEmail, TEST_EMAILS } from '../../utils/test-data-factory';
 import { deleteInvitationViaDB } from '../../utils/api-helpers';
 
+const expectTextToContainAny = (actual: string, expected: string[]) => {
+  const normalizedActual = actual.toLowerCase();
+  expect(
+    expected.some((text) => normalizedActual.includes(text.toLowerCase()))
+  ).toBeTruthy();
+};
+
 test.describe('Email-based Invitations', () => {
   let invitationIds: string[] = [];
 
@@ -33,7 +40,7 @@ test.describe('Email-based Invitations', () => {
     await invitationPage.waitForSuccess();
 
     const successText = await invitationPage.getSuccessToastText();
-    expect(successText).toContain('초대' || 'success' || 'invite');
+    expectTextToContainAny(successText, ['초대', 'success', 'invite']);
 
     const hasInvitation = await invitationPage.hasInvitationWithEmail(inviteEmail);
     expect(hasInvitation).toBeTruthy();
@@ -146,7 +153,7 @@ test.describe('Email-based Invitations', () => {
     await masterPage.waitForTimeout(1000);
 
     const successText = await invitationPage.getSuccessToastText();
-    expect(successText.toLowerCase()).toContain('resend' || '재발송' || 'success');
+    expectTextToContainAny(successText, ['resend', '재발송', 'success']);
   });
 
   test('Can cancel pending invitation', async ({ masterPage, testStore }) => {
@@ -170,6 +177,6 @@ test.describe('Email-based Invitations', () => {
     await masterPage.waitForTimeout(1000);
 
     const status = await invitationPage.getInvitationStatus(inviteEmail);
-    expect(status.toUpperCase()).toContain('CANCEL' || '취소');
+    expectTextToContainAny(status, ['cancel', '취소']);
   });
 });

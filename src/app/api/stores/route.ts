@@ -125,20 +125,11 @@ async function getStores(
         { p_user_id: user.id }
       );
 
-      console.log("매장 목록 조회 - RLS 우회 함수 결과:", {
-        userId: user.id,
-        stores,
-        storesError,
-        storesCount: stores?.length || 0,
-      });
-
       // 함수가 없는 경우 대안 로직 사용
       if (
         storesError &&
         storesError.message.includes("Could not find the function")
       ) {
-        console.log("RLS 우회 함수가 없어서 대안 로직 사용");
-
         // 직접 쿼리로 매장 조회 (소유한 매장 + 초대된 매장)
         const { data: ownedStores } = await supabase
           .from("stores")
@@ -153,12 +144,6 @@ async function getStores(
           .eq("user_id", user.id)
           .eq("status", "ACTIVE");
 
-        console.log("매장 목록 조회 - user_store_roles:", {
-          userId: user.id,
-          userRoles,
-          userRolesError,
-        });
-
         // store_users에서도 조회 (일반 유저의 경우)
         const { data: storeUsers, error: storeUsersError } = await supabase
           .from("store_users")
@@ -167,24 +152,11 @@ async function getStores(
           .eq("is_active", true)
           .eq("is_guest", false);
 
-        console.log("매장 목록 조회 - store_users:", {
-          userId: user.id,
-          storeUsers,
-          storeUsersError,
-        });
-
         // 모든 매장 ID 수집 (중복 제거)
         const storeIds = new Set<string>();
         (ownedStores || []).forEach((store) => storeIds.add(store.id));
         (userRoles || []).forEach((role) => storeIds.add(role.store_id));
         (storeUsers || []).forEach((su) => storeIds.add(su.store_id));
-
-        console.log("매장 목록 조회 - 수집된 매장 ID:", {
-          ownedStoresCount: ownedStores?.length || 0,
-          userRolesCount: userRoles?.length || 0,
-          storeUsersCount: storeUsers?.length || 0,
-          totalStoreIds: Array.from(storeIds),
-        });
 
         // 매장 정보 조회
         const { data: allStoresData, error: allStoresError } = await supabase
@@ -192,11 +164,6 @@ async function getStores(
           .select("*")
           .eq("status", "ACTIVE")
           .in("id", Array.from(storeIds));
-
-        console.log("매장 목록 조회 - 매장 정보:", {
-          allStoresData,
-          allStoresError,
-        });
 
         // 매장 목록 생성 (역할 정보 포함)
         const allStores = (allStoresData || []).map((store) => {
@@ -251,22 +218,6 @@ async function getStores(
           { status: 500 }
         );
       }
-
-      console.log("매장 목록 조회 결과:", {
-        userId: user.id,
-        userEmail: user.email,
-        storesCount: stores?.length || 0,
-        stores: stores?.map((s) => ({
-          id: s.id,
-          name: s.name,
-          owner_id: s.owner_id,
-          user_role: s.user_role,
-          isOwner: s.owner_id === user.id,
-        })),
-        usedFallback:
-          storesError?.message?.includes("Could not find the function") ||
-          false,
-      });
 
       // RLS 우회 함수가 이미 역할 정보를 포함하므로 그대로 사용
       const storesWithRole = stores || [];

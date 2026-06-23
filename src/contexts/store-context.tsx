@@ -2,6 +2,7 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useState,
   useEffect,
@@ -51,7 +52,7 @@ export function StoreProvider({ children }: StoreProviderProps) {
   /**
    * 사용자가 접근 가능한 매장 목록을 로드
    */
-  const loadAccessibleStores = async () => {
+  const loadAccessibleStores = useCallback(async () => {
     if (!user) {
       setAccessibleStores([]);
       setCurrentStore(null);
@@ -81,20 +82,23 @@ export function StoreProvider({ children }: StoreProviderProps) {
           setAccessibleStores(stores);
 
           // 현재 선택된 매장이 목록에 없으면 첫 번째 매장으로 설정
-          if (!currentStore || !stores.find((s) => s.id === currentStore.id)) {
+          setCurrentStore((selectedStore) => {
+            if (selectedStore && stores.find((s) => s.id === selectedStore.id)) {
+              return selectedStore;
+            }
+
             if (stores.length > 0) {
-              setCurrentStore(stores[0]);
-              // localStorage에 저장
               localStorage.setItem("currentStoreId", stores[0].id);
               console.log("StoreContext: 첫 번째 매장으로 설정", {
                 storeName: stores[0].name,
               });
-            } else {
-              setCurrentStore(null);
-              localStorage.removeItem("currentStoreId");
-              console.log("StoreContext: 매장 없음");
+              return stores[0];
             }
-          }
+
+            localStorage.removeItem("currentStoreId");
+            console.log("StoreContext: 매장 없음");
+            return null;
+          });
         }
       } else {
         console.error("매장 목록 로드 실패:", response.statusText);
@@ -104,7 +108,7 @@ export function StoreProvider({ children }: StoreProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   /**
    * 매장 선택
@@ -121,9 +125,9 @@ export function StoreProvider({ children }: StoreProviderProps) {
   /**
    * 매장 목록 새로고침
    */
-  const refreshStores = async () => {
+  const refreshStores = useCallback(async () => {
     await loadAccessibleStores();
-  };
+  }, [loadAccessibleStores]);
 
   /**
    * 매장 추가 (새로 생성된 매장)
@@ -182,7 +186,7 @@ export function StoreProvider({ children }: StoreProviderProps) {
   // 사용자 변경 시 매장 목록 로드
   useEffect(() => {
     loadAccessibleStores();
-  }, [user]);
+  }, [loadAccessibleStores]);
 
   // 초기 로드 시 localStorage에서 이전 선택 매장 복원
   useEffect(() => {
