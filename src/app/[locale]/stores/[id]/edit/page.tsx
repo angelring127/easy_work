@@ -31,6 +31,7 @@ import {
 import { WorkItemRoleManager } from "@/components/schedule/work-item-role-manager";
 import { RolesEditor } from "@/components/schedule/roles-editor";
 import { WorkItemsEditor } from "@/components/schedule/work-items-editor";
+import { AutoScheduleSettingsEditor } from "@/components/schedule/auto-schedule-settings-editor";
 import {
   getCurrencySymbol,
   getCurrencyName,
@@ -216,6 +217,9 @@ export default function EditStorePage() {
                 <TabsTrigger value="policies" className="shrink-0">
                   {t("settings.store.policies", currentLocale)}
                 </TabsTrigger>
+                <TabsTrigger value="autoSchedule" className="shrink-0">
+                  {t("settings.store.autoSchedule", currentLocale)}
+                </TabsTrigger>
                 <TabsTrigger value="notifications" className="shrink-0">
                   {t("settings.store.notifications", currentLocale)}
                 </TabsTrigger>
@@ -263,6 +267,15 @@ export default function EditStorePage() {
                 className="pt-4 text-sm text-gray-600"
               >
                 <PoliciesEditor storeId={storeId} locale={currentLocale} />
+              </TabsContent>
+              <TabsContent
+                value="autoSchedule"
+                className="pt-4 text-sm text-gray-600"
+              >
+                <AutoScheduleSettingsEditor
+                  storeId={storeId}
+                  locale={currentLocale}
+                />
               </TabsContent>
               <TabsContent
                 value="notifications"

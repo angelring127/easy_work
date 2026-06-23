@@ -342,6 +342,125 @@ export interface Database {
           updated_at?: string;
         };
       };
+      store_auto_schedule_condition_priorities: {
+        Row: {
+          id: string;
+          store_id: string;
+          condition_key:
+            | "desired_weekly_hours"
+            | "day_off_preference"
+            | "preferred_weekday";
+          priority_rank: number;
+          weight: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id: string;
+          condition_key:
+            | "desired_weekly_hours"
+            | "day_off_preference"
+            | "preferred_weekday";
+          priority_rank: number;
+          weight?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string;
+          condition_key?:
+            | "desired_weekly_hours"
+            | "day_off_preference"
+            | "preferred_weekday";
+          priority_rank?: number;
+          weight?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      store_auto_schedule_user_priorities: {
+        Row: {
+          id: string;
+          store_id: string;
+          user_id: string;
+          priority_rank: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id: string;
+          user_id: string;
+          priority_rank: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string;
+          user_id?: string;
+          priority_rank?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      store_auto_schedule_opening_policies: {
+        Row: {
+          id: string;
+          store_id: string;
+          enabled: boolean;
+          start_source: "business_open" | "custom";
+          custom_start_min: number | null;
+          end_min: number | null;
+          required_headcount: number;
+          failure_mode: "warn_and_continue" | "block_commit";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id: string;
+          enabled?: boolean;
+          start_source?: "business_open" | "custom";
+          custom_start_min?: number | null;
+          end_min?: number | null;
+          required_headcount?: number;
+          failure_mode?: "warn_and_continue" | "block_commit";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string;
+          enabled?: boolean;
+          start_source?: "business_open" | "custom";
+          custom_start_min?: number | null;
+          end_min?: number | null;
+          required_headcount?: number;
+          failure_mode?: "warn_and_continue" | "block_commit";
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      store_auto_schedule_opening_work_items: {
+        Row: {
+          store_id: string;
+          work_item_id: string;
+          created_at: string;
+        };
+        Insert: {
+          store_id: string;
+          work_item_id: string;
+          created_at?: string;
+        };
+        Update: {
+          store_id?: string;
+          work_item_id?: string;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       user_accessible_stores: {
