@@ -18,10 +18,29 @@ export const localeNames: Record<Locale, string> = {
 const translations = {
   ko: {
     "schedule.autoAssign": "자동 배정",
+    "schedule.autoAssignError": "자동 배정 중 오류가 발생했습니다.",
+    "schedule.autoAssignResultTitle": "자동 배정 결과",
+    "schedule.autoAssignResultDescription":
+      "새 스케줄 {created}개를 등록하고 저장했습니다.",
+    "schedule.autoAssignUnmetTitle": "운영 커버리지 경고 {count}개",
+    "schedule.autoAssignUnmetGuidance":
+      "아래 구간은 스케줄에서 수동으로 보정해주세요.",
+    "schedule.autoAssignUnmetHeadcount":
+      "필요 인원 {required}명 중 {assigned}명 배정",
+    "schedule.autoAssignMissingRoles": "미충족 역할: {roles}",
+    "schedule.autoAssignComplete":
+      "모든 운영 패턴 구간의 최소 인원과 역할을 충족했습니다.",
+    "schedule.deleteWeek": "주 삭제",
+    "schedule.deleteWeekConfirm": "삭제",
+    "schedule.deleteWeekConfirmTitle": "현재 주 스케줄을 삭제할까요?",
+    "schedule.deleteWeekConfirmDescription":
+      "{week}에 등록된 스케줄 {count}개가 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "schedule.deleteWeekSuccess": "스케줄 {count}개가 삭제되었습니다.",
+    "schedule.deleteWeekError": "현재 주 스케줄 삭제 중 오류가 발생했습니다.",
     "settings.store.autoSchedule": "자동 스케줄",
     "autoSchedule.title": "자동 스케줄 설정",
     "autoSchedule.description":
-      "자동 배정 조건 우선순위, 직원 배정 순서, 오프닝 정책을 매장별로 관리합니다.",
+      "자동 배정 조건 우선순위, 운영 패턴, 직원 배정 순서를 매장별로 관리합니다.",
     "autoSchedule.loadError": "자동 스케줄 설정을 불러오지 못했습니다.",
     "autoSchedule.saveSuccess": "자동 스케줄 설정이 저장되었습니다.",
     "autoSchedule.saveError": "자동 스케줄 설정 저장에 실패했습니다.",
@@ -64,6 +83,48 @@ const translations = {
     "autoSchedule.failureBlock": "등록 차단",
     "autoSchedule.openingWorkItems": "오프닝 가능 근무 항목",
     "autoSchedule.noWorkItems": "선택할 근무 항목이 없습니다.",
+    "autoSchedule.pattern.title": "운영 패턴",
+    "autoSchedule.pattern.description":
+      "요일별 시간 구간에 필요한 최소 인원과 팀 역할 커버리지를 설정합니다.",
+    "autoSchedule.pattern.add": "패턴 추가",
+    "autoSchedule.pattern.empty":
+      "등록된 운영 패턴이 없습니다. 패턴이 없으면 기존 자동 배정 기준을 사용합니다.",
+    "autoSchedule.pattern.untitled": "이름 없는 패턴",
+    "autoSchedule.pattern.active": "패턴 활성화",
+    "autoSchedule.pattern.remove": "패턴 삭제",
+    "autoSchedule.pattern.name": "패턴 이름",
+    "autoSchedule.pattern.weekdays": "적용 요일",
+    "autoSchedule.pattern.weekday.sun": "일",
+    "autoSchedule.pattern.weekday.mon": "월",
+    "autoSchedule.pattern.weekday.tue": "화",
+    "autoSchedule.pattern.weekday.wed": "수",
+    "autoSchedule.pattern.weekday.thu": "목",
+    "autoSchedule.pattern.weekday.fri": "금",
+    "autoSchedule.pattern.weekday.sat": "토",
+    "autoSchedule.pattern.segmentName": "구간 이름",
+    "autoSchedule.pattern.startTime": "시작 시간",
+    "autoSchedule.pattern.endTime": "종료 시간",
+    "autoSchedule.pattern.nextDay": "다음 날",
+    "autoSchedule.pattern.minHeadcount": "최소 인원",
+    "autoSchedule.pattern.requiredRoles": "필요한 역할",
+    "autoSchedule.pattern.noRoles": "선택할 활성 직책이 없습니다.",
+    "autoSchedule.pattern.removeSegment": "구간 삭제",
+    "autoSchedule.pattern.addSegment": "구간 추가",
+    "autoSchedule.pattern.fixErrors":
+      "운영 패턴의 오류를 수정한 뒤 다시 저장해주세요.",
+    "autoSchedule.pattern.issue.duplicateWeekday":
+      "같은 요일은 하나의 활성 운영 패턴에만 배정할 수 있습니다.",
+    "autoSchedule.pattern.issue.emptyPatternName": "패턴 이름을 입력해주세요.",
+    "autoSchedule.pattern.issue.emptySegmentName": "구간 이름을 입력해주세요.",
+    "autoSchedule.pattern.issue.invalidTime":
+      "구간 시작 시간은 종료 시간보다 빨라야 합니다.",
+    "autoSchedule.pattern.issue.invalidHeadcount":
+      "최소 인원은 1명 이상이어야 합니다.",
+    "autoSchedule.pattern.issue.overlap": "패턴 안의 시간 구간이 겹칩니다.",
+    "autoSchedule.pattern.issue.gap":
+      "시간 구간 사이에 운영 기준이 없는 빈틈이 있습니다.",
+    "autoSchedule.pattern.issue.noRoles":
+      "필요한 역할을 선택하지 않았습니다. 최소 인원만 검사합니다.",
     "schedule.morningStaff": "오전 인원",
     "schedule.afternoonStaff": "오후 인원",
     "schedule.morningStaffShort": "오전",
@@ -703,6 +764,9 @@ const translations = {
     "user.desiredWeeklyHours": "희망 주 근무 시간",
     "user.desiredWeeklyHoursPlaceholder":
       "주당 근무 시간을 입력하세요 (예: 20)",
+    "user.desiredDailyHours": "희망 일 근무 시간",
+    "user.desiredDailyHoursPlaceholder":
+      "하루에 일하고 싶은 시간을 입력하세요 (예: 6.5)",
     "user.noResignationDate": "퇴사 예정일 없음",
     "user.setResignationDate": "퇴사 예정일 설정",
     "user.removeResignationDate": "퇴사 예정일 제거",
@@ -1207,10 +1271,30 @@ const translations = {
   },
   en: {
     "schedule.autoAssign": "Auto Assign",
+    "schedule.autoAssignError": "An error occurred during automatic assignment.",
+    "schedule.autoAssignResultTitle": "Automatic Assignment Result",
+    "schedule.autoAssignResultDescription":
+      "Created and saved {created} new schedule assignments.",
+    "schedule.autoAssignUnmetTitle": "Operating coverage warnings ({count})",
+    "schedule.autoAssignUnmetGuidance":
+      "Review these segments and adjust the schedule manually.",
+    "schedule.autoAssignUnmetHeadcount":
+      "Assigned {assigned} of {required} required staff",
+    "schedule.autoAssignMissingRoles": "Missing roles: {roles}",
+    "schedule.autoAssignComplete":
+      "All operating pattern segments meet their minimum staff and role requirements.",
+    "schedule.deleteWeek": "Delete Week",
+    "schedule.deleteWeekConfirm": "Delete",
+    "schedule.deleteWeekConfirmTitle": "Delete this week's schedules?",
+    "schedule.deleteWeekConfirmDescription":
+      "All {count} schedules registered in {week} will be deleted. This action cannot be undone.",
+    "schedule.deleteWeekSuccess": "{count} schedules deleted.",
+    "schedule.deleteWeekError":
+      "An error occurred while deleting this week's schedules.",
     "settings.store.autoSchedule": "Auto Schedule",
     "autoSchedule.title": "Auto Schedule Settings",
     "autoSchedule.description":
-      "Manage automatic assignment condition priorities, staff order, and opening policies for this store.",
+      "Manage automatic assignment priorities, operating patterns, and staff order for this store.",
     "autoSchedule.loadError": "Failed to load auto schedule settings.",
     "autoSchedule.saveSuccess": "Auto schedule settings saved.",
     "autoSchedule.saveError": "Failed to save auto schedule settings.",
@@ -1253,6 +1337,49 @@ const translations = {
     "autoSchedule.failureBlock": "Block commit",
     "autoSchedule.openingWorkItems": "Opening-capable work items",
     "autoSchedule.noWorkItems": "No work items available.",
+    "autoSchedule.pattern.title": "Operating Patterns",
+    "autoSchedule.pattern.description":
+      "Set the minimum headcount and team role coverage required in each weekday time segment.",
+    "autoSchedule.pattern.add": "Add pattern",
+    "autoSchedule.pattern.empty":
+      "No operating patterns are configured. The existing assignment rules will be used instead.",
+    "autoSchedule.pattern.untitled": "Untitled pattern",
+    "autoSchedule.pattern.active": "Enable pattern",
+    "autoSchedule.pattern.remove": "Delete pattern",
+    "autoSchedule.pattern.name": "Pattern name",
+    "autoSchedule.pattern.weekdays": "Applicable weekdays",
+    "autoSchedule.pattern.weekday.sun": "Sun",
+    "autoSchedule.pattern.weekday.mon": "Mon",
+    "autoSchedule.pattern.weekday.tue": "Tue",
+    "autoSchedule.pattern.weekday.wed": "Wed",
+    "autoSchedule.pattern.weekday.thu": "Thu",
+    "autoSchedule.pattern.weekday.fri": "Fri",
+    "autoSchedule.pattern.weekday.sat": "Sat",
+    "autoSchedule.pattern.segmentName": "Segment name",
+    "autoSchedule.pattern.startTime": "Start time",
+    "autoSchedule.pattern.endTime": "End time",
+    "autoSchedule.pattern.nextDay": "Next day",
+    "autoSchedule.pattern.minHeadcount": "Minimum staff",
+    "autoSchedule.pattern.requiredRoles": "Required roles",
+    "autoSchedule.pattern.noRoles": "No active job roles are available.",
+    "autoSchedule.pattern.removeSegment": "Delete segment",
+    "autoSchedule.pattern.addSegment": "Add segment",
+    "autoSchedule.pattern.fixErrors":
+      "Fix the operating pattern errors before saving again.",
+    "autoSchedule.pattern.issue.duplicateWeekday":
+      "A weekday can belong to only one active operating pattern.",
+    "autoSchedule.pattern.issue.emptyPatternName": "Enter a pattern name.",
+    "autoSchedule.pattern.issue.emptySegmentName": "Enter a segment name.",
+    "autoSchedule.pattern.issue.invalidTime":
+      "The segment start time must be earlier than its end time.",
+    "autoSchedule.pattern.issue.invalidHeadcount":
+      "Minimum staff must be at least one.",
+    "autoSchedule.pattern.issue.overlap":
+      "Time segments overlap within this pattern.",
+    "autoSchedule.pattern.issue.gap":
+      "There is a gap without an operating requirement between segments.",
+    "autoSchedule.pattern.issue.noRoles":
+      "No required roles are selected. Only minimum staff will be checked.",
     "schedule.morningStaff": "Morning Staff",
     "schedule.afternoonStaff": "Afternoon Staff",
     "schedule.morningStaffShort": "AM",
@@ -1765,6 +1892,9 @@ const translations = {
     "user.resignationDate": "Resignation Date",
     "user.desiredWeeklyHours": "Desired Weekly Hours",
     "user.desiredWeeklyHoursPlaceholder": "Enter weekly work hours (e.g., 20)",
+    "user.desiredDailyHours": "Desired Daily Work Hours",
+    "user.desiredDailyHoursPlaceholder":
+      "Enter preferred daily work hours (e.g., 6.5)",
     "user.noResignationDate": "No resignation date",
     "user.setResignationDate": "Set resignation date",
     "user.removeResignationDate": "Remove resignation date",
@@ -2449,10 +2579,30 @@ const translations = {
   },
   ja: {
     "schedule.autoAssign": "自動割当",
+    "schedule.autoAssignError": "自動割当中にエラーが発生しました。",
+    "schedule.autoAssignResultTitle": "自動割当結果",
+    "schedule.autoAssignResultDescription":
+      "新しいスケジュールを{created}件登録して保存しました。",
+    "schedule.autoAssignUnmetTitle": "運営カバー警告 {count}件",
+    "schedule.autoAssignUnmetGuidance":
+      "以下の時間帯はスケジュールで手動調整してください。",
+    "schedule.autoAssignUnmetHeadcount":
+      "必要人数{required}人のうち{assigned}人を割当",
+    "schedule.autoAssignMissingRoles": "不足している役割: {roles}",
+    "schedule.autoAssignComplete":
+      "すべての運営パターン時間帯で最低人数と役割条件を満たしました。",
+    "schedule.deleteWeek": "週を削除",
+    "schedule.deleteWeekConfirm": "削除",
+    "schedule.deleteWeekConfirmTitle": "この週のスケジュールを削除しますか？",
+    "schedule.deleteWeekConfirmDescription":
+      "{week}に登録されたスケジュール{count}件がすべて削除されます。この操作は元に戻せません。",
+    "schedule.deleteWeekSuccess": "スケジュール{count}件を削除しました。",
+    "schedule.deleteWeekError":
+      "この週のスケジュール削除中にエラーが発生しました。",
     "settings.store.autoSchedule": "自動スケジュール",
     "autoSchedule.title": "自動スケジュール設定",
     "autoSchedule.description":
-      "自動割当の条件優先度、スタッフ順序、オープニングポリシーを店舗別に管理します。",
+      "自動割当の条件優先度、運営パターン、スタッフ順序を店舗別に管理します。",
     "autoSchedule.loadError": "自動スケジュール設定を読み込めませんでした。",
     "autoSchedule.saveSuccess": "自動スケジュール設定を保存しました。",
     "autoSchedule.saveError": "自動スケジュール設定の保存に失敗しました。",
@@ -2495,6 +2645,48 @@ const translations = {
     "autoSchedule.failureBlock": "登録をブロック",
     "autoSchedule.openingWorkItems": "オープニング可能な勤務項目",
     "autoSchedule.noWorkItems": "選択できる勤務項目がありません。",
+    "autoSchedule.pattern.title": "運営パターン",
+    "autoSchedule.pattern.description":
+      "曜日ごとの時間帯に必要な最低人数とチームの役割カバーを設定します。",
+    "autoSchedule.pattern.add": "パターンを追加",
+    "autoSchedule.pattern.empty":
+      "運営パターンがありません。既存の自動割当基準を使用します。",
+    "autoSchedule.pattern.untitled": "名称未設定のパターン",
+    "autoSchedule.pattern.active": "パターンを有効化",
+    "autoSchedule.pattern.remove": "パターンを削除",
+    "autoSchedule.pattern.name": "パターン名",
+    "autoSchedule.pattern.weekdays": "適用曜日",
+    "autoSchedule.pattern.weekday.sun": "日",
+    "autoSchedule.pattern.weekday.mon": "月",
+    "autoSchedule.pattern.weekday.tue": "火",
+    "autoSchedule.pattern.weekday.wed": "水",
+    "autoSchedule.pattern.weekday.thu": "木",
+    "autoSchedule.pattern.weekday.fri": "金",
+    "autoSchedule.pattern.weekday.sat": "土",
+    "autoSchedule.pattern.segmentName": "時間帯名",
+    "autoSchedule.pattern.startTime": "開始時間",
+    "autoSchedule.pattern.endTime": "終了時間",
+    "autoSchedule.pattern.nextDay": "翌日",
+    "autoSchedule.pattern.minHeadcount": "最低人数",
+    "autoSchedule.pattern.requiredRoles": "必要な役割",
+    "autoSchedule.pattern.noRoles": "選択できる有効な役割がありません。",
+    "autoSchedule.pattern.removeSegment": "時間帯を削除",
+    "autoSchedule.pattern.addSegment": "時間帯を追加",
+    "autoSchedule.pattern.fixErrors":
+      "運営パターンのエラーを修正してから保存してください。",
+    "autoSchedule.pattern.issue.duplicateWeekday":
+      "同じ曜日は1つの有効な運営パターンにのみ設定できます。",
+    "autoSchedule.pattern.issue.emptyPatternName": "パターン名を入力してください。",
+    "autoSchedule.pattern.issue.emptySegmentName": "時間帯名を入力してください。",
+    "autoSchedule.pattern.issue.invalidTime":
+      "開始時間は終了時間より前に設定してください。",
+    "autoSchedule.pattern.issue.invalidHeadcount":
+      "最低人数は1人以上に設定してください。",
+    "autoSchedule.pattern.issue.overlap": "パターン内の時間帯が重複しています。",
+    "autoSchedule.pattern.issue.gap":
+      "時間帯の間に運営基準がない空きがあります。",
+    "autoSchedule.pattern.issue.noRoles":
+      "必要な役割が未選択です。最低人数のみ確認します。",
     "schedule.morningStaff": "午前人員",
     "schedule.afternoonStaff": "午後人員",
     "schedule.morningStaffShort": "午前",
@@ -3085,6 +3277,9 @@ const translations = {
     "user.desiredWeeklyHours": "希望週勤務時間",
     "user.desiredWeeklyHoursPlaceholder":
       "週勤務時間を入力してください（例：20）",
+    "user.desiredDailyHours": "希望日勤務時間",
+    "user.desiredDailyHoursPlaceholder":
+      "1日に働きたい時間を入力してください（例：6.5）",
     "user.noResignationDate": "退職予定日なし",
     "user.setResignationDate": "退職予定日を設定",
     "user.removeResignationDate": "退職予定日を削除",

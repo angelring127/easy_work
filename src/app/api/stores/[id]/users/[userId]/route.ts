@@ -9,6 +9,7 @@ const updateUserProfileSchema = z.object({
   jobRoleIds: z.array(z.string().uuid()).optional(),
   resignationDate: z.string().optional().nullable(),
   desiredWeeklyHours: z.number().int().min(0).max(168).optional().nullable(),
+  desiredDailyHours: z.number().min(0).max(24).optional().nullable(),
   preferredWeekdays: z
     .array(
       z.object({
@@ -93,6 +94,7 @@ async function getUserDetail(
       const guestMetadata = (guestUser.metadata as any) || {};
       const resignationDate = guestMetadata.resignation_date || null;
       const desiredWeeklyHours = guestMetadata.desired_weekly_hours || null;
+      const desiredDailyHours = guestMetadata.desired_daily_hours || null;
 
       // 게스트 사용자의 출근이 어려운 요일 조회 (store_users.id를 user_id로 사용)
       const { data: preferredWeekdays, error: weekdaysError } = await supabase
@@ -119,6 +121,7 @@ async function getUserDetail(
           jobRoles: jobRoles || [],
           resignationDate,
           desiredWeeklyHours,
+          desiredDailyHours,
           preferredWeekdays: preferredWeekdays || [],
           avatarUrl: null,
           isGuest: true,
@@ -224,6 +227,7 @@ async function getUserDetail(
     const userMetadata = userInfo.user.user_metadata || {};
     const resignationDate = userMetadata.resignation_date || null;
     const desiredWeeklyHours = userMetadata.desired_weekly_hours || null;
+    const desiredDailyHours = userMetadata.desired_daily_hours || null;
 
     // 출근이 어려운 요일 조회
     // storeUser가 있으면 store_users.id를 사용, 없으면 auth.users.id를 사용
@@ -257,6 +261,7 @@ async function getUserDetail(
         jobRoles: jobRoles || [],
         resignationDate,
         desiredWeeklyHours,
+        desiredDailyHours,
         preferredWeekdays: preferredWeekdays || [],
         avatarUrl: userInfo.user.user_metadata?.avatar_url || null,
       },
@@ -439,10 +444,15 @@ async function updateUserProfile(
         updatedMetadata.desired_weekly_hours = validatedData.desiredWeeklyHours;
       }
 
+      if (validatedData.desiredDailyHours !== undefined) {
+        updatedMetadata.desired_daily_hours = validatedData.desiredDailyHours;
+      }
+
       // 메타데이터가 변경된 경우 store_users 테이블 업데이트
       if (
         validatedData.resignationDate !== undefined ||
-        validatedData.desiredWeeklyHours !== undefined
+        validatedData.desiredWeeklyHours !== undefined ||
+        validatedData.desiredDailyHours !== undefined
       ) {
         updateData.metadata = updatedMetadata;
       }
@@ -681,7 +691,8 @@ async function updateUserProfile(
     // 사용자 메타데이터 업데이트 (퇴사 예정일, 희망 근무 시간 변경 시에만)
     const hasMetadataUpdates =
       validatedData.resignationDate !== undefined ||
-      validatedData.desiredWeeklyHours !== undefined;
+      validatedData.desiredWeeklyHours !== undefined ||
+      validatedData.desiredDailyHours !== undefined;
 
     if (hasMetadataUpdates) {
       const currentMetadata = targetUser.user.user_metadata || {};
@@ -692,6 +703,9 @@ async function updateUserProfile(
         }),
         ...(validatedData.desiredWeeklyHours !== undefined && {
           desired_weekly_hours: validatedData.desiredWeeklyHours,
+        }),
+        ...(validatedData.desiredDailyHours !== undefined && {
+          desired_daily_hours: validatedData.desiredDailyHours,
         }),
       };
 

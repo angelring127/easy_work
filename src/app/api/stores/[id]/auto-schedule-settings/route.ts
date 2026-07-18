@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth } from "@/lib/auth/middleware";
+import {
+  isOperatingPatternStorageMissing,
+  loadOperatingPatterns,
+  replaceOperatingPatterns,
+} from "@/lib/schedule/operating-pattern-settings";
+import { findOperatingPatternValidationIssues } from "@/lib/schedule/operating-patterns";
 import { createClient, createPureClient } from "@/lib/supabase/server";
+import { operatingPatternsSchema } from "@/lib/validations/schedule/operating-patterns";
 
 const conditionKeys = [
   "desired_weekly_hours",
@@ -40,6 +47,7 @@ const updateSettingsSchema = z.object({
   conditionPriorities: z.array(conditionPrioritySchema).optional(),
   userPriorities: z.array(userPrioritySchema).optional(),
   openingPolicy: openingPolicySchema.optional(),
+  operatingPatterns: operatingPatternsSchema.optional(),
 });
 
 type StoreUserRow = {
@@ -93,6 +101,10 @@ function validateUniqueRanks<T extends { priorityRank?: number }>(rows: T[]) {
     }
   });
   return ranks.size === rows.length;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
 }
 
 function normalizeConditionPriorities(
@@ -180,6 +192,7 @@ async function getSettings(
     openingWorkItemsResult,
     workItemsResult,
     storeUsersResult,
+    jobRolesResult,
   ] = await Promise.all([
     supabase
       .from("store_auto_schedule_condition_priorities")
@@ -210,6 +223,12 @@ async function getSettings(
       .select("id, user_id, name, role, is_active, is_guest, granted_at")
       .eq("store_id", storeId)
       .order("granted_at"),
+    supabase
+      .from("store_job_roles")
+      .select("id, name, code")
+      .eq("store_id", storeId)
+      .eq("active", true)
+      .order("name"),
   ]);
 
   const firstError =
@@ -218,7 +237,8 @@ async function getSettings(
     openingPolicyResult.error ||
     openingWorkItemsResult.error ||
     workItemsResult.error ||
-    storeUsersResult.error;
+    storeUsersResult.error ||
+    jobRolesResult.error;
 
   if (firstError) {
     return NextResponse.json(
@@ -284,6 +304,20 @@ async function getSettings(
         openingWorkItemIds: [],
       };
 
+  let operatingPatterns;
+  try {
+    operatingPatterns = await loadOperatingPatterns(supabase, storeId);
+  } catch (error) {
+    if (isOperatingPatternStorageMissing(error)) {
+      operatingPatterns = [];
+    } else {
+      return NextResponse.json(
+        { success: false, error: getErrorMessage(error) },
+        { status: 500 }
+      );
+    }
+  }
+
   return NextResponse.json({
     success: true,
     data: {
@@ -291,6 +325,8 @@ async function getSettings(
       userPriorities,
       openingPolicy,
       workItems: workItemsResult.data || [],
+      jobRoles: jobRolesResult.data || [],
+      operatingPatterns,
     },
   });
 }
@@ -323,6 +359,35 @@ async function updateSettings(
 
   const payload = parsed.data;
   const supabase = await createClient();
+
+  if (payload.operatingPatterns) {
+    const blockingIssues = findOperatingPatternValidationIssues(
+      payload.operatingPatterns
+    ).filter((issue) => issue.severity === "error");
+    if (blockingIssues.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid operating patterns",
+          issues: blockingIssues,
+        },
+        { status: 400 }
+      );
+    }
+
+    try {
+      await replaceOperatingPatterns(
+        supabase,
+        storeId,
+        payload.operatingPatterns
+      );
+    } catch (error) {
+      return NextResponse.json(
+        { success: false, error: getErrorMessage(error) },
+        { status: 500 }
+      );
+    }
+  }
 
   if (payload.conditionPriorities) {
     if (

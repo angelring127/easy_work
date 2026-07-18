@@ -10,6 +10,7 @@ import {
   Clock,
   ArrowLeft,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,9 +28,14 @@ import { StoreSwitcher } from "@/components/ui/store-switcher";
 import { WeekGrid } from "@/components/schedule/week-grid";
 import { UserAvailabilityCalendar } from "@/components/schedule/user-availability-calendar";
 import { ScheduleExporter } from "@/components/schedule/schedule-exporter";
+import {
+  AutoAssignResultDialog,
+  type AutoAssignResult,
+} from "@/components/schedule/auto-assign-result-dialog";
 import { ResponsiveHeader } from "@/components/layout/responsive-header";
 import { useAuth } from "@/contexts/auth-context";
 import { useStore } from "@/contexts/store-context";
+import { useToast } from "@/hooks/use-toast";
 import { t, type Locale } from "@/lib/i18n";
 import {
   format,
@@ -83,6 +89,7 @@ export default function SchedulePage() {
   const router = useRouter();
   const { user } = useAuth();
   const { currentStore } = useStore();
+  const { toast } = useToast();
   const currentLocale = locale as Locale;
 
   // 状態管理
@@ -108,6 +115,11 @@ export default function SchedulePage() {
   const [canManage, setCanManage] = useState(false);
   const [workItems, setWorkItems] = useState<any[]>([]);
   const [showWorkItemsModal, setShowWorkItemsModal] = useState(false);
+  const [showDeleteWeekDialog, setShowDeleteWeekDialog] = useState(false);
+  const [isDeletingWeek, setIsDeletingWeek] = useState(false);
+  const [isAutoAssigning, setIsAutoAssigning] = useState(false);
+  const [autoAssignResult, setAutoAssignResult] =
+    useState<AutoAssignResult | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -394,16 +406,68 @@ export default function SchedulePage() {
     if (!currentStore?.id) return;
     const from = format(weekStart, "yyyy-MM-dd");
     const to = format(weekEnd, "yyyy-MM-dd");
+    setIsAutoAssigning(true);
     try {
       const res = await fetch(
         `/api/schedule/auto-assign?store_id=${currentStore.id}&from=${from}&to=${to}`,
         { method: "POST" }
       );
       const json = await res.json();
-      console.log("auto-assign:", json);
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to auto assign schedules");
+      }
+      setAutoAssignResult({
+        created: json.data?.created || 0,
+        skipped: json.data?.skipped || 0,
+        warnings: json.data?.warnings || [],
+        unmetSegments: json.data?.unmetSegments || [],
+      });
       await loadScheduleData();
     } catch (e) {
       console.error("auto-assign error", e);
+      toast({
+        title: t("common.error", currentLocale),
+        description: t("schedule.autoAssignError", currentLocale),
+        variant: "destructive",
+      });
+    } finally {
+      setIsAutoAssigning(false);
+    }
+  };
+
+  const handleDeleteCurrentWeek = async () => {
+    if (!currentStore?.id) return;
+
+    setIsDeletingWeek(true);
+    const from = format(weekStart, "yyyy-MM-dd");
+    const to = format(weekEnd, "yyyy-MM-dd");
+
+    try {
+      const res = await fetch(
+        `/api/schedule/assignments?store_id=${currentStore.id}&from=${from}&to=${to}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to delete week schedules");
+      }
+
+      toast({
+        title: t("schedule.deleteWeekSuccess", currentLocale, {
+          count: json.data?.deleted ?? 0,
+        }),
+      });
+      setShowDeleteWeekDialog(false);
+      await loadScheduleData();
+    } catch (error) {
+      console.error("delete week schedules error", error);
+      toast({
+        title: t("common.error", currentLocale),
+        description: t("schedule.deleteWeekError", currentLocale),
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingWeek(false);
     }
   };
 
@@ -464,9 +528,27 @@ export default function SchedulePage() {
                 variant="default"
                 size="sm"
                 onClick={handleAutoAssign}
+                disabled={isAutoAssigning}
                 className="min-h-[44px] touch-manipulation flex-1 md:flex-none"
               >
-                {t("schedule.autoAssign", currentLocale)}
+                {isAutoAssigning && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {isAutoAssigning
+                  ? t("schedule.processing", currentLocale)
+                  : t("schedule.autoAssign", currentLocale)}
+              </Button>
+            )}
+            {canManage && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteWeekDialog(true)}
+                disabled={assignments.length === 0 || loading}
+                className="min-h-[44px] touch-manipulation flex-1 md:flex-none"
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                {t("schedule.deleteWeek", currentLocale)}
               </Button>
             )}
             <div className="flex-1 md:flex-none">
@@ -620,6 +702,52 @@ export default function SchedulePage() {
           </DialogFooter>
         </DialogContent>
         </Dialog>
+
+        <Dialog
+          open={showDeleteWeekDialog}
+          onOpenChange={setShowDeleteWeekDialog}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+                {t("schedule.deleteWeekConfirmTitle", currentLocale)}
+              </DialogTitle>
+              <DialogDescription>
+                {t("schedule.deleteWeekConfirmDescription", currentLocale, {
+                  week: formatWeekRangeWithMeta(),
+                  count: assignments.length,
+                })}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteWeekDialog(false)}
+                disabled={isDeletingWeek}
+                className="w-full sm:w-auto min-h-[44px] touch-manipulation"
+              >
+                {t("common.cancel", currentLocale)}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteCurrentWeek}
+                disabled={isDeletingWeek}
+                className="w-full sm:w-auto min-h-[44px] touch-manipulation"
+              >
+                {isDeletingWeek
+                  ? t("schedule.processing", currentLocale)
+                  : t("schedule.deleteWeekConfirm", currentLocale)}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AutoAssignResultDialog
+          result={autoAssignResult}
+          locale={currentLocale}
+          onClose={() => setAutoAssignResult(null)}
+        />
       </div>
     </>
   );

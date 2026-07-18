@@ -378,3 +378,101 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+/**
+ * 스케줄 배정 일괄 삭제
+ * DELETE /api/schedule/assignments?store_id=&from=&to=
+ */
+export async function DELETE(request: NextRequest) {
+  const supabase = await createClient();
+
+  const { searchParams } = new URL(request.url);
+  const store_id = searchParams.get("store_id");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+
+  if (!store_id || !from || !to) {
+    return NextResponse.json(
+      { success: false, error: "store_id, from, to are required" },
+      { status: 400 }
+    );
+  }
+
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user.user) {
+    return NextResponse.json(
+      { success: false, error: "unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const { data: userRole, error: roleError } = await supabase
+      .from("user_store_roles")
+      .select("role")
+      .eq("store_id", store_id)
+      .eq("user_id", user.user.id)
+      .eq("status", "ACTIVE")
+      .single();
+
+    if (
+      roleError ||
+      !userRole ||
+      !["MASTER", "SUB", "SUB_MANAGER"].includes(userRole.role)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Insufficient permissions" },
+        { status: 403 }
+      );
+    }
+
+    const { data: targetAssignments, error: fetchError } = await supabase
+      .from("schedule_assignments")
+      .select("id")
+      .eq("store_id", store_id)
+      .gte("date", from)
+      .lte("date", to);
+
+    if (fetchError) {
+      return NextResponse.json(
+        { success: false, error: fetchError.message },
+        { status: 500 }
+      );
+    }
+
+    const ids = (targetAssignments || []).map((assignment) => assignment.id);
+    if (ids.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: { deleted: 0 },
+      });
+    }
+
+    const batchSize = 1000;
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      const { error: deleteError } = await supabase
+        .from("schedule_assignments")
+        .delete()
+        .in("id", batch);
+
+      if (deleteError) {
+        return NextResponse.json(
+          { success: false, error: deleteError.message },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { deleted: ids.length },
+    });
+  } catch (error) {
+    console.error("스케줄 일괄 삭제 중 오류:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

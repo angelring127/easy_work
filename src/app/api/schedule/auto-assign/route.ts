@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadOperatingPatterns } from "@/lib/schedule/operating-pattern-settings";
+import {
+  calculateWorkItemOverflowMinutes,
+  evaluateOperatingSegmentCoverage,
+} from "@/lib/schedule/operating-patterns";
 import { createClient, createPureClient } from "@/lib/supabase/server";
+import type { OperatingPatternPayload } from "@/lib/validations/schedule/operating-patterns";
 
 type ConditionKey =
   | "desired_weekly_hours"
@@ -26,6 +32,7 @@ type StoreMember = {
 
 type Candidate = StoreMember & {
   desiredWeeklyHours: number | null;
+  desiredDailyHours: number | null;
   jobRoleIds: Set<string>;
   difficultWeekdays: Set<number>;
   preferredWeekdays: Set<number>;
@@ -49,6 +56,20 @@ type Slot = {
   endMin: number;
   unpaidBreakMin: number;
   isOpening: boolean;
+};
+
+type UnmetOperatingSegment = {
+  date: string;
+  patternId: string;
+  patternName: string;
+  segmentId: string;
+  segmentName: string;
+  startMin: number;
+  endMin: number;
+  requiredHeadcount: number;
+  assignedHeadcount: number;
+  missingRoleIds: string[];
+  missingRoleNames: string[];
 };
 
 const defaultConditionPriorities = [
@@ -250,6 +271,19 @@ function hasAssignmentConflict(
   );
 }
 
+function hasAnyAssignmentOnDate(
+  assignments: AssignmentLike[],
+  userId: string,
+  date: string
+) {
+  return assignments.some(
+    (assignment) =>
+      assignment.user_id === userId &&
+      assignment.date === date &&
+      assignment.status !== "CANCELLED"
+  );
+}
+
 function getShiftCounts(
   assignments: AssignmentLike[],
   date: string,
@@ -332,6 +366,14 @@ function scoreCandidate({
     }
   });
 
+  if (candidate.desiredDailyHours && candidate.desiredDailyHours > 0) {
+    const slotHours = slotPaidMin / 60;
+    const diff = Math.abs(candidate.desiredDailyHours - slotHours);
+    const closeness =
+      1 - Math.min(candidate.desiredDailyHours, diff) / candidate.desiredDailyHours;
+    conditionScore += Math.round(8 * Math.max(0, closeness));
+  }
+
   const userPriorityScore =
     userPriorityCount <= 1
       ? 10
@@ -405,6 +447,7 @@ export async function POST(request: NextRequest) {
       userJobRolesResult,
       availabilityResult,
       weekdayPrefsResult,
+      storeJobRolesResult,
     ] = await Promise.all([
       db.from("stores").select("*").eq("id", storeId).single(),
       db.from("store_business_hours").select("*").eq("store_id", storeId),
@@ -451,6 +494,11 @@ export async function POST(request: NextRequest) {
         .from("user_difficult_weekdays")
         .select("user_id, weekday, is_preferred")
         .eq("store_id", storeId),
+      db
+        .from("store_job_roles")
+        .select("id, name")
+        .eq("store_id", storeId)
+        .eq("active", true),
     ]);
 
     const firstError =
@@ -472,7 +520,8 @@ export async function POST(request: NextRequest) {
       storeUsersResult.error ||
       userJobRolesResult.error ||
       availabilityResult.error ||
-      weekdayPrefsResult.error;
+      weekdayPrefsResult.error ||
+      storeJobRolesResult.error;
 
     if (firstError) {
       return NextResponse.json(
@@ -483,6 +532,14 @@ export async function POST(request: NextRequest) {
 
     const store = storeResult.data || {};
     const workItems = (workItemsResult.data || []) as WorkItem[];
+    let operatingPatterns: OperatingPatternPayload[] = [];
+    try {
+      operatingPatterns = await loadOperatingPatterns(supabase, storeId);
+    } catch (error) {
+      if (!isMissingSettingsTableError(error)) {
+        throw error;
+      }
+    }
     if (workItems.length === 0) {
       return NextResponse.json({
         success: true,
@@ -490,6 +547,7 @@ export async function POST(request: NextRequest) {
           created: 0,
           skipped: dates.length,
           warnings: ["No work items configured"],
+          unmetSegments: [],
         },
       });
     }
@@ -599,7 +657,7 @@ export async function POST(request: NextRequest) {
     const difficultByUser = new Map<string, Set<number>>();
     const preferredByUser = new Map<string, Set<number>>();
     (weekdayPrefsResult.data || []).forEach((row: any) => {
-      const targetMap = row.is_preferred ? difficultByUser : preferredByUser;
+      const targetMap = row.is_preferred ? preferredByUser : difficultByUser;
       const set = targetMap.get(row.user_id) || new Set<number>();
       set.add(row.weekday);
       targetMap.set(row.user_id, set);
@@ -628,6 +686,10 @@ export async function POST(request: NextRequest) {
             typeof metadata.desired_weekly_hours === "number"
               ? metadata.desired_weekly_hours
               : null,
+          desiredDailyHours:
+            typeof metadata.desired_daily_hours === "number"
+              ? metadata.desired_daily_hours
+              : null,
           jobRoleIds: jobRolesByUser.get(member.id) || new Set<string>(),
           difficultWeekdays: difficultByUser.get(member.id) || new Set<number>(),
           preferredWeekdays: preferredByUser.get(member.id) || new Set<number>(),
@@ -651,6 +713,7 @@ export async function POST(request: NextRequest) {
       created_by: string;
     }> = [];
     const warnings: string[] = [];
+    const unmetSegments: UnmetOperatingSegment[] = [];
     const skipped: Array<{ date: string; workItemName: string; reason: string }> =
       [];
 
@@ -714,14 +777,21 @@ export async function POST(request: NextRequest) {
       return true;
     };
 
-    const assignSlot = (slot: Slot) => {
+    const assignSlot = (
+      slot: Slot,
+      preferredRoleIds: Set<string> = new Set<string>(),
+      requirePreferredRole = false,
+      recordFailure = true
+    ) => {
       if (!canAssignSlotByStaffLimit(slot)) {
-        skipped.push({
-          date: slot.date,
-          workItemName: slot.workItem.name,
-          reason: "staff_limit",
-        });
-        return;
+        if (recordFailure) {
+          skipped.push({
+            date: slot.date,
+            workItemName: slot.workItem.name,
+            reason: "staff_limit",
+          });
+        }
+        return false;
       }
 
       const requiredRoles = requiredRolesByItem.get(slot.workItem.id) || new Set<string>();
@@ -733,7 +803,20 @@ export async function POST(request: NextRequest) {
       const weekday = getWeekday(slot.date);
 
       const candidates = members.filter((candidate) => {
+        if (hasAnyAssignmentOnDate(scheduledAssignments, candidate.id, slot.date)) {
+          return false;
+        }
+
         if (!hasRequiredRole(candidate, requiredRoles)) {
+          return false;
+        }
+
+        if (
+          requirePreferredRole &&
+          ![...preferredRoleIds].some((roleId) =>
+            candidate.jobRoleIds.has(roleId)
+          )
+        ) {
           return false;
         }
 
@@ -780,17 +863,22 @@ export async function POST(request: NextRequest) {
       });
 
       if (candidates.length === 0) {
-        skipped.push({
-          date: slot.date,
-          workItemName: slot.workItem.name,
-          reason: slot.isOpening ? "opening_no_candidate" : "no_candidate",
-        });
-        return;
+        if (recordFailure) {
+          skipped.push({
+            date: slot.date,
+            workItemName: slot.workItem.name,
+            reason: slot.isOpening ? "opening_no_candidate" : "no_candidate",
+          });
+        }
+        return false;
       }
 
       const [selected] = candidates
         .map((candidate) => ({
           candidate,
+          coverageGain: [...preferredRoleIds].filter((roleId) =>
+            candidate.jobRoleIds.has(roleId)
+          ).length,
           score: scoreCandidate({
             candidate,
             slot,
@@ -800,6 +888,10 @@ export async function POST(request: NextRequest) {
           }),
         }))
         .sort((a, b) => {
+          if (b.coverageGain !== a.coverageGain) {
+            return b.coverageGain - a.coverageGain;
+          }
+
           if (b.score !== a.score) {
             return b.score - a.score;
           }
@@ -856,34 +948,173 @@ export async function POST(request: NextRequest) {
         selected.candidate.id,
         parseDateKey(slot.date).getTime()
       );
+      return true;
+    };
+
+    const roleNameById = new Map<string, string>(
+      (storeJobRolesResult.data || []).map(
+        (row: { id: string; name: string }) => [row.id, row.name]
+      )
+    );
+    const patternByWeekday = new Map<number, OperatingPatternPayload>();
+    operatingPatterns
+      .filter((pattern) => pattern.isActive)
+      .forEach((pattern) =>
+        pattern.weekdays.forEach((weekday) =>
+          patternByWeekday.set(weekday, pattern)
+        )
+      );
+
+    const getSegmentCoverage = (
+      date: string,
+      segment: OperatingPatternPayload["segments"][number]
+    ) =>
+      evaluateOperatingSegmentCoverage(segment, scheduledAssignments
+        .filter(
+          (assignment) =>
+            assignment.store_id === storeId &&
+            assignment.date === date &&
+            assignment.status !== "CANCELLED"
+        )
+        .map((assignment) => ({
+          userId: assignment.user_id,
+          startMin: timeToMinutes(assignment.start_time),
+          endMin: timeToMinutes(assignment.end_time),
+          roleIds: jobRolesByUser.get(assignment.user_id) || [],
+        }))
+      );
+
+    const assignOperatingPattern = (
+      date: string,
+      pattern: OperatingPatternPayload
+    ) => {
+      const segments = [...pattern.segments].sort(
+        (left, right) => left.startMin - right.startMin
+      );
+
+      segments.forEach((segment, segmentIndex) => {
+        const coveringItems = workItems
+          .map((workItem) => ({
+            workItem,
+            overflowMinutes: calculateWorkItemOverflowMinutes(
+              workItem.start_min,
+              workItem.end_min,
+              segment.startMin,
+              segment.endMin
+            ),
+          }))
+          .filter(
+            (
+              item
+            ): item is { workItem: WorkItem; overflowMinutes: number } =>
+              item.overflowMinutes !== null
+          )
+          .sort((left, right) => left.overflowMinutes - right.overflowMinutes);
+
+        let attempts = 0;
+        while (attempts < members.length) {
+          const coverage = getSegmentCoverage(date, segment);
+          if (coverage.isSatisfied) {
+            break;
+          }
+
+          const missingRoleIds = new Set(coverage.missingRoleIds);
+          const requireMissingRole =
+            coverage.assignedHeadcount >= segment.minHeadcount &&
+            missingRoleIds.size > 0;
+          let assigned = false;
+
+          for (const item of coveringItems) {
+            assigned = assignSlot(
+              {
+                date,
+                workItem: item.workItem,
+                startMin: item.workItem.start_min,
+                endMin: item.workItem.end_min,
+                unpaidBreakMin: item.workItem.unpaid_break_min || 0,
+                isOpening: segmentIndex === 0,
+              },
+              missingRoleIds,
+              requireMissingRole,
+              false
+            );
+            if (assigned) {
+              break;
+            }
+          }
+
+          if (!assigned) {
+            break;
+          }
+          attempts += 1;
+        }
+
+        const coverage = getSegmentCoverage(date, segment);
+        if (!coverage.isSatisfied) {
+          unmetSegments.push({
+            date,
+            patternId: pattern.id,
+            patternName: pattern.name,
+            segmentId: segment.id,
+            segmentName: segment.name,
+            startMin: segment.startMin,
+            endMin: segment.endMin,
+            requiredHeadcount: segment.minHeadcount,
+            assignedHeadcount: coverage.assignedHeadcount,
+            missingRoleIds: coverage.missingRoleIds,
+            missingRoleNames: coverage.missingRoleIds.map(
+              (roleId) => roleNameById.get(roleId) || roleId
+            ),
+          });
+        }
+      });
     };
 
     dates.forEach((date) => {
-      const openingItems = workItems.filter((item) => openingItemIds.has(item.id));
-      const regularItems = workItems.filter((item) => !openingItemIds.has(item.id));
+      const operatingPattern = patternByWeekday.get(getWeekday(date));
+      if (operatingPattern) {
+        assignOperatingPattern(date, operatingPattern);
+        return;
+      }
+
+      const openingStart =
+        openingPolicy.start_source === "custom" &&
+        typeof openingPolicy.custom_start_min === "number"
+          ? openingPolicy.custom_start_min
+          : getBusinessOpenMin(businessHoursResult.data || [], date);
+      const openingItems = workItems.filter(
+        (item) =>
+          openingItemIds.has(item.id) &&
+          item.start_min <= openingStart &&
+          item.end_min > openingStart
+      );
+      const regularItems = workItems.filter(
+        (item) => !openingItemIds.has(item.id)
+      );
 
       if (openingPolicy.enabled && openingItems.length > 0) {
-        const openingStart =
-          openingPolicy.start_source === "custom" &&
-          typeof openingPolicy.custom_start_min === "number"
-            ? openingPolicy.custom_start_min
-            : getBusinessOpenMin(businessHoursResult.data || [], date);
-        const openingEnd =
-          typeof openingPolicy.end_min === "number"
-            ? openingPolicy.end_min
-            : openingStart + 60;
         const openingWorkItem = openingItems[0];
+        const requiredHeadcount = Math.max(
+          1,
+          Number(openingPolicy.required_headcount || 1)
+        );
 
-        for (let i = 0; i < Number(openingPolicy.required_headcount || 1); i++) {
+        for (let i = 0; i < requiredHeadcount; i++) {
           assignSlot({
             date,
             workItem: openingWorkItem,
-            startMin: openingStart,
-            endMin: Math.max(openingStart + 1, openingEnd),
-            unpaidBreakMin: 0,
+            startMin: openingWorkItem.start_min,
+            endMin: openingWorkItem.end_min,
+            unpaidBreakMin: openingWorkItem.unpaid_break_min || 0,
             isOpening: true,
           });
         }
+      } else if (openingPolicy.enabled && openingItemIds.size > 0) {
+        skipped.push({
+          date,
+          workItemName: "Opening",
+          reason: "opening_work_item_time_mismatch",
+        });
       }
 
       regularItems.forEach((workItem) => {
@@ -920,6 +1151,7 @@ export async function POST(request: NextRequest) {
         created: chosen.length,
         skipped: skipped.length,
         warnings,
+        unmetSegments,
       },
     });
   } catch (e: any) {

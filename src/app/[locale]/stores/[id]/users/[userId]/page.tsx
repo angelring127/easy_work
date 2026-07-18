@@ -48,6 +48,7 @@ interface UserDetail {
   }>;
   resignationDate: string | null;
   desiredWeeklyHours: number | null;
+  desiredDailyHours: number | null;
   preferredWeekdays: Array<{
     weekday: number;
     is_preferred: boolean;
@@ -141,6 +142,7 @@ export default function UserDetailPage() {
       jobRoleIds?: string[];
       resignationDate?: string | null;
       desiredWeeklyHours?: number | null;
+      desiredDailyHours?: number | null;
       preferredWeekdays?: Array<{ weekday: number; isPreferred: boolean }>;
     }) => {
       const response = await fetch(`/api/stores/${storeId}/users/${userId}`, {

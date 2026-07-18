@@ -21,8 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { OperatingPatternEditor } from "@/components/schedule/operating-pattern-editor";
 import { useToast } from "@/hooks/use-toast";
 import { t, type Locale } from "@/lib/i18n";
+import { findOperatingPatternValidationIssues } from "@/lib/schedule/operating-patterns";
+import type { OperatingPatternPayload } from "@/lib/validations/schedule/operating-patterns";
 
 type ConditionKey =
   | "desired_weekly_hours"
@@ -61,11 +64,19 @@ type WorkItem = {
   end_min: number;
 };
 
+type JobRole = {
+  id: string;
+  name: string;
+  code: string;
+};
+
 type AutoScheduleSettings = {
   conditionPriorities: ConditionPriority[];
   userPriorities: UserPriority[];
   openingPolicy: OpeningPolicy;
   workItems: WorkItem[];
+  jobRoles: JobRole[];
+  operatingPatterns: OperatingPatternPayload[];
 };
 
 const requiredConditionKeys = [
@@ -223,6 +234,18 @@ export function AutoScheduleSettingsEditor({
       return;
     }
 
+    const blockingPatternIssues = findOperatingPatternValidationIssues(
+      settings.operatingPatterns
+    ).filter((issue) => issue.severity === "error");
+    if (blockingPatternIssues.length > 0) {
+      toast({
+        title: t("common.error", locale),
+        description: t("autoSchedule.pattern.fixErrors", locale),
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch(`/api/stores/${storeId}/auto-schedule-settings`, {
@@ -235,6 +258,7 @@ export function AutoScheduleSettingsEditor({
             priorityRank: priority.priorityRank,
           })),
           openingPolicy: settings.openingPolicy,
+          operatingPatterns: settings.operatingPatterns,
         }),
       });
       const json = await res.json();
@@ -361,6 +385,17 @@ export function AutoScheduleSettingsEditor({
           </div>
         </CardContent>
       </Card>
+
+      <OperatingPatternEditor
+        patterns={settings.operatingPatterns}
+        jobRoles={settings.jobRoles}
+        locale={locale}
+        onChange={(operatingPatterns) =>
+          setSettings((current) =>
+            current ? { ...current, operatingPatterns } : current
+          )
+        }
+      />
 
       <Card>
         <CardHeader>

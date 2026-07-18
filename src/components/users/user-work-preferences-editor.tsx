@@ -25,6 +25,7 @@ interface UserDetail {
   }>;
   resignationDate: string | null;
   desiredWeeklyHours: number | null;
+  desiredDailyHours: number | null;
   preferredWeekdays: Array<{
     weekday: number;
     is_preferred: boolean;
@@ -49,6 +50,7 @@ export interface UserWorkPreferencesSaveSummary {
   jobRoleIds: string[];
   resignationDate: string | null;
   desiredWeeklyHours: number | null;
+  desiredDailyHours: number | null;
   preferredWeekdays: Array<{
     weekday: number;
     is_preferred: boolean;
@@ -144,6 +146,7 @@ export function UserWorkPreferencesEditor({
   const [jobRoleIds, setJobRoleIds] = useState<string[]>([]);
   const [resignationDate, setResignationDate] = useState("");
   const [desiredWeeklyHours, setDesiredWeeklyHours] = useState("");
+  const [desiredDailyHours, setDesiredDailyHours] = useState("");
   const [difficultWeekdays, setDifficultWeekdays] = useState<Set<number>>(
     new Set()
   );
@@ -198,6 +201,7 @@ export function UserWorkPreferencesEditor({
     setJobRoleIds(userDetail.jobRoles.map((jobRole) => jobRole.store_job_roles.id));
     setResignationDate(userDetail.resignationDate || "");
     setDesiredWeeklyHours(userDetail.desiredWeeklyHours?.toString() || "");
+    setDesiredDailyHours(userDetail.desiredDailyHours?.toString() || "");
     setDifficultWeekdays(
       new Set(
         userDetail.preferredWeekdays
@@ -241,11 +245,11 @@ export function UserWorkPreferencesEditor({
       })
     )
   );
-
   const hasChanges =
     !compareStringArrays(jobRoleIds, currentJobRoleIds) ||
     resignationDate !== (userDetail?.resignationDate || "") ||
     desiredWeeklyHours !== (userDetail?.desiredWeeklyHours?.toString() || "") ||
+    desiredDailyHours !== (userDetail?.desiredDailyHours?.toString() || "") ||
     !compareWeekdayRows(nextWeekdayRows, currentWeekdayRows);
 
   const updateProfileMutation = useMutation({
@@ -254,6 +258,7 @@ export function UserWorkPreferencesEditor({
         jobRoleIds?: string[];
         resignationDate?: string | null;
         desiredWeeklyHours?: number | null;
+        desiredDailyHours?: number | null;
         preferredWeekdays?: Array<{
           weekday: number;
           isPreferred: boolean;
@@ -329,6 +334,7 @@ export function UserWorkPreferencesEditor({
       jobRoleIds?: string[];
       resignationDate?: string | null;
       desiredWeeklyHours?: number | null;
+      desiredDailyHours?: number | null;
       preferredWeekdays?: Array<{ weekday: number; isPreferred: boolean }>;
     } = {};
     const nextWeekdayPayload = buildWeekdayPayload(
@@ -350,6 +356,12 @@ export function UserWorkPreferencesEditor({
         : null;
     }
 
+    if (desiredDailyHours !== (userDetail.desiredDailyHours?.toString() || "")) {
+      patchData.desiredDailyHours = desiredDailyHours
+        ? Number(desiredDailyHours)
+        : null;
+    }
+
     if (!compareWeekdayRows(nextWeekdayRows, currentWeekdayRows)) {
       patchData.preferredWeekdays = nextWeekdayPayload.map((weekday) => ({
         weekday: weekday.weekday,
@@ -366,6 +378,7 @@ export function UserWorkPreferencesEditor({
         desiredWeeklyHours: desiredWeeklyHours
           ? parseInt(desiredWeeklyHours, 10)
           : null,
+        desiredDailyHours: desiredDailyHours ? Number(desiredDailyHours) : null,
         preferredWeekdays: nextWeekdayPayload.map((weekday) => ({
           weekday: weekday.weekday,
           is_preferred: weekday.isPreferred,
@@ -477,6 +490,23 @@ export function UserWorkPreferencesEditor({
               placeholder={t("user.desiredWeeklyHoursPlaceholder", locale)}
               value={desiredWeeklyHours}
               onChange={(event) => setDesiredWeeklyHours(event.target.value)}
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor={`${mode}-desired-daily-hours`}>
+              {t("user.desiredDailyHours", locale)}
+            </Label>
+            <Input
+              id={`${mode}-desired-daily-hours`}
+              type="number"
+              min="0"
+              max="24"
+              step="0.5"
+              placeholder={t("user.desiredDailyHoursPlaceholder", locale)}
+              value={desiredDailyHours}
+              onChange={(event) => setDesiredDailyHours(event.target.value)}
               className="mt-1"
             />
           </div>
