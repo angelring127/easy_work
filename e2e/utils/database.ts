@@ -76,6 +76,162 @@ export const getTestUserByEmail = async (email: string) => {
   return users?.users.find(u => u.email === email);
 };
 
+export const addUserToStore = async (
+  storeId: string,
+  userId: string,
+  role: 'MASTER' | 'SUB_MANAGER' | 'PART_TIMER',
+  grantedBy: string,
+  name?: string
+) => {
+  const adminClient = getAdminClient();
+
+  const { error: roleError } = await adminClient
+    .from('user_store_roles')
+    .upsert(
+      {
+        store_id: storeId,
+        user_id: userId,
+        role,
+        status: 'ACTIVE',
+        is_default_store: false,
+        granted_at: new Date().toISOString(),
+        deleted_at: null,
+      } as any,
+      { onConflict: 'user_id,store_id' }
+    );
+
+  if (roleError) {
+    throw new Error(`Failed to grant store role: ${roleError.message}`);
+  }
+
+  const { data: existingStoreUser } = await adminClient
+    .from('store_users')
+    .select('id')
+    .eq('store_id', storeId)
+    .eq('user_id', userId)
+    .eq('is_guest', false)
+    .maybeSingle();
+
+  if (existingStoreUser?.id) {
+    const { data: updatedStoreUser, error: updateStoreUserError } = await adminClient
+      .from('store_users')
+      .update({
+        role,
+        name: name ?? undefined,
+        is_active: true,
+      })
+      .eq('id', existingStoreUser.id)
+      .select('id, store_id, user_id, role, name')
+      .single();
+
+    if (updateStoreUserError) {
+      throw new Error(`Failed to update store user: ${updateStoreUserError.message}`);
+    }
+
+    return updatedStoreUser;
+  }
+
+  const { data: storeUser, error: storeUserError } = await adminClient
+    .from('store_users')
+    .insert({
+      store_id: storeId,
+      user_id: userId,
+      name: name ?? null,
+      role,
+      is_guest: false,
+      is_active: true,
+      granted_by: grantedBy,
+      granted_at: new Date().toISOString(),
+    })
+    .select('id, store_id, user_id, role, name')
+    .single();
+
+  if (storeUserError || !storeUser) {
+    throw new Error(`Failed to create store user: ${storeUserError?.message}`);
+  }
+
+  return storeUser;
+};
+
+export const createWorkItem = async (
+  storeId: string,
+  {
+    name,
+    startMin,
+    endMin,
+    unpaidBreakMin = 0,
+    maxHeadcount = 1,
+  }: {
+    name: string;
+    startMin: number;
+    endMin: number;
+    unpaidBreakMin?: number;
+    maxHeadcount?: number;
+  }
+) => {
+  const adminClient = getAdminClient();
+  const { data, error } = await adminClient
+    .from('work_items')
+    .insert({
+      store_id: storeId,
+      name,
+      start_min: startMin,
+      end_min: endMin,
+      unpaid_break_min: unpaidBreakMin,
+      max_headcount: maxHeadcount,
+    })
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to create work item: ${error?.message}`);
+  }
+
+  return data;
+};
+
+export const createScheduleAssignment = async ({
+  storeId,
+  storeUserId,
+  workItemId,
+  date,
+  startTime,
+  endTime,
+  createdBy,
+  status = 'ASSIGNED',
+}: {
+  storeId: string;
+  storeUserId: string;
+  workItemId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  createdBy: string;
+  status?: 'ASSIGNED' | 'CONFIRMED' | 'CANCELLED';
+}) => {
+  const adminClient = getAdminClient();
+  const { data, error } = await adminClient
+    .from('schedule_assignments')
+    .insert({
+      store_id: storeId,
+      user_id: storeUserId,
+      work_item_id: workItemId,
+      date,
+      start_time: startTime,
+      end_time: endTime,
+      status,
+      created_by: createdBy,
+    })
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to create schedule assignment: ${error?.message}`);
+  }
+
+  return data;
+};
+
 export const createTestStore = async (
   userId: string,
   storeName: string,

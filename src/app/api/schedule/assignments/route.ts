@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPureClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import {
+  getCrossStoreConflicts,
+  getManagedStores,
+} from "@/lib/server/cross-store";
+import { buildCrossStoreIdentityKey } from "@/lib/schedule/cross-store-identity";
 
 const formatMinutesToTime = (minutes: number): string => {
   const safeMinutes = Math.max(0, minutes);
@@ -201,6 +206,8 @@ export async function POST(request: NextRequest) {
     parsed.data;
 
   try {
+    const adminClient = await createPureClient();
+
     // 권한 확인: 매장 관리자만 배정 가능
     const { data: userRole, error: roleError } = await supabase
       .from("user_store_roles")
@@ -301,6 +308,38 @@ export async function POST(request: NextRequest) {
 
     // user_id를 store_users.id로 사용 (일반 유저의 경우 변환됨)
     const finalUserId = storeUser.id;
+
+    const managedStores = await getManagedStores(adminClient, user.user.id);
+    const targetIdentityKey = buildCrossStoreIdentityKey({
+      authUserId: storeUser.user_id,
+      isGuest: storeUser.is_guest,
+      name: storeUser.name,
+    });
+    const crossStoreConflicts = await getCrossStoreConflicts(adminClient, {
+      currentStoreId: store_id,
+      managedStores,
+      identityKey: targetIdentityKey,
+      date,
+      startTime: start_time,
+      endTime: end_time,
+    });
+
+    if (crossStoreConflicts.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Cross-store schedule conflict",
+          conflicts: crossStoreConflicts.map((conflict) => ({
+            storeId: conflict.storeId,
+            storeName: conflict.storeName,
+            date: conflict.date,
+            startTime: conflict.startTime,
+            endTime: conflict.endTime,
+          })),
+        },
+        { status: 409 }
+      );
+    }
 
     // 출근 불가 확인 (경고만 표시, 배정은 진행)
     const { data: availability, error: availabilityError } = await supabase

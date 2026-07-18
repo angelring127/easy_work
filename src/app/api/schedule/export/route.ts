@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createPureClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import ExcelJS from "exceljs";
+import {
+  getCrossStoreAssignmentsForUsers,
+  getManagedStores,
+} from "@/lib/server/cross-store";
+import { buildCrossStoreIdentityKey } from "@/lib/schedule/cross-store-identity";
+import { defaultLocale, isValidLocale, t, type Locale } from "@/lib/i18n";
 
 // 엑셀 내보내기 스키마
 const ExportSchema = z.object({
@@ -29,6 +35,9 @@ export async function GET(request: NextRequest) {
     scope: searchParams.get("scope") || "all",
     include_private_info: searchParams.get("include_private_info") === "true",
   };
+  const localeParam = searchParams.get("locale");
+  const locale: Locale =
+    localeParam && isValidLocale(localeParam) ? localeParam : defaultLocale;
 
   const parsed = ExportSchema.safeParse(queryParams);
   if (!parsed.success) {
@@ -179,7 +188,7 @@ export async function GET(request: NextRequest) {
     // 사용자 표시명 조회 (store_users 기반)
     const { data: storeUsers, error: storeUsersError } = await supabase
       .from("store_users")
-      .select("id, user_id, name")
+      .select("id, user_id, name, is_guest")
       .eq("store_id", store_id);
 
     if (storeUsersError) {
@@ -209,11 +218,58 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const managedStores = await getManagedStores(adminClient, user.user.id);
+    const crossStoreAssignments = await getCrossStoreAssignmentsForUsers(
+      adminClient,
+      {
+        currentStoreId: store_id,
+        managedStores,
+        identityKeys: (storeUsers || [])
+          .map((item) =>
+            buildCrossStoreIdentityKey({
+              authUserId: item.user_id,
+              isGuest: item.is_guest,
+              name: item.name,
+            })
+          )
+          .filter(Boolean),
+        from,
+        to,
+      }
+    );
+
+    const crossStoreCodeMap = new Map<string, string>();
+    crossStoreAssignments.forEach((assignment) => {
+      const key = `${assignment.authUserId}::${assignment.date}`;
+      const existing = crossStoreCodeMap.get(key);
+      if (!existing) {
+        crossStoreCodeMap.set(key, assignment.shortCode);
+        return;
+      }
+
+      const codes = new Set(existing.split("/").filter(Boolean));
+      codes.add(assignment.shortCode);
+      crossStoreCodeMap.set(key, Array.from(codes).join("/"));
+    });
+
+    const crossStoreLegend = Array.from(
+      new Map(
+        crossStoreAssignments.map((assignment) => [
+          assignment.shortCode,
+          assignment.storeName,
+        ])
+      ).entries()
+    );
+
     // 1. Week Grid 시트
     const weekGridData = generateWeekGridData(
       filteredAssignments,
       userMap,
-      include_private_info
+      include_private_info,
+      storeUserById,
+      crossStoreCodeMap,
+      crossStoreLegend,
+      locale
     );
 
     // 2. Assignments 시트
@@ -296,7 +352,11 @@ function toCsv(rows: unknown[][]) {
 function generateWeekGridData(
   assignments: any[],
   userMap: Map<string, any>,
-  includePrivateInfo: boolean
+  includePrivateInfo: boolean,
+  storeUserById: Map<string, any>,
+  crossStoreCodeMap: Map<string, string>,
+  crossStoreLegend: Array<[string, string]>,
+  locale: Locale
 ): any[][] {
   const data: any[][] = [];
 
@@ -313,8 +373,9 @@ function generateWeekGridData(
   users.forEach((userId) => {
     const userAssignments = assignments.filter((a) => a.user_id === userId);
     const userInfo = userMap.get(userId);
+    const storeUser = storeUserById.get(userId);
     const resolvedName =
-      userInfo?.raw_user_meta_data?.name || userInfo?.email || "";
+      storeUser?.name || userInfo?.raw_user_meta_data?.name || userInfo?.email || "";
     const userName =
       typeof resolvedName === "string" &&
       resolvedName.trim().length > 0 &&
@@ -325,17 +386,31 @@ function generateWeekGridData(
     const userRow = [userName];
     dates.forEach((date) => {
       const dayAssignments = userAssignments.filter((a) => a.date === date);
+      const authUserId = storeUser?.user_id || null;
+      const crossStoreCodes = authUserId
+        ? crossStoreCodeMap.get(`${authUserId}::${date}`) || ""
+        : "";
       if (dayAssignments.length > 0) {
         const workItems = dayAssignments
           .map((a) => a.work_items.name)
           .join("\n");
-        userRow.push(workItems);
+        userRow.push(
+          [workItems, crossStoreCodes].filter(Boolean).join("\n")
+        );
       } else {
-        userRow.push("");
+        userRow.push(crossStoreCodes);
       }
     });
     data.push(userRow);
   });
+
+  if (crossStoreLegend.length > 0) {
+    data.push([]);
+    data.push([t("export.crossStoreLegend", locale)]);
+    crossStoreLegend.forEach(([code, storeName]) => {
+      data.push([`${code}: ${storeName}`]);
+    });
+  }
 
   return data;
 }

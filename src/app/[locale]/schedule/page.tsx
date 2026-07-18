@@ -37,6 +37,8 @@ import { useAuth } from "@/contexts/auth-context";
 import { useStore } from "@/contexts/store-context";
 import { useToast } from "@/hooks/use-toast";
 import { t, type Locale } from "@/lib/i18n";
+import { CrossStoreAssignment } from "@/lib/supabase/types";
+import { buildCrossStoreIdentityKey } from "@/lib/schedule/cross-store-identity";
 import {
   format,
   startOfWeek,
@@ -104,7 +106,13 @@ export default function SchedulePage() {
       name: string;
       email: string;
       roles: string[];
+      authUserId?: string | null;
+      status?: string;
+      deleted_at?: string | null;
     }>
+  >([]);
+  const [crossStoreAssignments, setCrossStoreAssignments] = useState<
+    CrossStoreAssignment[]
   >([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +172,7 @@ export default function SchedulePage() {
         assignmentsRes,
         availabilitiesRes,
         storeUsersRes,
+        crossStoreAssignmentsRes,
         businessHoursRes,
         workItemsRes,
       ] = await Promise.all([
@@ -174,6 +183,9 @@ export default function SchedulePage() {
           `/api/schedule/availability?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
         ),
         fetch(`/api/stores/${currentStore.id}/users`),
+        fetch(
+          `/api/schedule/cross-store-assignments?store_id=${currentStore.id}&from=${fromDate}&to=${toDate}`
+        ),
         fetch(`/api/store-business-hours?store_id=${currentStore.id}`),
         fetch(`/api/work-items?store_id=${currentStore.id}`),
       ]);
@@ -243,6 +255,11 @@ export default function SchedulePage() {
             name: member.name || member.email || "Unknown User",
             email: member.email || "",
             roles: [member.role], // 단일 역할을 배열로 변환
+            authUserId: buildCrossStoreIdentityKey({
+              authUserId: member.auth_user_id || null,
+              isGuest: member.is_guest,
+              name: member.name || null,
+            }),
             status: member.status,
             deleted_at: member.deleted_at,
           }));
@@ -255,6 +272,15 @@ export default function SchedulePage() {
           storeUsersRes.status,
           storeUsersRes.statusText
         );
+      }
+
+      if (crossStoreAssignmentsRes.ok) {
+        const crossStoreAssignmentsData = await crossStoreAssignmentsRes.json();
+        if (crossStoreAssignmentsData.success) {
+          setCrossStoreAssignments(crossStoreAssignmentsData.data || []);
+        }
+      } else {
+        setCrossStoreAssignments([]);
       }
     } catch (error) {
       console.error("스케줄 데이터 로드 실패:", error);
@@ -562,6 +588,7 @@ export default function SchedulePage() {
                 userAvailabilities={userAvailabilities}
                 currentWeek={currentWeek}
                 storeUsers={storeUsers}
+                crossStoreAssignments={crossStoreAssignments}
                 storeName={currentStore.name}
                 businessHours={businessHours}
               />
@@ -604,10 +631,11 @@ export default function SchedulePage() {
                 storeId={currentStore.id}
                 currentWeek={currentWeek}
                 locale={currentLocale}
-                assignments={assignments}
-                userAvailabilities={userAvailabilities}
-                storeUsers={storeUsers}
-                onAssignmentClick={handleAssignmentClick}
+              assignments={assignments}
+              userAvailabilities={userAvailabilities}
+              storeUsers={storeUsers}
+              crossStoreAssignments={crossStoreAssignments}
+              onAssignmentClick={handleAssignmentClick}
                 onUserClick={handleUserClick}
                 onAvailabilityToggle={handleAvailabilityToggle}
                 onScheduleChange={loadScheduleData}

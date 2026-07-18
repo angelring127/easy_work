@@ -28,6 +28,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { t, type Locale } from "@/lib/i18n";
+import { CrossStoreAssignment } from "@/lib/supabase/types";
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from "date-fns";
 import { ko, enUS, ja } from "date-fns/locale";
 import ExcelJS from "exceljs";
@@ -64,6 +65,7 @@ interface StoreUser {
   name: string;
   email: string;
   roles: string[];
+  authUserId?: string | null;
   status?: string;
   deleted_at?: string | null;
 }
@@ -87,6 +89,7 @@ interface ScheduleExporterProps {
   userAvailabilities?: UserAvailability[];
   currentWeek?: Date;
   storeUsers?: StoreUser[]; // 모든 매장 사용자 (스케줄 없는 유저 포함)
+  crossStoreAssignments?: CrossStoreAssignment[];
   storeName?: string; // 매장 이름
   businessHours?: BusinessHour[]; // 영업 시간 정보
 }
@@ -110,7 +113,7 @@ const resolveScheduleRows = (
   const effectiveEndMin = endMin === 0 ? 1440 : endMin;
   const endText =
     effectiveEndMin >= effectiveCloseMin && effectiveCloseMin > 0
-      ? "close"
+      ? "CLOSE"
       : endTime.substring(0, 5);
 
   const firstRowText = startMin < boundaryMin ? startTime.substring(0, 5) : "";
@@ -140,6 +143,7 @@ export function ScheduleExporter({
   userAvailabilities = [],
   currentWeek,
   storeUsers = [],
+  crossStoreAssignments = [],
   storeName = "",
   businessHours = [],
 }: ScheduleExporterProps) {
@@ -151,6 +155,30 @@ export function ScheduleExporter({
   const [includePrivateInfo, setIncludePrivateInfo] = useState(false);
   const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
+  const crossStoreLegendEntries = Array.from(
+    new Map(
+      crossStoreAssignments.map((assignment) => [
+        assignment.shortCode,
+        assignment.storeName,
+      ])
+    ).entries()
+  );
+
+  const getCrossStoreShortCodes = (userId: string, date: string) => {
+    const authUserId =
+      storeUsers.find((storeUser) => storeUser.id === userId)?.authUserId || null;
+    if (!authUserId) {
+      return "";
+    }
+
+    return crossStoreAssignments
+      .filter(
+        (assignment) =>
+          assignment.authUserId === authUserId && assignment.date === date
+      )
+      .map((assignment) => assignment.shortCode)
+      .join("/");
+  };
 
   const loadShiftBoundaryTimeMin = async () => {
     try {
@@ -214,7 +242,11 @@ export function ScheduleExporter({
       const rowHeight = 26;
       const headerRows = 4;
       const width = leftColWidth + weekDays.length * dayColWidth;
-      const height = (headerRows + users.length * 3) * rowHeight;
+      const legendHeight =
+        crossStoreLegendEntries.length > 0
+          ? (crossStoreLegendEntries.length + 2) * rowHeight
+          : 0;
+      const height = (headerRows + users.length * 3) * rowHeight + legendHeight;
 
       const canvas = document.createElement("canvas");
       canvas.width = width;
@@ -247,7 +279,14 @@ export function ScheduleExporter({
         ctx.fillText(text, x + w / 2, y + h / 2);
       };
 
-      drawCell(0, 0, leftColWidth, rowHeight * 2, storeName || "Schedule", true);
+      drawCell(
+        0,
+        0,
+        leftColWidth,
+        rowHeight * 2,
+        storeName || t("export.defaultScheduleTitle", locale),
+        true
+      );
       weekDays.forEach((day, idx) => {
         const x = leftColWidth + idx * dayColWidth;
         drawCell(x, 0, dayColWidth, rowHeight, format(day, "d", { locale: dateLocale }), true);
@@ -299,6 +338,7 @@ export function ScheduleExporter({
           const availability = userAvailabilities.find(
             (ua) => ua.userId === user.id && ua.date === dayStr
           );
+          const crossStoreCodes = getCrossStoreShortCodes(user.id, dayStr);
 
           if (availability && !userAssignment) {
             drawCell(x, baseY, dayColWidth, rowHeight * 3, "X", true);
@@ -306,7 +346,7 @@ export function ScheduleExporter({
           }
 
           drawCell(x, baseY, dayColWidth, rowHeight, userAssignment?.startTime?.substring(0, 5) || "");
-          drawCell(x, baseY + rowHeight, dayColWidth, rowHeight, "");
+          drawCell(x, baseY + rowHeight, dayColWidth, rowHeight, crossStoreCodes);
 
           let endText = "";
           if (userAssignment) {
@@ -317,12 +357,34 @@ export function ScheduleExporter({
             const effectiveEndMin = endMin === 0 ? 1440 : endMin;
             endText =
               effectiveEndMin >= effectiveCloseMin && effectiveCloseMin > 0
-                ? "close"
+                ? "CLOSE"
                 : userAssignment.endTime.substring(0, 5);
           }
           drawCell(x, baseY + rowHeight * 2, dayColWidth, rowHeight, endText);
         });
       });
+
+      if (crossStoreLegendEntries.length > 0) {
+        const legendStartY = (headerRows + users.length * 3) * rowHeight + rowHeight;
+        ctx.fillStyle = "#111827";
+        ctx.font = "600 12px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(
+          t("export.crossStoreLegend", locale),
+          12,
+          legendStartY
+        );
+
+        crossStoreLegendEntries.forEach(([code, name], index) => {
+          ctx.font = "400 12px sans-serif";
+          ctx.fillText(
+            `${code}: ${name}`,
+            12,
+            legendStartY + (index + 1) * rowHeight
+          );
+        });
+      }
 
       const pngBlob = await new Promise<Blob | null>((resolve, reject) => {
         try {
@@ -368,7 +430,7 @@ export function ScheduleExporter({
     if (!currentWeek) {
       toast({
         title: t("common.error", locale),
-        description: "No data to export",
+        description: t("export.noDataToExport", locale),
         variant: "destructive",
       });
       return;
@@ -386,7 +448,9 @@ export function ScheduleExporter({
 
       // ExcelJS 워크북 생성
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Weekly Schedule");
+      const worksheet = workbook.addWorksheet(
+        t("export.weeklySheetTitle", locale)
+      );
 
       // 중앙 정렬 스타일 정의
       const centerAlignStyle: Partial<ExcelJS.Style> = {
@@ -397,7 +461,10 @@ export function ScheduleExporter({
       };
 
       // 1. 헤더 행 (날짜)
-      const dateRow = worksheet.addRow([storeName || "Schedule", ...weekDays.map((day) => format(day, "d", { locale: dateLocale }))]);
+      const dateRow = worksheet.addRow([
+        storeName || t("export.defaultScheduleTitle", locale),
+        ...weekDays.map((day) => format(day, "d", { locale: dateLocale })),
+      ]);
       dateRow.eachCell((cell) => {
         cell.style = centerAlignStyle;
         cell.font = { bold: true };
@@ -522,6 +589,7 @@ export function ScheduleExporter({
           const availability = userAvailabilities.find(
             (ua) => ua.userId === userId && ua.date === dayStr
           );
+          const crossStoreCodes = getCrossStoreShortCodes(userId, dayStr);
 
           // Find Business Hours for this day
           const dayBusinessHour = businessHours.find(h => h.weekday === dayOfWeek);
@@ -535,7 +603,9 @@ export function ScheduleExporter({
               closeMin
             );
             nameRowData.push(rowTexts.firstRowText);
-            startRowData.push(rowTexts.secondRowText);
+            startRowData.push(
+              [rowTexts.secondRowText, crossStoreCodes].filter(Boolean).join(" / ")
+            );
             endRowData.push(rowTexts.thirdRowText);
           } else if (availability) {
             // Unavailable - Merge "X" across 3 rows (only if no assignment)
@@ -545,7 +615,7 @@ export function ScheduleExporter({
           } else {
             // Empty
             nameRowData.push("");
-            startRowData.push("");
+            startRowData.push(crossStoreCodes);
             endRowData.push("");
           }
         });
@@ -608,6 +678,15 @@ export function ScheduleExporter({
         worksheet.getRow(rowNumber++).height = 20; // End
       });
 
+      if (crossStoreLegendEntries.length > 0) {
+        worksheet.addRow([]);
+        const legendTitleRow = worksheet.addRow([t("export.crossStoreLegend", locale)]);
+        legendTitleRow.getCell(1).font = { bold: true };
+        crossStoreLegendEntries.forEach(([code, name]) => {
+          worksheet.addRow([`${code}: ${name}`]);
+        });
+      }
+
       // 파일 다운로드
       const fileName = `${storeName ? storeName.replace(/\s+/g, "_") + "_" : ""}schedule_${format(weekStart, "yyyy-MM-dd", { locale: dateLocale })}_to_${format(weekEnd, "yyyy-MM-dd", { locale: dateLocale })}.xlsx`;
       const buffer = await workbook.xlsx.writeBuffer();
@@ -642,7 +721,7 @@ export function ScheduleExporter({
     if (!storeId) {
       toast({
         title: t("common.error", locale),
-        description: "Store ID is required",
+        description: t("export.storeIdRequired", locale),
         variant: "destructive",
       });
       return;
@@ -669,6 +748,7 @@ export function ScheduleExporter({
         format: exportFormat,
         scope: exportScope,
         include_private_info: includePrivateInfo.toString(),
+        locale,
       });
 
       const response = await fetch(`/api/schedule/export?${params}`);

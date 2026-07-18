@@ -12,6 +12,12 @@ export interface GuestInviteData {
   role: 'PART_TIMER' | 'SUB_MANAGER';
 }
 
+export interface ImportInviteData {
+  sourceStoreName: string;
+  candidateName: string;
+  role?: 'PART_TIMER' | 'SUB_MANAGER';
+}
+
 export class InvitationPage {
   readonly page: Page;
   readonly createInviteButton: Locator;
@@ -21,6 +27,10 @@ export class InvitationPage {
   readonly roleSelect: Locator;
   readonly expiresInDaysSelect: Locator;
   readonly isGuestCheckbox: Locator;
+  readonly emailModeTab: Locator;
+  readonly guestModeTab: Locator;
+  readonly importModeTab: Locator;
+  readonly invitationManagementTab: Locator;
   readonly submitButton: Locator;
   readonly cancelButton: Locator;
   readonly invitationTable: Locator;
@@ -30,14 +40,31 @@ export class InvitationPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.createInviteButton = page.locator('button:has-text("초대 생성"), button:has-text("Create Invite")');
+    this.createInviteButton = page.locator(
+      'button:has-text("초대 생성"), button:has-text("Create Invitation"), button:has-text("Create Invite")'
+    );
     this.inviteDialog = page.locator('[role="dialog"]');
     this.emailInput = page.locator('[role="dialog"] input#email, [role="dialog"] input[type="email"]');
     this.nameInput = page.locator('[role="dialog"] input#name');
     this.roleSelect = page.locator('[role="dialog"] select, [role="dialog"] [role="combobox"]');
     this.expiresInDaysSelect = page.locator('[role="dialog"] select[name="expiresInDays"]');
     this.isGuestCheckbox = page.locator('[role="dialog"] input#isGuest, [role="dialog"] input[type="checkbox"]');
-    this.submitButton = page.locator('[role="dialog"] button:has-text("초대 생성"), [role="dialog"] button[type="submit"]');
+    this.emailModeTab = page.getByRole('tab', { name: /email invite|이메일 초대/i });
+    this.guestModeTab = page.getByRole('tab', { name: /guest registration|게스트 등록/i });
+    this.importModeTab = page.getByRole('tab', { name: /other store users|다른 지점 유저/i });
+    this.invitationManagementTab = page.getByRole('tab', {
+      name: /invitation management|초대 관리/i,
+    });
+    this.submitButton = page.locator(
+      [
+        '[role="dialog"] button:has-text("초대 생성")',
+        '[role="dialog"] button:has-text("Create Invitation")',
+        '[role="dialog"] button:has-text("Create Invite")',
+        '[role="dialog"] button:has-text("현재 지점에 등록")',
+        '[role="dialog"] button:has-text("Add to Current Store")',
+        '[role="dialog"] button[type="submit"]',
+      ].join(', ')
+    );
     this.cancelButton = page.locator('[role="dialog"] button:has-text("취소"), [role="dialog"] button:has-text("Cancel")');
     this.invitationTable = page.locator('table');
     this.statusBadges = page.locator('[data-status], .badge');
@@ -51,12 +78,22 @@ export class InvitationPage {
   }
 
   async openInviteDialog() {
+    if (await this.invitationManagementTab.count()) {
+      await this.invitationManagementTab.click();
+      await this.page.waitForTimeout(500);
+    }
+
+    await this.createInviteButton.waitFor({ state: 'visible', timeout: 10000 });
     await this.createInviteButton.click();
     await this.inviteDialog.waitFor({ state: 'visible', timeout: 5000 });
     await this.page.waitForTimeout(500);
   }
 
   async fillEmailInvite(data: EmailInviteData) {
+    if (await this.emailModeTab.count()) {
+      await this.emailModeTab.click();
+    }
+
     await this.emailInput.fill(data.email);
 
     if (data.name) {
@@ -82,6 +119,16 @@ export class InvitationPage {
     await this.fillRole(data.role);
   }
 
+  async fillImportInvite(data: ImportInviteData) {
+    await this.switchToImportMode();
+    await this.selectSourceStore(data.sourceStoreName);
+    await this.selectImportCandidate(data.candidateName);
+
+    if (data.role) {
+      await this.fillRole(data.role);
+    }
+  }
+
   private async fillRole(role: 'PART_TIMER' | 'SUB_MANAGER') {
     const isNativeSelect = await this.page.locator('[role="dialog"] select').count() > 0;
 
@@ -89,18 +136,69 @@ export class InvitationPage {
       await this.roleSelect.selectOption(role);
     } else {
       await this.roleSelect.click();
-      const roleText = role === 'PART_TIMER' ? '파트타이머' : '서브 매니저';
-      await this.page.locator(`[role="option"]:has-text("${roleText}"), [role="option"]:has-text("${role}")`).first().click();
+      const roleTexts =
+        role === 'PART_TIMER'
+          ? ['파트타이머', 'Part Timer', 'アルバイト', role]
+          : ['서브 매니저', 'Sub Manager', 'サブ管理者', role];
+
+      for (const roleText of roleTexts) {
+        const option = this.page.getByRole('option', { name: roleText }).first();
+        if (await option.count()) {
+          await option.click();
+          return;
+        }
+      }
+
+      throw new Error(`Role option not found: ${role}`);
     }
   }
 
   async toggleGuestMode() {
-    await this.isGuestCheckbox.check();
+    if (await this.guestModeTab.count()) {
+      await this.guestModeTab.click();
+    } else {
+      await this.isGuestCheckbox.check();
+    }
     await this.page.waitForTimeout(300);
   }
 
+  async switchToImportMode() {
+    await this.importModeTab.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  async selectSourceStore(storeName: string) {
+    const tab = this.page
+      .locator('[role="dialog"]')
+      .getByRole('tab', { name: storeName })
+      .first();
+    await tab.click();
+    await this.page.waitForTimeout(500);
+  }
+
+  async selectImportCandidate(candidateName: string) {
+    const candidateLabel = this.page
+      .locator('[role="dialog"] label')
+      .filter({ hasText: candidateName })
+      .first();
+    await candidateLabel.evaluate((element) => {
+      (element as HTMLElement).click();
+    });
+  }
+
+  async hasImportCandidate(candidateName: string): Promise<boolean> {
+    return await this.page
+      .locator('[role="dialog"] label')
+      .filter({ hasText: candidateName })
+      .first()
+      .isVisible()
+      .catch(() => false);
+  }
+
   async submitInvite() {
-    await this.submitButton.click();
+    await this.submitButton.evaluate((element) => {
+      (element as HTMLElement).click();
+    });
   }
 
   async waitForSuccess() {

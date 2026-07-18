@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,33 +30,69 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { t } from "@/lib/i18n";
 import { Locale } from "@/lib/i18n-config";
 import { Invitation, CreateInvitationRequest } from "@/lib/supabase/types";
+import { useStore } from "@/contexts/store-context";
 
 interface InvitationManagerProps {
   storeId: string;
   locale: Locale;
 }
 
+interface ImportCandidate {
+  importId: string;
+  userId: string | null;
+  storeUserId: string | null;
+  isGuest: boolean;
+  name: string;
+  email: string;
+  sourceRole: string | null;
+}
+
 export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [inviteMode, setInviteMode] = useState<"email" | "guest" | "import">(
+    "email"
+  );
   const [createForm, setCreateForm] = useState<{
     email: string;
     name: string;
     roleHint: "PART_TIMER" | "SUB_MANAGER";
     expiresInDays: number;
-    isGuest: boolean;
   }>({
     email: "",
     name: "",
     roleHint: "PART_TIMER",
     expiresInDays: 7,
-    isGuest: false,
   });
+  const [selectedSourceStoreId, setSelectedSourceStoreId] = useState("");
+  const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { accessibleStores } = useStore();
+
+  const manageableSourceStores = useMemo(
+    () =>
+      accessibleStores.filter(
+        (store) =>
+          store.id !== storeId &&
+          ["MASTER", "SUB_MANAGER", "SUB"].includes(store.user_role || "")
+      ),
+    [accessibleStores, storeId]
+  );
+
+  useEffect(() => {
+    if (
+      manageableSourceStores.length > 0 &&
+      (!selectedSourceStoreId ||
+        !manageableSourceStores.some((store) => store.id === selectedSourceStoreId))
+    ) {
+      setSelectedSourceStoreId(manageableSourceStores[0].id);
+    }
+  }, [manageableSourceStores, selectedSourceStoreId]);
 
   // 초대 목록 조회
   const {
@@ -81,6 +117,27 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
     gcTime: 0, // v5: 캐시 정리 시간 (기존 cacheTime 대체)
   });
 
+  const importCandidatesQuery = useQuery({
+    queryKey: ["import-candidates", storeId, selectedSourceStoreId],
+    enabled:
+      isCreateDialogOpen &&
+      inviteMode === "import" &&
+      Boolean(selectedSourceStoreId),
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/stores/${storeId}/users/import-candidates?source_store_id=${selectedSourceStoreId}`
+      );
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      return result.data as {
+        store: { id: string; name: string };
+        candidates: ImportCandidate[];
+      };
+    },
+  });
+
   // 초대 생성
   const createInvitationMutation = useMutation({
     mutationFn: async (data: CreateInvitationRequest) => {
@@ -103,8 +160,9 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
         name: "",
         roleHint: "PART_TIMER",
         expiresInDays: 7,
-        isGuest: false,
       });
+      setInviteMode("email");
+      setSelectedImportIds([]);
       toast({
         title: t("invite.createSuccess", locale),
         description: t("invite.createSuccess", locale),
@@ -113,6 +171,60 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
     onError: (error) => {
       toast({
         title: t("invite.createError", locale),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const importUsersMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/stores/${storeId}/users/import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceStoreId: selectedSourceStoreId,
+          candidates: (importCandidatesQuery.data?.candidates || [])
+            .filter((candidate) => selectedImportIds.includes(candidate.importId))
+            .map((candidate) => ({
+              userId: candidate.userId,
+              sourceStoreUserId: candidate.storeUserId,
+              isGuest: candidate.isGuest,
+            })),
+          role: createForm.roleHint,
+        }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      return result.data as {
+        imported: Array<{ userId: string; storeUserId?: string }>;
+        skipped: Array<{ userId: string; reason: string }>;
+        alreadyExists: Array<{ userId: string }>;
+      };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["store-users", storeId] });
+      setSelectedImportIds([]);
+      setIsCreateDialogOpen(false);
+
+      const summary = [
+        `${t("invite.importResultImported", locale)}: ${data.imported.length}`,
+        `${t("invite.importResultAlreadyExists", locale)}: ${data.alreadyExists.length}`,
+        `${t("invite.importResultSkipped", locale)}: ${data.skipped.length}`,
+      ].join(" / ");
+
+      toast({
+        title: t("invite.importSuccess", locale),
+        description: summary,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: t("invite.importError", locale),
         description: error.message,
         variant: "destructive",
       });
@@ -189,8 +301,21 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
   });
 
   const handleCreateInvitation = () => {
+    if (inviteMode === "import") {
+      if (!selectedSourceStoreId || selectedImportIds.length === 0) {
+        toast({
+          title: t("invite.importSelectionRequired", locale),
+          variant: "destructive",
+        });
+        return;
+      }
+
+      importUsersMutation.mutate();
+      return;
+    }
+
     // 게스트 사용자 등록인 경우
-    if (createForm.isGuest) {
+    if (inviteMode === "guest") {
       if (!createForm.name) {
         toast({
           title: t("invite.setupPassword.nameRequiredTitle", locale),
@@ -291,67 +416,71 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
               <DialogTitle>{t("invite.create", locale)}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="isGuest"
-                  checked={createForm.isGuest}
-                  onCheckedChange={(checked) =>
-                    setCreateForm({
-                      ...createForm,
-                      isGuest: checked === true,
-                      email: checked ? "" : createForm.email, // 게스트 모드일 때 이메일 초기화
-                    })
-                  }
-                />
-                <Label
-                  htmlFor="isGuest"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  {t("invite.registerWithoutEmail", locale)}
-                </Label>
-              </div>
-              <div>
-                <Label htmlFor="name">
-                  {t("invite.name", locale)}
-                  {createForm.isGuest && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={createForm.name}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, name: e.target.value })
-                  }
-                  placeholder="홍길동"
-                  required={createForm.isGuest}
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">
-                  {t("invite.email", locale)}
-                  {!createForm.isGuest && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={createForm.email}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, email: e.target.value })
-                  }
-                  placeholder="example@email.com"
-                  disabled={createForm.isGuest}
-                  required={!createForm.isGuest}
-                />
-                {createForm.isGuest && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    게스트 사용자는 이메일 없이 등록됩니다.
-                  </p>
-                )}
-              </div>
+              <Tabs
+                value={inviteMode}
+                onValueChange={(value) => {
+                  setInviteMode(value as "email" | "guest" | "import");
+                  setSelectedImportIds([]);
+                }}
+              >
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="email">
+                    {t("invite.mode.email", locale)}
+                  </TabsTrigger>
+                  <TabsTrigger value="guest">
+                    {t("invite.mode.guest", locale)}
+                  </TabsTrigger>
+                  <TabsTrigger value="import">
+                    {t("invite.mode.import", locale)}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {inviteMode !== "import" && (
+                <>
+                  <div>
+                    <Label htmlFor="name">
+                      {t("invite.name", locale)}
+                      {inviteMode === "guest" && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
+                    </Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      value={createForm.name}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, name: e.target.value })
+                      }
+                      placeholder={t("invite.namePlaceholder", locale)}
+                      required={inviteMode === "guest"}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">
+                      {t("invite.email", locale)}
+                      {inviteMode === "email" && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={createForm.email}
+                      onChange={(e) =>
+                        setCreateForm({ ...createForm, email: e.target.value })
+                      }
+                      placeholder={t("invite.emailPlaceholder", locale)}
+                      disabled={inviteMode !== "email"}
+                      required={inviteMode === "email"}
+                    />
+                    {inviteMode === "guest" && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t("invite.guestNoEmailDescription", locale)}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
               <div>
                 <Label htmlFor="role">{t("invite.role", locale)}</Label>
                 <Select
@@ -376,7 +505,7 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                   </SelectContent>
                 </Select>
               </div>
-              {!createForm.isGuest && (
+              {inviteMode === "email" && (
                 <div>
                   <Label htmlFor="expiresIn">
                     {t("invite.expiresIn", locale)}
@@ -413,13 +542,105 @@ export function InvitationManager({ storeId, locale }: InvitationManagerProps) {
                   </Select>
                 </div>
               )}
+              {inviteMode === "import" && (
+                <div className="space-y-4 rounded-md border p-4">
+                  <div className="space-y-2">
+                    <Label>{t("invite.importSourceStore", locale)}</Label>
+                    {manageableSourceStores.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t("invite.importNoSourceStores", locale)}
+                      </p>
+                    ) : (
+                      <Tabs
+                        value={selectedSourceStoreId}
+                        onValueChange={(value) => {
+                          setSelectedSourceStoreId(value);
+                          setSelectedImportIds([]);
+                        }}
+                      >
+                        <TabsList className="flex h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+                          {manageableSourceStores.map((store) => (
+                            <TabsTrigger
+                              key={store.id}
+                              value={store.id}
+                              className="border"
+                            >
+                              {store.name}
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+                      </Tabs>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>{t("invite.importCandidates", locale)}</Label>
+                    {importCandidatesQuery.isLoading ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t("dashboard.loading", locale)}
+                      </p>
+                    ) : importCandidatesQuery.isError ? (
+                      <p className="text-sm text-destructive">
+                        {t("invite.importLoadError", locale)}
+                      </p>
+                    ) : importCandidatesQuery.data?.candidates?.length ? (
+                      <div className="max-h-64 space-y-2 overflow-y-auto rounded-md border p-2">
+                        {importCandidatesQuery.data.candidates.map((candidate) => (
+                          <label
+                            key={candidate.importId}
+                            className="flex cursor-pointer items-start gap-3 rounded-md border p-3"
+                          >
+                            <Checkbox
+                              checked={selectedImportIds.includes(candidate.importId)}
+                              onCheckedChange={(checked) => {
+                                setSelectedImportIds((prev) =>
+                                  checked === true
+                                    ? [...prev, candidate.importId]
+                                    : prev.filter((id) => id !== candidate.importId)
+                                );
+                              }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 font-medium">
+                                <span>{candidate.name}</span>
+                                {candidate.isGuest && (
+                                  <Badge variant="secondary">
+                                    {t("user.guest", locale)}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {candidate.email || "-"}
+                              </div>
+                              {candidate.sourceRole && (
+                                <div className="text-xs text-muted-foreground">
+                                  {t("invite.importSourceRole", locale)}:{" "}
+                                  {getRoleDisplayName(candidate.sourceRole)}
+                                </div>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {t("invite.importEmpty", locale)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               <Button
                 onClick={handleCreateInvitation}
-                disabled={createInvitationMutation.isPending}
+                disabled={
+                  createInvitationMutation.isPending || importUsersMutation.isPending
+                }
                 className="w-full"
               >
-                {createInvitationMutation.isPending
+                {createInvitationMutation.isPending || importUsersMutation.isPending
                   ? t("dashboard.loading", locale)
+                  : inviteMode === "import"
+                  ? t("invite.importSubmit", locale)
                   : t("invite.create", locale)}
               </Button>
             </div>

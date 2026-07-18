@@ -160,6 +160,7 @@ async function getStoreUsers(
         // store_users.id를 사용 (없으면 user_store_roles.id를 fallback으로 사용)
         id: storeUser?.id || userRole.id,
         user_id: userRole.user_id,
+        auth_user_id: userRole.user_id,
         store_id: userRole.store_id,
         role: userRole.role,
         status: userRole.status,
@@ -184,6 +185,7 @@ async function getStoreUsers(
       return {
         id: guestUser.id,
         user_id: null, // 게스트 사용자는 user_id가 NULL
+        auth_user_id: null,
         store_id: guestUser.store_id,
         role: guestUser.role,
         status: "ACTIVE", // 게스트 사용자는 항상 ACTIVE
@@ -210,6 +212,7 @@ async function getStoreUsers(
     const deletedMembers = deletedRoles.map((role) => ({
       id: role.id,
       user_id: role.user_id,
+      auth_user_id: role.user_id,
       store_id: role.store_id,
       role: role.role,
       status: role.status,
