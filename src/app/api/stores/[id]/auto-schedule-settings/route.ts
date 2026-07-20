@@ -33,20 +33,9 @@ const userPrioritySchema = z.object({
   priorityRank: z.number().int().min(1),
 });
 
-const openingPolicySchema = z.object({
-  enabled: z.boolean(),
-  startSource: z.enum(["business_open", "custom"]),
-  customStartMin: z.number().int().min(0).max(1440).nullable(),
-  endMin: z.number().int().min(0).max(1440).nullable(),
-  requiredHeadcount: z.number().int().min(1).max(99),
-  failureMode: z.enum(["warn_and_continue", "block_commit"]),
-  openingWorkItemIds: z.array(z.string().uuid()),
-});
-
 const updateSettingsSchema = z.object({
   conditionPriorities: z.array(conditionPrioritySchema).optional(),
   userPriorities: z.array(userPrioritySchema).optional(),
-  openingPolicy: openingPolicySchema.optional(),
   operatingPatterns: operatingPatternsSchema.optional(),
 });
 
@@ -188,9 +177,6 @@ async function getSettings(
   const [
     conditionResult,
     userPriorityResult,
-    openingPolicyResult,
-    openingWorkItemsResult,
-    workItemsResult,
     storeUsersResult,
     jobRolesResult,
   ] = await Promise.all([
@@ -204,20 +190,6 @@ async function getSettings(
       .select("user_id, priority_rank")
       .eq("store_id", storeId)
       .order("priority_rank"),
-    supabase
-      .from("store_auto_schedule_opening_policies")
-      .select("*")
-      .eq("store_id", storeId)
-      .maybeSingle(),
-    supabase
-      .from("store_auto_schedule_opening_work_items")
-      .select("work_item_id")
-      .eq("store_id", storeId),
-    supabase
-      .from("work_items")
-      .select("id, name, start_min, end_min")
-      .eq("store_id", storeId)
-      .order("start_min"),
     supabase
       .from("store_users")
       .select("id, user_id, name, role, is_active, is_guest, granted_at")
@@ -234,9 +206,6 @@ async function getSettings(
   const firstError =
     conditionResult.error ||
     userPriorityResult.error ||
-    openingPolicyResult.error ||
-    openingWorkItemsResult.error ||
-    workItemsResult.error ||
     storeUsersResult.error ||
     jobRolesResult.error;
 
@@ -282,28 +251,6 @@ async function getSettings(
     })
     .map((member, index) => ({ ...member, priorityRank: index + 1 }));
 
-  const openingPolicy = openingPolicyResult.data
-    ? {
-        enabled: openingPolicyResult.data.enabled,
-        startSource: openingPolicyResult.data.start_source,
-        customStartMin: openingPolicyResult.data.custom_start_min,
-        endMin: openingPolicyResult.data.end_min,
-        requiredHeadcount: openingPolicyResult.data.required_headcount,
-        failureMode: openingPolicyResult.data.failure_mode,
-        openingWorkItemIds: (openingWorkItemsResult.data || []).map(
-          (row) => row.work_item_id
-        ),
-      }
-    : {
-        enabled: true,
-        startSource: "business_open",
-        customStartMin: null,
-        endMin: 660,
-        requiredHeadcount: 1,
-        failureMode: "warn_and_continue",
-        openingWorkItemIds: [],
-      };
-
   let operatingPatterns;
   try {
     operatingPatterns = await loadOperatingPatterns(supabase, storeId);
@@ -323,8 +270,6 @@ async function getSettings(
     data: {
       conditionPriorities: normalizeConditionPriorities(conditionResult.data),
       userPriorities,
-      openingPolicy,
-      workItems: workItemsResult.data || [],
       jobRoles: jobRolesResult.data || [],
       operatingPatterns,
     },
@@ -482,87 +427,6 @@ async function updateSettings(
             priority_rank: priority.priorityRank,
           }))
         );
-      if (insertError) {
-        return NextResponse.json(
-          { success: false, error: insertError.message },
-          { status: 500 }
-        );
-      }
-    }
-  }
-
-  if (payload.openingPolicy) {
-    const openingPolicy = payload.openingPolicy;
-
-    if (openingPolicy.openingWorkItemIds.length > 0) {
-      const { data: validWorkItems, error: validWorkItemsError } =
-        await supabase
-          .from("work_items")
-          .select("id")
-          .eq("store_id", storeId)
-          .in("id", openingPolicy.openingWorkItemIds);
-
-      if (validWorkItemsError) {
-        return NextResponse.json(
-          { success: false, error: validWorkItemsError.message },
-          { status: 500 }
-        );
-      }
-
-      if (
-        (validWorkItems || []).length !==
-        new Set(openingPolicy.openingWorkItemIds).size
-      ) {
-        return NextResponse.json(
-          { success: false, error: "Invalid opening work item" },
-          { status: 400 }
-        );
-      }
-    }
-
-    const { error: policyError } = await supabase
-      .from("store_auto_schedule_opening_policies")
-      .upsert(
-        {
-          store_id: storeId,
-          enabled: openingPolicy.enabled,
-          start_source: openingPolicy.startSource,
-          custom_start_min: openingPolicy.customStartMin,
-          end_min: openingPolicy.endMin,
-          required_headcount: openingPolicy.requiredHeadcount,
-          failure_mode: openingPolicy.failureMode,
-        },
-        { onConflict: "store_id" }
-      );
-
-    if (policyError) {
-      return NextResponse.json(
-        { success: false, error: policyError.message },
-        { status: 500 }
-      );
-    }
-
-    const { error: deleteError } = await supabase
-      .from("store_auto_schedule_opening_work_items")
-      .delete()
-      .eq("store_id", storeId);
-    if (deleteError) {
-      return NextResponse.json(
-        { success: false, error: deleteError.message },
-        { status: 500 }
-      );
-    }
-
-    if (openingPolicy.openingWorkItemIds.length > 0) {
-      const { error: insertError } = await supabase
-        .from("store_auto_schedule_opening_work_items")
-        .insert(
-          openingPolicy.openingWorkItemIds.map((workItemId) => ({
-            store_id: storeId,
-            work_item_id: workItemId,
-          }))
-        );
-
       if (insertError) {
         return NextResponse.json(
           { success: false, error: insertError.message },

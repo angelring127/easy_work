@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  createWorkItemSlots,
+  type WorkItemSlot,
+} from "@/lib/schedule/auto-schedule-slots";
+import {
+  calculateDesiredDailyHoursFitScore,
+  calculateDesiredWeeklyHoursScore,
+  calculateDesiredWeeklyOverflowMinutes,
+  calculateFutureCoverageClosureRisk,
+  calculateFutureCoverageGain,
+  compareOperatingAssignmentChoices,
+} from "@/lib/schedule/assignment-ranking";
 import { loadOperatingPatterns } from "@/lib/schedule/operating-pattern-settings";
 import {
   calculateWorkItemOverflowMinutes,
   evaluateOperatingSegmentCoverage,
 } from "@/lib/schedule/operating-patterns";
+import {
+  evaluateRoleAllocationCandidate,
+  findMostConstrainedRoleIds,
+} from "@/lib/schedule/role-allocation";
+import { wouldExceedConcurrentStaffLimit } from "@/lib/schedule/staff-limits";
+import { groupLegacyUserWeekdayPreferences } from "@/lib/schedule/weekday-preferences";
 import { createClient, createPureClient } from "@/lib/supabase/server";
 import type { OperatingPatternPayload } from "@/lib/validations/schedule/operating-patterns";
 
@@ -42,6 +60,7 @@ type Candidate = StoreMember & {
 type AssignmentLike = {
   user_id: string;
   store_id: string;
+  work_item_id?: string | null;
   date: string;
   start_time: string;
   end_time: string;
@@ -49,14 +68,18 @@ type AssignmentLike = {
   work_items?: { unpaid_break_min?: number | null } | null;
 };
 
-type Slot = {
-  date: string;
-  workItem: WorkItem;
-  startMin: number;
-  endMin: number;
-  unpaidBreakMin: number;
-  isOpening: boolean;
+type CandidateEvaluation = {
+  readonly candidate: Candidate;
+  readonly roleAllocation: ReturnType<typeof evaluateRoleAllocationCandidate>;
+  readonly desiredWeeklyOverflowMinutes: number;
+  readonly dailyHoursFitScore: number;
+  readonly preferenceScore: number;
+  readonly weeklyMinutes: number;
+  readonly monthlyMinutes: number;
+  readonly lastAssignedTime: number;
 };
+
+type Slot = WorkItemSlot<WorkItem>;
 
 type UnmetOperatingSegment = {
   date: string;
@@ -194,27 +217,6 @@ function isMissingSettingsTableError(error: any) {
   );
 }
 
-function getBusinessHourForDate(
-  businessHours: Array<Record<string, any>>,
-  date: string
-) {
-  const weekday = getWeekday(date);
-  return businessHours.find(
-    (hour) => hour.weekday === weekday || hour.day_of_week === weekday
-  );
-}
-
-function getBusinessOpenMin(
-  businessHours: Array<Record<string, any>>,
-  date: string
-) {
-  const businessHour = getBusinessHourForDate(businessHours, date);
-  if (!businessHour) {
-    return 540;
-  }
-  return businessHour.open_min ?? 540;
-}
-
 function hasRequiredRole(candidate: Candidate, requiredRoles: Set<string>) {
   if (requiredRoles.size === 0) {
     return true;
@@ -284,33 +286,6 @@ function hasAnyAssignmentOnDate(
   );
 }
 
-function getShiftCounts(
-  assignments: AssignmentLike[],
-  date: string,
-  boundaryMin: number
-) {
-  let morning = 0;
-  let afternoon = 0;
-
-  assignments.forEach((assignment) => {
-    if (assignment.date !== date || assignment.status === "CANCELLED") {
-      return;
-    }
-
-    const startMin = timeToMinutes(assignment.start_time);
-    const endMin = timeToMinutes(assignment.end_time);
-
-    if (startMin < boundaryMin) {
-      morning += 1;
-    }
-    if (endMin > boundaryMin) {
-      afternoon += 1;
-    }
-  });
-
-  return { morning, afternoon };
-}
-
 function scoreCandidate({
   candidate,
   slot,
@@ -330,26 +305,15 @@ function scoreCandidate({
     slot.endMin,
     slot.unpaidBreakMin
   );
-  const nextWeeklyHours =
-    ((weeklyMinutes.get(candidate.id) || 0) + slotPaidMin) / 60;
-
   let conditionScore = 0;
   conditionPriorities.forEach((condition) => {
     if (condition.conditionKey === "desired_weekly_hours") {
-      if (!candidate.desiredWeeklyHours || candidate.desiredWeeklyHours <= 0) {
-        return;
-      }
-
-      if (nextWeeklyHours <= candidate.desiredWeeklyHours) {
-        const closeness =
-          1 -
-          Math.min(
-            candidate.desiredWeeklyHours,
-            Math.abs(candidate.desiredWeeklyHours - nextWeeklyHours)
-          ) /
-            candidate.desiredWeeklyHours;
-        conditionScore += Math.round(condition.weight * Math.max(0, closeness));
-      }
+      conditionScore += calculateDesiredWeeklyHoursScore({
+        currentMinutes: weeklyMinutes.get(candidate.id) || 0,
+        slotMinutes: slotPaidMin,
+        desiredHours: candidate.desiredWeeklyHours,
+        weight: condition.weight,
+      });
       return;
     }
 
@@ -365,14 +329,6 @@ function scoreCandidate({
       conditionScore += condition.weight;
     }
   });
-
-  if (candidate.desiredDailyHours && candidate.desiredDailyHours > 0) {
-    const slotHours = slotPaidMin / 60;
-    const diff = Math.abs(candidate.desiredDailyHours - slotHours);
-    const closeness =
-      1 - Math.min(candidate.desiredDailyHours, diff) / candidate.desiredDailyHours;
-    conditionScore += Math.round(8 * Math.max(0, closeness));
-  }
 
   const userPriorityScore =
     userPriorityCount <= 1
@@ -411,6 +367,7 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     );
   }
+  const authenticatedUserId = authUser.user.id;
 
   const { data: role, error: roleError } = await db
     .from("user_store_roles")
@@ -437,12 +394,9 @@ export async function POST(request: NextRequest) {
 
     const [
       storeResult,
-      businessHoursResult,
       workItemsResult,
       conditionResult,
       userPriorityResult,
-      openingPolicyResult,
-      openingWorkItemsResult,
       storeUsersResult,
       userJobRolesResult,
       availabilityResult,
@@ -450,7 +404,6 @@ export async function POST(request: NextRequest) {
       storeJobRolesResult,
     ] = await Promise.all([
       db.from("stores").select("*").eq("id", storeId).single(),
-      db.from("store_business_hours").select("*").eq("store_id", storeId),
       db
         .from("work_items")
         .select("id, name, start_min, end_min, unpaid_break_min, max_headcount")
@@ -466,15 +419,6 @@ export async function POST(request: NextRequest) {
         .select("user_id, priority_rank")
         .eq("store_id", storeId)
         .order("priority_rank"),
-      db
-        .from("store_auto_schedule_opening_policies")
-        .select("*")
-        .eq("store_id", storeId)
-        .maybeSingle(),
-      db
-        .from("store_auto_schedule_opening_work_items")
-        .select("work_item_id")
-        .eq("store_id", storeId),
       db
         .from("store_users")
         .select("id, user_id, name, role, is_guest, is_active, metadata")
@@ -503,7 +447,6 @@ export async function POST(request: NextRequest) {
 
     const firstError =
       storeResult.error ||
-      businessHoursResult.error ||
       workItemsResult.error ||
       (isMissingSettingsTableError(conditionResult.error)
         ? null
@@ -511,12 +454,6 @@ export async function POST(request: NextRequest) {
       (isMissingSettingsTableError(userPriorityResult.error)
         ? null
         : userPriorityResult.error) ||
-      (isMissingSettingsTableError(openingPolicyResult.error)
-        ? null
-        : openingPolicyResult.error) ||
-      (isMissingSettingsTableError(openingWorkItemsResult.error)
-        ? null
-        : openingWorkItemsResult.error) ||
       storeUsersResult.error ||
       userJobRolesResult.error ||
       availabilityResult.error ||
@@ -577,6 +514,7 @@ export async function POST(request: NextRequest) {
         `
         store_id,
         user_id,
+        work_item_id,
         date,
         start_time,
         end_time,
@@ -613,32 +551,6 @@ export async function POST(request: NextRequest) {
       ])
     );
 
-    const openingPolicy =
-      !openingPolicyResult.error && openingPolicyResult.data
-        ? openingPolicyResult.data
-        : {
-      enabled: true,
-      start_source: "business_open",
-      custom_start_min: null,
-      end_min: 660,
-      required_headcount: 1,
-      failure_mode: "warn_and_continue",
-    };
-    const explicitOpeningItemIds = new Set(
-      (openingWorkItemsResult.error
-        ? []
-        : openingWorkItemsResult.data || []
-      ).map((row: any) => row.work_item_id)
-    );
-    const openingItemIds =
-      explicitOpeningItemIds.size > 0
-        ? explicitOpeningItemIds
-        : new Set(
-            workItems
-              .filter((item) => item.name.toLowerCase().includes("opening"))
-              .map((item) => item.id)
-          );
-
     const jobRolesByUser = new Map<string, Set<string>>();
     (userJobRolesResult.data || []).forEach((row: any) => {
       const roles = jobRolesByUser.get(row.user_id) || new Set<string>();
@@ -654,14 +566,8 @@ export async function POST(request: NextRequest) {
       requiredRolesByItem.set(row.work_item_id, roles);
     });
 
-    const difficultByUser = new Map<string, Set<number>>();
-    const preferredByUser = new Map<string, Set<number>>();
-    (weekdayPrefsResult.data || []).forEach((row: any) => {
-      const targetMap = row.is_preferred ? preferredByUser : difficultByUser;
-      const set = targetMap.get(row.user_id) || new Set<number>();
-      set.add(row.weekday);
-      targetMap.set(row.user_id, set);
-    });
+    const { difficultByUser, preferredByUser } =
+      groupLegacyUserWeekdayPreferences(weekdayPrefsResult.data || []);
 
     const availabilityByUserDate = new Map<string, Array<Record<string, any>>>();
     (availabilityResult.data || []).forEach((row: any) => {
@@ -720,6 +626,7 @@ export async function POST(request: NextRequest) {
     const weeklyMinutes = new Map<string, number>();
     const monthlyMinutes = new Map<string, number>();
     const lastAssignedTime = new Map<string, number>();
+    const workItemUsageCount = new Map<string, number>();
 
     existingAssignments.forEach((assignment) => {
       if (assignment.status === "CANCELLED") {
@@ -732,6 +639,12 @@ export async function POST(request: NextRequest) {
           assignment.user_id,
           (weeklyMinutes.get(assignment.user_id) || 0) + minutes
         );
+        if (assignment.work_item_id) {
+          workItemUsageCount.set(
+            assignment.work_item_id,
+            (workItemUsageCount.get(assignment.work_item_id) || 0) + 1
+          );
+        }
       }
       monthlyMinutes.set(
         assignment.user_id,
@@ -752,46 +665,82 @@ export async function POST(request: NextRequest) {
     const boundaryMin = Number(store.shift_boundary_time_min || 720);
     const maxMorningStaff = Number(store.max_morning_staff || 0);
     const maxAfternoonStaff = Number(store.max_afternoon_staff || 0);
+    const roleMemberCounts = new Map<string, number>();
+    members.forEach((member) =>
+      member.jobRoleIds.forEach((roleId) =>
+        roleMemberCounts.set(roleId, (roleMemberCounts.get(roleId) || 0) + 1)
+      )
+    );
+    const roleDemandCounts = new Map<string, number>();
+    dates.forEach((date) => {
+      const pattern = operatingPatterns.find(
+        (candidatePattern) =>
+          candidatePattern.isActive &&
+          candidatePattern.weekdays.includes(getWeekday(date))
+      );
+      pattern?.segments.forEach((segment) =>
+        segment.requiredRoleIds.forEach((roleId) =>
+          roleDemandCounts.set(roleId, (roleDemandCounts.get(roleId) || 0) + 1)
+        )
+      );
+    });
+    const reservableRoleIds = findMostConstrainedRoleIds({
+      roleDemandCounts,
+      roleMemberCounts,
+    });
+    const reservableRoleIdsByDate = new Map<string, Set<string>>();
+    dates.forEach((date, dateIndex) => {
+      const futureRequiredRoleIds = new Set<string>();
+      dates.slice(dateIndex + 1).forEach((futureDate) => {
+        const futurePattern = operatingPatterns.find(
+          (candidatePattern) =>
+            candidatePattern.isActive &&
+            candidatePattern.weekdays.includes(getWeekday(futureDate))
+        );
+        futurePattern?.segments.forEach((segment) =>
+          segment.requiredRoleIds.forEach((roleId) =>
+            futureRequiredRoleIds.add(roleId)
+          )
+        );
+      });
+      reservableRoleIdsByDate.set(
+        date,
+        new Set(
+          [...reservableRoleIds].filter((roleId) =>
+            futureRequiredRoleIds.has(roleId)
+          )
+        )
+      );
+    });
 
     const canAssignSlotByStaffLimit = (slot: Slot) => {
-      const currentCounts = getShiftCounts(scheduledAssignments, slot.date, boundaryMin);
-      const touchesMorning = slot.startMin < boundaryMin;
-      const touchesAfternoon = slot.endMin > boundaryMin;
+      const assignments = scheduledAssignments
+        .filter(
+          (assignment) =>
+            assignment.date === slot.date && assignment.status !== "CANCELLED"
+        )
+        .map((assignment) => ({
+          startMin: timeToMinutes(assignment.start_time),
+          endMin: timeToMinutes(assignment.end_time),
+        }));
 
-      if (
-        maxMorningStaff > 0 &&
-        touchesMorning &&
-        currentCounts.morning >= maxMorningStaff
-      ) {
-        return false;
-      }
-
-      if (
-        maxAfternoonStaff > 0 &&
-        touchesAfternoon &&
-        currentCounts.afternoon >= maxAfternoonStaff
-      ) {
-        return false;
-      }
-
-      return true;
+      return !wouldExceedConcurrentStaffLimit({
+        assignments,
+        proposedSlot: { startMin: slot.startMin, endMin: slot.endMin },
+        boundaryMin,
+        maxMorningStaff,
+        maxAfternoonStaff,
+      });
     };
 
-    const assignSlot = (
+    const getCandidateEvaluations = (
       slot: Slot,
       preferredRoleIds: Set<string> = new Set<string>(),
       requirePreferredRole = false,
-      recordFailure = true
-    ) => {
+      remainingHeadcount = 1
+    ): CandidateEvaluation[] => {
       if (!canAssignSlotByStaffLimit(slot)) {
-        if (recordFailure) {
-          skipped.push({
-            date: slot.date,
-            workItemName: slot.workItem.name,
-            reason: "staff_limit",
-          });
-        }
-        return false;
+        return [];
       }
 
       const requiredRoles = requiredRolesByItem.get(slot.workItem.id) || new Set<string>();
@@ -862,73 +811,57 @@ export async function POST(request: NextRequest) {
         return true;
       });
 
-      if (candidates.length === 0) {
-        if (recordFailure) {
-          skipped.push({
-            date: slot.date,
-            workItemName: slot.workItem.name,
-            reason: slot.isOpening ? "opening_no_candidate" : "no_candidate",
-          });
-        }
-        return false;
-      }
-
-      const [selected] = candidates
-        .map((candidate) => ({
-          candidate,
-          coverageGain: [...preferredRoleIds].filter((roleId) =>
-            candidate.jobRoleIds.has(roleId)
-          ).length,
-          score: scoreCandidate({
-            candidate,
-            slot,
-            weeklyMinutes,
-            conditionPriorities,
-            userPriorityCount: members.length,
+      return candidates.map((candidate) => ({
+        candidate,
+        roleAllocation: evaluateRoleAllocationCandidate({
+          candidateRoleIds: candidate.jobRoleIds,
+          otherCandidateRoleIds: candidates
+            .filter((other) => other.id !== candidate.id)
+            .map((other) => other.jobRoleIds),
+          missingRoleIds: preferredRoleIds,
+          remainingHeadcount,
+          reservableRoleIds:
+            reservableRoleIdsByDate.get(slot.date) || new Set<string>(),
+          roleMemberCounts,
+        }),
+        desiredWeeklyOverflowMinutes:
+          calculateDesiredWeeklyOverflowMinutes({
+            currentMinutes: weeklyMinutes.get(candidate.id) || 0,
+            slotMinutes: slotPaidMin,
+            desiredHours: candidate.desiredWeeklyHours,
           }),
-        }))
-        .sort((a, b) => {
-          if (b.coverageGain !== a.coverageGain) {
-            return b.coverageGain - a.coverageGain;
-          }
+        dailyHoursFitScore: calculateDesiredDailyHoursFitScore({
+          slotMinutes: slotPaidMin,
+          desiredHours: candidate.desiredDailyHours,
+        }),
+        preferenceScore: scoreCandidate({
+          candidate,
+          slot,
+          weeklyMinutes,
+          conditionPriorities,
+          userPriorityCount: members.length,
+        }),
+        weeklyMinutes: weeklyMinutes.get(candidate.id) || 0,
+        monthlyMinutes: monthlyMinutes.get(candidate.id) || 0,
+        lastAssignedTime: lastAssignedTime.get(candidate.id) || 0,
+      }));
+    };
 
-          if (b.score !== a.score) {
-            return b.score - a.score;
-          }
-
-          const weeklyDiff =
-            (weeklyMinutes.get(a.candidate.id) || 0) -
-            (weeklyMinutes.get(b.candidate.id) || 0);
-          if (weeklyDiff !== 0) {
-            return weeklyDiff;
-          }
-
-          const monthlyDiff =
-            (monthlyMinutes.get(a.candidate.id) || 0) -
-            (monthlyMinutes.get(b.candidate.id) || 0);
-          if (monthlyDiff !== 0) {
-            return monthlyDiff;
-          }
-
-          const lastAssignedDiff =
-            (lastAssignedTime.get(a.candidate.id) || 0) -
-            (lastAssignedTime.get(b.candidate.id) || 0);
-          if (lastAssignedDiff !== 0) {
-            return lastAssignedDiff;
-          }
-
-          return a.candidate.id.localeCompare(b.candidate.id);
-        });
-
+    const commitAssignment = (slot: Slot, candidate: Candidate) => {
+      const slotPaidMin = paidMinutes(
+        slot.startMin,
+        slot.endMin,
+        slot.unpaidBreakMin
+      );
       const row = {
         store_id: storeId,
-        user_id: selected.candidate.id,
+        user_id: candidate.id,
         work_item_id: slot.workItem.id,
         date: slot.date,
         start_time: minutesToTime(slot.startMin),
         end_time: minutesToTime(slot.endMin),
         status: "ASSIGNED",
-        created_by: authUser.user!.id,
+        created_by: authenticatedUserId,
       };
 
       chosen.push(row);
@@ -937,17 +870,62 @@ export async function POST(request: NextRequest) {
         work_items: { unpaid_break_min: slot.unpaidBreakMin },
       });
       weeklyMinutes.set(
-        selected.candidate.id,
-        (weeklyMinutes.get(selected.candidate.id) || 0) + slotPaidMin
+        candidate.id,
+        (weeklyMinutes.get(candidate.id) || 0) + slotPaidMin
       );
       monthlyMinutes.set(
-        selected.candidate.id,
-        (monthlyMinutes.get(selected.candidate.id) || 0) + slotPaidMin
+        candidate.id,
+        (monthlyMinutes.get(candidate.id) || 0) + slotPaidMin
       );
       lastAssignedTime.set(
-        selected.candidate.id,
+        candidate.id,
         parseDateKey(slot.date).getTime()
       );
+      workItemUsageCount.set(
+        slot.workItem.id,
+        (workItemUsageCount.get(slot.workItem.id) || 0) + 1
+      );
+    };
+
+    const assignSlot = (
+      slot: Slot,
+      preferredRoleIds: Set<string> = new Set<string>(),
+      requirePreferredRole = false,
+      recordFailure = true,
+      remainingHeadcount = 1
+    ) => {
+      const evaluations = getCandidateEvaluations(
+        slot,
+        preferredRoleIds,
+        requirePreferredRole,
+        remainingHeadcount
+      );
+      const [selected] = evaluations
+        .map((evaluation) => ({
+          ...evaluation,
+          candidateId: evaluation.candidate.id,
+          workItemId: slot.workItem.id,
+          futureCoverageClosureRisk: 0,
+          futureCoverageGain: 0,
+          workItemUsageCount: workItemUsageCount.get(slot.workItem.id) || 0,
+          overflowMinutes: 0,
+        }))
+        .sort(compareOperatingAssignmentChoices);
+
+      if (!selected) {
+        if (recordFailure) {
+          skipped.push({
+            date: slot.date,
+            workItemName: slot.workItem.name,
+            reason: canAssignSlotByStaffLimit(slot)
+              ? "no_candidate"
+              : "staff_limit",
+          });
+        }
+        return false;
+      }
+
+      commitAssignment(slot, selected.candidate);
       return true;
     };
 
@@ -992,7 +970,7 @@ export async function POST(request: NextRequest) {
         (left, right) => left.startMin - right.startMin
       );
 
-      segments.forEach((segment, segmentIndex) => {
+      segments.forEach((segment) => {
         const coveringItems = workItems
           .map((workItem) => ({
             workItem,
@@ -1022,30 +1000,68 @@ export async function POST(request: NextRequest) {
           const requireMissingRole =
             coverage.assignedHeadcount >= segment.minHeadcount &&
             missingRoleIds.size > 0;
-          let assigned = false;
-
-          for (const item of coveringItems) {
-            assigned = assignSlot(
-              {
-                date,
-                workItem: item.workItem,
-                startMin: item.workItem.start_min,
-                endMin: item.workItem.end_min,
-                unpaidBreakMin: item.workItem.unpaid_break_min || 0,
-                isOpening: segmentIndex === 0,
-              },
+          const remainingHeadcount = Math.max(
+            0,
+            segment.minHeadcount - coverage.assignedHeadcount
+          );
+          const segmentNeeds = segments.map((candidateSegment) => {
+            const candidateCoverage = getSegmentCoverage(
+              date,
+              candidateSegment
+            );
+            return {
+              startMin: candidateSegment.startMin,
+              endMin: candidateSegment.endMin,
+              missingHeadcount: Math.max(
+                0,
+                candidateSegment.minHeadcount -
+                  candidateCoverage.assignedHeadcount
+              ),
+              missingRoleIds: new Set(candidateCoverage.missingRoleIds),
+            };
+          });
+          const choices = coveringItems.flatMap((item) => {
+            const slot = {
+              date,
+              workItem: item.workItem,
+              startMin: item.workItem.start_min,
+              endMin: item.workItem.end_min,
+              unpaidBreakMin: item.workItem.unpaid_break_min || 0,
+            };
+            return getCandidateEvaluations(
+              slot,
               missingRoleIds,
               requireMissingRole,
-              false
-            );
-            if (assigned) {
-              break;
-            }
-          }
+              remainingHeadcount
+            ).map((evaluation) => ({
+              ...evaluation,
+              slot,
+              candidateId: evaluation.candidate.id,
+              workItemId: item.workItem.id,
+              futureCoverageClosureRisk:
+                calculateFutureCoverageClosureRisk({
+                  slotStartMin: slot.startMin,
+                  slotEndMin: slot.endMin,
+                  candidateRoleIds: evaluation.candidate.jobRoleIds,
+                  segmentNeeds,
+                }),
+              futureCoverageGain: calculateFutureCoverageGain({
+                slotStartMin: slot.startMin,
+                slotEndMin: slot.endMin,
+                candidateRoleIds: evaluation.candidate.jobRoleIds,
+                segmentNeeds,
+              }),
+              workItemUsageCount:
+                workItemUsageCount.get(item.workItem.id) || 0,
+              overflowMinutes: item.overflowMinutes,
+            }));
+          });
+          const [selected] = choices.sort(compareOperatingAssignmentChoices);
 
-          if (!assigned) {
+          if (!selected) {
             break;
           }
+          commitAssignment(selected.slot, selected.candidate);
           attempts += 1;
         }
 
@@ -1077,56 +1093,7 @@ export async function POST(request: NextRequest) {
         return;
       }
 
-      const openingStart =
-        openingPolicy.start_source === "custom" &&
-        typeof openingPolicy.custom_start_min === "number"
-          ? openingPolicy.custom_start_min
-          : getBusinessOpenMin(businessHoursResult.data || [], date);
-      const openingItems = workItems.filter(
-        (item) =>
-          openingItemIds.has(item.id) &&
-          item.start_min <= openingStart &&
-          item.end_min > openingStart
-      );
-      const regularItems = workItems.filter(
-        (item) => !openingItemIds.has(item.id)
-      );
-
-      if (openingPolicy.enabled && openingItems.length > 0) {
-        const openingWorkItem = openingItems[0];
-        const requiredHeadcount = Math.max(
-          1,
-          Number(openingPolicy.required_headcount || 1)
-        );
-
-        for (let i = 0; i < requiredHeadcount; i++) {
-          assignSlot({
-            date,
-            workItem: openingWorkItem,
-            startMin: openingWorkItem.start_min,
-            endMin: openingWorkItem.end_min,
-            unpaidBreakMin: openingWorkItem.unpaid_break_min || 0,
-            isOpening: true,
-          });
-        }
-      } else if (openingPolicy.enabled && openingItemIds.size > 0) {
-        skipped.push({
-          date,
-          workItemName: "Opening",
-          reason: "opening_work_item_time_mismatch",
-        });
-      }
-
-      regularItems.forEach((workItem) => {
-        assignSlot({
-          date,
-          workItem,
-          startMin: workItem.start_min,
-          endMin: workItem.end_min,
-          unpaidBreakMin: workItem.unpaid_break_min || 0,
-          isOpening: false,
-        });
-      });
+      createWorkItemSlots(date, workItems).forEach((slot) => assignSlot(slot));
     });
 
     if (chosen.length > 0) {

@@ -95,7 +95,7 @@ export function OperatingPatternEditor({
           <h4 className="text-base font-semibold text-gray-900">
             {t("autoSchedule.pattern.title", locale)}
           </h4>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 break-keep text-sm text-gray-600">
             {t("autoSchedule.pattern.description", locale)}
           </p>
         </div>
@@ -110,7 +110,7 @@ export function OperatingPatternEditor({
       </div>
 
       {patterns.length === 0 ? (
-        <div className="rounded-md border border-dashed p-6 text-center text-sm text-gray-600">
+        <div className="break-keep rounded-md border border-dashed p-6 text-center text-sm text-gray-600">
           {t("autoSchedule.pattern.empty", locale)}
         </div>
       ) : (

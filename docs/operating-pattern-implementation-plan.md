@@ -43,7 +43,7 @@
 
 ### 2.2 패턴 적용 요일
 
-테이블: `store_auto_schedule_operating_pattern_weekdays`
+테이블: `store_auto_schedule_pattern_weekdays`
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -60,7 +60,7 @@
 
 ### 2.3 패턴 시간 구간
 
-테이블: `store_auto_schedule_operating_pattern_segments`
+테이블: `store_auto_schedule_pattern_segments`
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -88,7 +88,7 @@
 
 ### 2.4 구간 필요한 역할
 
-테이블: `store_auto_schedule_operating_pattern_segment_roles`
+테이블: `store_auto_schedule_segment_roles`
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
@@ -123,8 +123,6 @@
   "data": {
     "conditionPriorities": [],
     "userPriorities": [],
-    "openingPolicy": {},
-    "workItems": [],
     "jobRoles": [],
     "operatingPatterns": [
       {
@@ -213,7 +211,6 @@ UI 구조:
 자동 스케줄 설정
   조건 우선순위
   직원 배정 우선순위
-  오프닝 정책
   운영 패턴
     [패턴 카드: 평일]
       적용 요일: 월 화 수 목
@@ -332,7 +329,7 @@ UI 메시지 예:
 - `화 17:30-22:00: 총 인원 3명 중 2명만 배정`
 - `화 17:30-22:00: 캐셔 역할 미충족`
 
-## 6. 기존 오프닝 정책과의 정리
+## 6. 영업 시작 구간의 통합 원칙
 
 운영 패턴이 들어오면 오프닝은 별도 1시간 슬롯이 아니라 운영 패턴의 첫 구간으로 표현한다.
 
@@ -342,11 +339,12 @@ UI 메시지 예:
 
 실제 배정은 기존 근무항목을 사용하므로 `Opening 10:00-22:30`이 이 구간을 충족할 수 있다.
 
-1차 구현에서의 권장 정리:
+시스템에는 별도 오프닝 정책, 오프닝 전용 근무항목 목록, 오프닝 플래그를 두지 않는다.
 
-- 운영 패턴이 있는 요일은 운영 패턴을 우선 사용한다.
-- 운영 패턴이 없는 요일은 기존 오프닝 정책과 기존 근무항목 기반 배정을 fallback으로 사용한다.
-- 추후 운영 패턴이 안정화되면 `store_auto_schedule_opening_policies`는 deprecated할 수 있다.
+- 운영 패턴이 있는 요일은 첫 구간도 다른 구간과 동일하게 처리한다.
+- 운영 패턴이 없는 요일은 모든 등록 근무항목을 이름 구분 없이 기존 필수 조건과 점수 조건으로 배정한다.
+- 영업 시작 구간이 미충족되면 다른 구간과 같은 `unmetSegments` 경고로 반환한다.
+- 기존 `store_auto_schedule_opening_policies`와 `store_auto_schedule_opening_work_items`는 제거한다.
 
 ## 7. 마이그레이션 초안
 
@@ -357,9 +355,9 @@ UI 메시지 예:
 필요 테이블:
 
 - `store_auto_schedule_operating_patterns`
-- `store_auto_schedule_operating_pattern_weekdays`
-- `store_auto_schedule_operating_pattern_segments`
-- `store_auto_schedule_operating_pattern_segment_roles`
+- `store_auto_schedule_pattern_weekdays`
+- `store_auto_schedule_pattern_segments`
+- `store_auto_schedule_segment_roles`
 
 RLS 정책:
 

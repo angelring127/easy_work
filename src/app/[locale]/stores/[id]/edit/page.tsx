@@ -1,8 +1,8 @@
 "use client";
 import { defaultLocale } from "@/lib/i18n-config";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { StoreForm } from "@/features/stores/components/store-form";
@@ -57,17 +57,30 @@ export default function EditStorePage() {
   const { user, loading } = useAuth();
   const { userRole } = usePermissions();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const currentLocale = (locale as Locale) || defaultLocale;
   const storeId = id as string;
 
   // URL 쿼리 파라미터에서 from 값 확인
-  const searchParams = new URLSearchParams(window.location.search);
   const fromDashboard = searchParams.get("from") === "dashboard";
   const tabParam = searchParams.get("tab");
 
   const [store, setStore] = useState<StoreData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const tabsListRef = useRef<HTMLDivElement>(null);
+
+  const scrollActiveTabIntoView = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      tabsListRef.current
+        ?.querySelector<HTMLElement>('[data-state="active"]')
+        ?.scrollIntoView({ block: "nearest", inline: "center" });
+    });
+  }, []);
+
+  useEffect(() => {
+    scrollActiveTabIntoView();
+  }, [isLoading, scrollActiveTabIntoView, tabParam]);
 
   const loadStoreData = useCallback(async () => {
     try {
@@ -197,8 +210,14 @@ export default function EditStorePage() {
       <main className="max-w-5xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <Tabs defaultValue={tabParam || "basic"}>
-              <TabsList className="w-full h-auto justify-start items-stretch overflow-x-auto whitespace-nowrap flex-nowrap gap-1 p-1 md:flex-wrap md:overflow-visible">
+            <Tabs
+              defaultValue={tabParam || "basic"}
+              onValueChange={scrollActiveTabIntoView}
+            >
+              <TabsList
+                ref={tabsListRef}
+                className="w-full h-auto justify-start items-stretch overflow-x-auto whitespace-nowrap flex-nowrap gap-1 p-1 md:flex-wrap md:overflow-visible"
+              >
                 <TabsTrigger value="basic" className="shrink-0">
                   {t("settings.store.basic", currentLocale)}
                 </TabsTrigger>

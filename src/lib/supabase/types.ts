@@ -406,61 +406,6 @@ export interface Database {
           updated_at?: string;
         };
       };
-      store_auto_schedule_opening_policies: {
-        Row: {
-          id: string;
-          store_id: string;
-          enabled: boolean;
-          start_source: "business_open" | "custom";
-          custom_start_min: number | null;
-          end_min: number | null;
-          required_headcount: number;
-          failure_mode: "warn_and_continue" | "block_commit";
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          store_id: string;
-          enabled?: boolean;
-          start_source?: "business_open" | "custom";
-          custom_start_min?: number | null;
-          end_min?: number | null;
-          required_headcount?: number;
-          failure_mode?: "warn_and_continue" | "block_commit";
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          store_id?: string;
-          enabled?: boolean;
-          start_source?: "business_open" | "custom";
-          custom_start_min?: number | null;
-          end_min?: number | null;
-          required_headcount?: number;
-          failure_mode?: "warn_and_continue" | "block_commit";
-          created_at?: string;
-          updated_at?: string;
-        };
-      };
-      store_auto_schedule_opening_work_items: {
-        Row: {
-          store_id: string;
-          work_item_id: string;
-          created_at: string;
-        };
-        Insert: {
-          store_id: string;
-          work_item_id: string;
-          created_at?: string;
-        };
-        Update: {
-          store_id?: string;
-          work_item_id?: string;
-          created_at?: string;
-        };
-      };
     };
     Views: {
       user_accessible_stores: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,17 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { OperatingPatternEditor } from "@/components/schedule/operating-pattern-editor";
 import { useToast } from "@/hooks/use-toast";
 import { t, type Locale } from "@/lib/i18n";
@@ -47,23 +36,6 @@ type UserPriority = {
   priorityRank: number;
 };
 
-type OpeningPolicy = {
-  enabled: boolean;
-  startSource: "business_open" | "custom";
-  customStartMin: number | null;
-  endMin: number | null;
-  requiredHeadcount: number;
-  failureMode: "warn_and_continue" | "block_commit";
-  openingWorkItemIds: string[];
-};
-
-type WorkItem = {
-  id: string;
-  name: string;
-  start_min: number;
-  end_min: number;
-};
-
 type JobRole = {
   id: string;
   name: string;
@@ -73,8 +45,6 @@ type JobRole = {
 type AutoScheduleSettings = {
   conditionPriorities: ConditionPriority[];
   userPriorities: UserPriority[];
-  openingPolicy: OpeningPolicy;
-  workItems: WorkItem[];
   jobRoles: JobRole[];
   operatingPatterns: OperatingPatternPayload[];
 };
@@ -85,7 +55,6 @@ const requiredConditionKeys = [
   "autoSchedule.required.unavailable",
   "autoSchedule.required.branchConflict",
   "autoSchedule.required.missingRole",
-  "autoSchedule.required.openingAnchor",
   "autoSchedule.required.staffLimit",
   "autoSchedule.required.coverageGap",
 ] as const;
@@ -113,23 +82,6 @@ function rankConditionPriorities(items: ConditionPriority[]) {
 
 function rankUserPriorities(items: UserPriority[]) {
   return items.map((item, index) => ({ ...item, priorityRank: index + 1 }));
-}
-
-function formatMinutes(minutes: number | null) {
-  const safeMinutes = minutes ?? 0;
-  const hour = Math.floor(safeMinutes / 60);
-  const minute = safeMinutes % 60;
-  return `${hour.toString().padStart(2, "0")}:${minute
-    .toString()
-    .padStart(2, "0")}`;
-}
-
-function parseTimeToMinutes(value: string) {
-  const [hour = "0", minute = "0"] = value.split(":");
-  return Math.min(
-    1440,
-    Math.max(0, Number(hour || 0) * 60 + Number(minute || 0))
-  );
 }
 
 export function AutoScheduleSettingsEditor({
@@ -175,11 +127,6 @@ export function AutoScheduleSettingsEditor({
     load();
   }, [load]);
 
-  const selectedOpeningWorkItems = useMemo(
-    () => new Set(settings?.openingPolicy.openingWorkItemIds || []),
-    [settings?.openingPolicy.openingWorkItemIds]
-  );
-
   const moveCondition = (fromIndex: number, toIndex: number) => {
     setSettings((current) => {
       if (!current || toIndex < 0 || toIndex >= current.conditionPriorities.length) {
@@ -206,27 +153,6 @@ export function AutoScheduleSettingsEditor({
         ),
       };
     });
-  };
-
-  const updateOpeningPolicy = (partial: Partial<OpeningPolicy>) => {
-    setSettings((current) =>
-      current
-        ? {
-            ...current,
-            openingPolicy: { ...current.openingPolicy, ...partial },
-          }
-        : current
-    );
-  };
-
-  const toggleOpeningWorkItem = (workItemId: string, checked: boolean) => {
-    const next = new Set(selectedOpeningWorkItems);
-    if (checked) {
-      next.add(workItemId);
-    } else {
-      next.delete(workItemId);
-    }
-    updateOpeningPolicy({ openingWorkItemIds: Array.from(next) });
   };
 
   const save = async () => {
@@ -257,7 +183,6 @@ export function AutoScheduleSettingsEditor({
             userId: priority.userId,
             priorityRank: priority.priorityRank,
           })),
-          openingPolicy: settings.openingPolicy,
           operatingPatterns: settings.operatingPatterns,
         }),
       });
@@ -302,7 +227,7 @@ export function AutoScheduleSettingsEditor({
         <h3 className="text-lg font-semibold">
           {t("autoSchedule.title", locale)}
         </h3>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 break-keep text-sm text-gray-600">
           {t("autoSchedule.description", locale)}
         </p>
       </div>
@@ -312,7 +237,7 @@ export function AutoScheduleSettingsEditor({
           <CardTitle className="text-base">
             {t("autoSchedule.conditionPriorities", locale)}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="break-keep">
             {t("autoSchedule.conditionPrioritiesDescription", locale)}
           </CardDescription>
         </CardHeader>
@@ -402,13 +327,13 @@ export function AutoScheduleSettingsEditor({
           <CardTitle className="text-base">
             {t("autoSchedule.userPriorities", locale)}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="break-keep">
             {t("autoSchedule.userPrioritiesDescription", locale)}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {settings.userPriorities.length === 0 ? (
-            <p className="text-sm text-gray-600">
+            <p className="break-keep text-sm text-gray-600">
               {t("autoSchedule.noMembers", locale)}
             </p>
           ) : (
@@ -463,165 +388,6 @@ export function AutoScheduleSettingsEditor({
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            {t("autoSchedule.openingPolicy", locale)}
-          </CardTitle>
-          <CardDescription>
-            {t("autoSchedule.openingPolicyDescription", locale)}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <Label htmlFor="opening-enabled">
-                {t("autoSchedule.openingEnabled", locale)}
-              </Label>
-              <p className="text-xs text-gray-500">
-                {t("autoSchedule.openingEnabledDescription", locale)}
-              </p>
-            </div>
-            <Switch
-              id="opening-enabled"
-              checked={settings.openingPolicy.enabled}
-              onCheckedChange={(enabled) => updateOpeningPolicy({ enabled })}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>{t("autoSchedule.openingStartSource", locale)}</Label>
-              <Select
-                value={settings.openingPolicy.startSource}
-                onValueChange={(startSource: "business_open" | "custom") =>
-                  updateOpeningPolicy({ startSource })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="business_open">
-                    {t("autoSchedule.startSourceBusinessOpen", locale)}
-                  </SelectItem>
-                  <SelectItem value="custom">
-                    {t("autoSchedule.startSourceCustom", locale)}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="opening-custom-start">
-                {t("autoSchedule.openingCustomStart", locale)}
-              </Label>
-              <Input
-                id="opening-custom-start"
-                type="time"
-                value={formatMinutes(settings.openingPolicy.customStartMin)}
-                onChange={(event) =>
-                  updateOpeningPolicy({
-                    customStartMin: parseTimeToMinutes(event.target.value),
-                  })
-                }
-                disabled={settings.openingPolicy.startSource !== "custom"}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="opening-end">
-                {t("autoSchedule.openingEndTime", locale)}
-              </Label>
-              <Input
-                id="opening-end"
-                type="time"
-                value={formatMinutes(settings.openingPolicy.endMin)}
-                onChange={(event) =>
-                  updateOpeningPolicy({
-                    endMin: parseTimeToMinutes(event.target.value),
-                  })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="opening-headcount">
-                {t("autoSchedule.openingRequiredHeadcount", locale)}
-              </Label>
-              <Input
-                id="opening-headcount"
-                type="number"
-                min={1}
-                max={99}
-                value={settings.openingPolicy.requiredHeadcount}
-                onChange={(event) =>
-                  updateOpeningPolicy({
-                    requiredHeadcount: Number(event.target.value || 1),
-                  })
-                }
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label>{t("autoSchedule.openingFailureMode", locale)}</Label>
-              <Select
-                value={settings.openingPolicy.failureMode}
-                onValueChange={(
-                  failureMode: "warn_and_continue" | "block_commit"
-                ) => updateOpeningPolicy({ failureMode })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="warn_and_continue">
-                    {t("autoSchedule.failureWarn", locale)}
-                  </SelectItem>
-                  <SelectItem value="block_commit">
-                    {t("autoSchedule.failureBlock", locale)}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Label>{t("autoSchedule.openingWorkItems", locale)}</Label>
-            {settings.workItems.length === 0 ? (
-              <p className="text-sm text-gray-600">
-                {t("autoSchedule.noWorkItems", locale)}
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {settings.workItems.map((workItem) => (
-                  <label
-                    key={workItem.id}
-                    className="flex items-center gap-3 rounded-md border p-3"
-                  >
-                    <Checkbox
-                      checked={selectedOpeningWorkItems.has(workItem.id)}
-                      onCheckedChange={(checked) =>
-                        toggleOpeningWorkItem(workItem.id, checked === true)
-                      }
-                    />
-                    <span className="min-w-0">
-                      <span className="block font-medium text-gray-900">
-                        {workItem.name}
-                      </span>
-                      <span className="block text-xs text-gray-500">
-                        {formatMinutes(workItem.start_min)}-
-                        {formatMinutes(workItem.end_min)}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
         </CardContent>
       </Card>
 
